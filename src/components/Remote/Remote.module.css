@@ -1,0 +1,131 @@
+.remote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+  background: var(--chassis-plastic-dark);
+  border-radius: var(--radius-panel);
+  border: 1px solid var(--chassis-seam);
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ledPanel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: #0c0b0a;
+  border-radius: 4px;
+  border: 1px solid var(--chassis-seam);
+}
+
+.powerLed {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--power-led-off);
+  box-shadow: none;
+}
+
+.powerLed[data-on='true'] {
+  background: var(--power-led-on);
+  box-shadow: 0 0 8px var(--led-on-glow);
+}
+
+.channelLed {
+  font-family: var(--font-led);
+  font-size: var(--font-size-led);
+  line-height: 1;
+  color: var(--led-dim);
+  letter-spacing: 0.08em;
+  min-width: 2.4ch;
+  text-align: center;
+}
+
+.channelLed[data-on='true'] {
+  color: var(--led-on);
+  text-shadow: 0 0 10px var(--led-on-glow);
+}
+
+.muteLed {
+  font-family: var(--font-chassis);
+  font-size: var(--font-size-label);
+  letter-spacing: 0.12em;
+  color: var(--led-off);
+}
+
+.muteLed[data-on='true'] {
+  color: var(--led-mute);
+  text-shadow: 0 0 8px rgba(255, 210, 60, 0.6);
+}
+
+.button {
+  font-family: var(--font-chassis);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: var(--chassis-text);
+  background: var(--chassis-plastic-light);
+  border: 1px solid var(--chassis-seam);
+  border-radius: 6px;
+  padding: var(--space-3) var(--space-4);
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--chassis-plastic);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.power {
+  background: #3a1a14;
+  color: var(--led-amber);
+}
+
+.power[data-on='true'] {
+  background: var(--led-on);
+  color: #1a0603;
+}
+
+.toggle[aria-pressed='true'] {
+  background: var(--led-amber);
+  color: #1a0603;
+}
+
+.label {
+  font-family: var(--font-chassis);
+  font-size: var(--font-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--chassis-label);
+}
+
+.volume {
+  width: 120px;
+  accent-color: var(--led-on);
+}
+
+@media (max-width: 768px) {
+  .remote {
+    justify-content: space-between;
+  }
+
+  .volume {
+    width: 90px;
+  }
+}

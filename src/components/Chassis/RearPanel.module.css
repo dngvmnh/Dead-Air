@@ -1,0 +1,46 @@
+.panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-6);
+  background: var(--chassis-plastic-dark);
+  border-top: 1px solid var(--chassis-seam);
+  border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+}
+
+.title {
+  font-family: var(--font-chassis);
+  font-size: var(--font-size-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--chassis-label);
+  margin-right: auto;
+}
+
+.button {
+  font-family: var(--font-chassis);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: var(--chassis-text);
+  background: var(--chassis-plastic-light);
+  border: 1px solid var(--chassis-seam);
+  border-radius: 6px;
+  padding: var(--space-2) var(--space-4);
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--chassis-plastic);
+}
+
+.button[aria-pressed='true'] {
+  background: var(--led-amber);
+  color: #1a0603;
+}
+
+.forget {
+  color: var(--led-on);
+  border-color: var(--led-dim);
+}

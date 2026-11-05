@@ -1,0 +1,49 @@
+/*
+ * The television cabinet. The bezel and gloss live on the chassis shell only —
+ * never over the tube opening (design §3). The opening is a child with no
+ * visual effects applied to it or to this element.
+ */
+
+.chassis {
+  width: min(92vw, 1024px);
+  background: linear-gradient(
+    160deg,
+    var(--chassis-plastic-light),
+    var(--chassis-plastic) 40%,
+    var(--chassis-plastic-dark)
+  );
+  border-radius: var(--radius-chassis);
+  padding: var(--space-6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 24px 60px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.bezel {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-4);
+  background: var(--chassis-plastic-dark);
+  border-radius: 12px;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.8);
+}
+
+.brand {
+  font-family: var(--font-chassis);
+  font-size: var(--font-size-label);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--chassis-label);
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .chassis {
+    width: 100%;
+    border-radius: 0;
+    padding: var(--space-4);
+  }
+}

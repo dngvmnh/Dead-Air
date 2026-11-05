@@ -1,0 +1,40 @@
+/*
+ * The darkened room the set sits in. The vignette lives on a pseudo-element
+ * behind the chassis and never over the tube opening, so it can't violate the
+ * clean-feed rule once YouTube sources arrive.
+ */
+
+.room {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-8);
+  background:
+    radial-gradient(
+      ellipse at center,
+      transparent 40%,
+      var(--room-vignette) 100%
+    ),
+    var(--room-bg);
+}
+
+.liveRegion {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 768px) {
+  .room {
+    padding: 0;
+    align-items: stretch;
+  }
+}

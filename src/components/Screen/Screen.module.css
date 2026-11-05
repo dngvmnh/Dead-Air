@@ -1,0 +1,42 @@
+/*
+ * TubeOpening: a plain 4:3 black rectangle. Per the YouTube clean-feed rules
+ * and design §3, this element and its ancestors must carry NO transform,
+ * filter, opacity, clip-path, mask, or mix-blend-mode. Screen effects happen
+ * inside the shader, never on the DOM.
+ */
+
+.tube {
+  position: relative;
+  aspect-ratio: var(--tube-aspect);
+  width: 100%;
+  max-width: 960px;
+  background: var(--tube-black);
+  overflow: hidden;
+  /* A gentle glass tint lives on a pseudo-element, outside the opening's own
+     box, so the picture area stays untouched. */
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Milestone-1 placeholder shown until the CRT renderer lands (task 4). */
+.placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--chassis-label);
+  font-family: var(--font-chassis);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+.off {
+  background: var(--tube-black);
+}
