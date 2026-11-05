@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Validate catalogue on save",
+      "description": "Runs schema, rights, duration and YouTube-policy checks when channel or event data changes.",
+      "trigger": "PostFileSave",
+      "matcher": "src[\\\\/]content[\\\\/](catalog|events)[\\\\/].*\\.json$",
+      "action": {
+        "type": "command",
+        "command": "npm run validate:catalog"
+      }
+    }
+  ]
+}

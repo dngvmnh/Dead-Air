@@ -1,0 +1,20 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+
+# Source media and transcodes live in object storage, never in git.
+media-src/
+*.mp4
+*.webm
+*.mov
+*.mkv
+*.wav
+
+# Never ignore .kiro/ — it is part of the project and the hackathon submission.
