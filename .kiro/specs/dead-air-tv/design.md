@@ -204,6 +204,7 @@ stateDiagram-v2
   ON_AIR --> TUNING: CH+ / CH-
   ON_AIR --> ON_AIR: item ended, next item
   ON_AIR --> EVENT: item-boundary or mid-item event
+  ON_AIR --> STAND_BY: re-resolve finds nothing playable
   EVENT --> ON_AIR: finished, re-resolve
   EVENT --> TUNING: CH+ / CH-
   EVENT --> SIGN_OFF: sign-off event
@@ -218,7 +219,9 @@ stateDiagram-v2
 
 `tvMachine.ts` is a pure reducer returning next state plus effect descriptions (`{type:'startTuning', channel}`). `useTelevision` executes effects. Each tune gets a token; results from an older token are discarded, so rapid surfing can't start a stale source.
 
-CH+ and CH- during an event are honoured: the viewer can always leave. POWER is always honoured, except that during `SIGN_OFF` the set is about to die anyway and powers off immediately.
+CH+ and CH- during an event are honoured: the viewer can always leave, including during the sign-off voice. They are ignored once the fixed sign-off text is showing. POWER is always honoured. During `SIGN_OFF` it completes the sign-off and sets Act 4, so the viewer can't get stuck in Act 3.
+
+E10 counts as fired only when it reaches `SIGN_OFF`, not when it starts. A viewer who leaves or powers off during the voice meets it again on the next visit to channel 13.
 
 ## 8. Viewer memory
 

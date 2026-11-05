@@ -4,13 +4,13 @@ Work in order. Each milestone ends in something runnable. Commit after each comp
 
 ## Milestone 1: The television (no media, no YouTube)
 
-- [ ] 1. Scaffold the project
-  - [ ] 1.1 Create the Vite + React + TypeScript app with strict settings, ESLint, Vitest, Playwright, Zod, and fast-check. Add the npm scripts from `tech.md`.
-  - [ ] 1.2 Create the directory layout from `structure.md`, design tokens, and an import rule stopping `src/core` importing React or using `Date.now`/`Math.random`.
+- [x] 1. Scaffold the project
+  - [x] 1.1 Create the Vite + React + TypeScript app with strict settings, ESLint, Vitest, Playwright, Zod, and fast-check. Add the npm scripts from `tech.md`.
+  - [x] 1.2 Create the directory layout from `structure.md`, design tokens, and an import rule stopping `src/core` importing React or using `Date.now`/`Math.random`.
   - _Requirements: 16.1_
-- [ ] 2. TV state machine
-  - [ ] 2.1 Implement `core/tvMachine.ts` reducer, effects, and tune tokens as in design section 7.
-  - [ ] 2.2 Test all transitions, including rapid surfing and POWER from every state.
+- [x] 2. TV state machine
+  - [x] 2.1 Implement `core/tvMachine.ts` reducer, effects, and tune tokens as in design section 7.
+  - [x] 2.2 Test all transitions, including rapid surfing and POWER from every state.
   - _Requirements: 1.3, 1.4, 2.1–2.4_
 - [ ] 3. Chassis and controls
   - [ ] 3.1 Build Room, Chassis, TubeOpening, LED, POWER, CH+/-, volume, mute, and CC, with accessible names and an ARIA live region.
