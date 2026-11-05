@@ -12,10 +12,10 @@ Work in order. Each milestone ends in something runnable. Commit after each comp
   - [x] 2.1 Implement `core/tvMachine.ts` reducer, effects, and tune tokens as in design section 7.
   - [x] 2.2 Test all transitions, including rapid surfing and POWER from every state.
   - _Requirements: 1.3, 1.4, 2.1–2.4_
-- [ ] 3. Chassis and controls
-  - [ ] 3.1 Build Room, Chassis, TubeOpening, LED, POWER, CH+/-, volume, mute, and CC, with accessible names and an ARIA live region.
-  - [ ] 3.2 Add keyboard shortcuts and the first-run StartNotice.
-  - [ ] 3.3 Add the rear panel: Reduced Effects, Forget me.
+- [x] 3. Chassis and controls
+  - [x] 3.1 Build Room, Chassis, TubeOpening, LED, POWER, CH+/-, volume, mute, and CC, with accessible names and an ARIA live region.
+  - [x] 3.2 Add keyboard shortcuts and the first-run StartNotice.
+  - [x] 3.3 Add the rear panel: Reduced Effects, Forget me.
   - _Requirements: 1.1, 1.2, 2.5, 2.6, 13.3–13.5, 15.2_
 - [ ] 4. CRT renderer
   - [ ] 4.1 Implement the WebGL2 pipeline, uniforms, look presets, and procedural static.
