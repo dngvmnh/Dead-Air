@@ -1,0 +1,99 @@
+/*
+ * Design tokens for DEAD AIR.
+ * One source of truth for colour, spacing, timing and type.
+ * Component CSS Modules consume these variables; they do not hardcode values.
+ */
+
+:root {
+  /* --- Room and chassis --------------------------------------------- */
+  --room-bg: #0a0a0c;
+  --room-vignette: rgba(0, 0, 0, 0.72);
+  --chassis-plastic: #2b2722;
+  --chassis-plastic-light: #3a352e;
+  --chassis-plastic-dark: #1a1714;
+  --chassis-seam: #110f0d;
+  --chassis-text: #d8cfbf;
+  --chassis-label: #9a9080;
+
+  /* Tube */
+  --tube-black: #050505;
+  --tube-glass: rgba(255, 255, 255, 0.04);
+
+  /* --- LED display -------------------------------------------------- */
+  --led-on: #ff5a3c;
+  --led-on-glow: rgba(255, 90, 60, 0.65);
+  --led-dim: #3a1a14;
+  --led-off: #1a0d0a;
+  --led-amber: #ffb347;
+  --led-mute: #ffd23c;
+
+  /* --- Status / power LED ------------------------------------------- */
+  --power-led-on: #ff3b30;
+  --power-led-off: #2a0f0d;
+
+  /* --- Channel identity palettes (from media-bible §3) -------------- */
+  /* Ch 02 — KDA Nightly News (broadcast) */
+  --ch02-navy: #14213d;
+  --ch02-offwhite: #f5f3ec;
+  --ch02-red: #d90429;
+  /* Ch 04 — Pumpkin Hour (broadcast) */
+  --ch04-orange: #ff7b00;
+  --ch04-purple: #6a0dad;
+  --ch04-cream: #fff4d6;
+  /* Ch 07 — Midnight Shopping (broadcast) */
+  --ch07-gold: #d4af37;
+  --ch07-magenta: #c8318a;
+  --ch07-teal: #1b998b;
+  /* Ch 13 — Dead Air (deadair) */
+  --ch13-black: #000000;
+  --ch13-phosphor: #e8f8e8;
+  --ch13-amber: #ffb000;
+
+  /* --- Typography --------------------------------------------------- */
+  --font-chassis: 'Courier New', 'Courier', monospace;
+  --font-led: 'Courier New', 'Courier', monospace;
+  --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --font-size-led: 2rem;
+  --font-size-label: 0.6875rem;
+  --font-size-body: 1rem;
+
+  /* --- Spacing ------------------------------------------------------ */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+
+  --radius-chassis: 18px;
+  --radius-button: 50%;
+  --radius-panel: 8px;
+
+  /* --- Timing (specs: boot ≤1500ms, shutdown ≤800ms, tune 350–700ms) */
+  --boot-ms: 1400ms;
+  --shutdown-ms: 700ms;
+  --tune-min-ms: 350ms;
+  --tune-max-ms: 700ms;
+  --signoff-hold-ms: 8000ms;
+
+  /* --- Focus / accessibility --------------------------------------- */
+  --focus-ring: #7cc5ff;
+  --focus-ring-width: 3px;
+
+  /* --- Layout breakpoint (specs 15.2) ------------------------------- */
+  --breakpoint-stack: 768px;
+
+  /* Internal render resolution is capped at 960×720 (specs 5.4). */
+  --tube-aspect: 4 / 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --boot-ms: 200ms;
+    --shutdown-ms: 150ms;
+    --tune-min-ms: 120ms;
+    --tune-max-ms: 180ms;
+  }
+}
