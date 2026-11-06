@@ -202,3 +202,55 @@ done, how it was checked, and anything left unverified.
 - Decisions made alone: none (verification/reconciliation of pre-existing work).
 - Unverified: the validator that consumes these schemas and the depth/release
   rules are task 7.2 (next).
+## Task 7.2 — Catalogue validator (`validate-catalog.ts`, `--release`, rule tests)
+
+- Mode: direct implementation (the `spec-task-execution` subagent was tried once
+  and is still absent from the registry: `agent 'spec-task-execution' not found`).
+- Done:
+  - `src/content/validateCatalog.ts`: a pure `validateCatalog(input, {release})`
+    returning `{ ok, errors[] }`, so every rule is unit-testable with in-memory
+    fixtures and no filesystem (design §13 "each failing rule"). It parses the
+    authored JSON through the Zod schemas (rule 14.1 schema validity), then
+    applies the cross-cutting rules: unique item/scene/event ids, durations > 0,
+    references resolve (scene items → scenes, event `scene` steps → scenes, file
+    urls / captions / station cards / scene image layers / audio cues / voice
+    urls → local assets when a local-asset set is supplied), rights present
+    (14.2), no `mid-item` event eligible on a channel carrying a YouTube item
+    (14.3, "any" channels included), channel 13 only `original`/`ai-generated`
+    and no YouTube (14.4). Under `--release` it also rejects `placeholder` items
+    (14.5) and enforces requirement 4 depth: ≥30 min per channel (4.1) and ≥4
+    interstitials on channels 02/04/07 (4.2). Exported the thresholds
+    (`MIN_CHANNEL_MS`, `MIN_INTERSTITIALS`, `INTERSTITIAL_CHANNELS`).
+  - `src/content/schema.ts`: added the event schemas the validator needs —
+    `seamSchema`, a recursive `conditionSchema` (z.lazy for all/any/not),
+    `eventStepSchema` (discriminated on `do`), and `horrorEventSchema`, plus
+    inferred types (design §9).
+  - `scripts/validate-catalog.ts`: the `npm run validate:catalog` CLI. Reads
+    `src/content/catalog/*.json`, `src/content/scenes/*.json`,
+    `src/content/events/*.json` (array or `{events:[...]}`), and the real asset
+    set under `public/media`; runs the validator; prints a summary and every
+    failing `[rule] where: message`; exits non-zero on failure. Content is
+    authored in later tasks, so missing dirs are warned-and-treated-as-empty,
+    not fatal. Local-asset resolution is only enforced once `public/media`
+    exists (before then an empty set would false-fail every reference).
+- Checked: `npm test` 148 passed (24 new validator tests covering every failing
+  rule + the release depth rules, 6 new event-schema tests). `npm run lint`
+  clean. `npm run build` clean (JS unchanged at 79.31 KB gzip; `tsc -b`
+  type-checks `scripts/**` via tsconfig.node.json under
+  exactOptionalPropertyTypes, so the script + its import are covered). CLI:
+  `npm run validate:catalog` and `-- --release` both run and exit 0 on the
+  current (empty) tree; a temporary bad-channel fixture was used to prove the
+  CLI exits 1 and prints the failing rule, then removed.
+- Decisions made alone: (1) npm 10 strips `--release` before the script sees it
+  (confirmed: a positional arg forwards, `--release` does not), so the script
+  accepts the flag from argv OR npm's `npm_config_release` env var — both
+  `tsx … --release` and `npm run validate:catalog -- --release` now select
+  release mode (reversible; it only widens detection). (2) Asset-reference
+  checking is skipped while `public/media` is absent, to avoid false failures
+  before art lands; it switches on automatically once the dir exists. (3) Added
+  a channel-13 "no YouTube item" check under 14.4 (ch13 is owned-media only;
+  a YouTube item there also can't be original/ai-generated). All reversible.
+- Unverified: the validator has no real catalogue to run against yet (channels,
+  scenes, events are authored in tasks 10/13/14/15); it is exercised only by
+  fixtures and the temporary probe. End-to-end release gating over real content
+  is proven when that content exists.

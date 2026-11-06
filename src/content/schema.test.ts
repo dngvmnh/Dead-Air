@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   channelSchema,
+  conditionSchema,
+  horrorEventSchema,
   itemSchema,
   rightsSchema,
   sceneProgramSchema,
@@ -141,6 +143,53 @@ describe('sceneProgramSchema (design §6)', () => {
       captions: [{ atMs: 0, endMs: 10, text: '' }],
     };
     expect(sceneProgramSchema.safeParse(bad).success).toBe(false);
+  });
+});
+
+describe('horrorEventSchema (design §9)', () => {
+  const validEvent = {
+    id: 'E01',
+    minAct: 1,
+    channels: [2, 13] as const,
+    seams: ['tune-in', 'item-boundary'],
+    when: { all: [{ distinctChannelsGte: 2 }, { watchMsGte: 60_000 }] },
+    limit: { perViewer: 1 },
+    cooldownMs: 90_000,
+    priority: 5,
+    steps: [
+      { do: 'static', ms: 500 },
+      { do: 'slate', text: 'STAND BY', ms: 2000 },
+      { do: 'voice', stems: ['one', 'three'], caption: 'Channel {lastChannel}.' },
+      { do: 'signOff' },
+    ],
+  };
+
+  it('parses a valid event', () => {
+    expect(horrorEventSchema.safeParse(validEvent).success).toBe(true);
+  });
+
+  it('accepts "any" channels', () => {
+    expect(horrorEventSchema.safeParse({ ...validEvent, channels: 'any' }).success).toBe(true);
+  });
+
+  it('rejects an unknown seam', () => {
+    expect(horrorEventSchema.safeParse({ ...validEvent, seams: ['mid'] }).success).toBe(false);
+  });
+
+  it('rejects an unknown step kind', () => {
+    const bad = { ...validEvent, steps: [{ do: 'explode', ms: 1 }] };
+    expect(horrorEventSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it('requires at least one seam and one step', () => {
+    expect(horrorEventSchema.safeParse({ ...validEvent, seams: [] }).success).toBe(false);
+    expect(horrorEventSchema.safeParse({ ...validEvent, steps: [] }).success).toBe(false);
+  });
+
+  it('validates nested conditions', () => {
+    const nested = { any: [{ not: { lastChannelIs: 7 } }, { sessionCountGte: 3 }] };
+    expect(conditionSchema.safeParse(nested).success).toBe(true);
+    expect(conditionSchema.safeParse({ lastChannelIs: 99 }).success).toBe(false);
   });
 });
 

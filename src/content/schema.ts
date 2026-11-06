@@ -210,8 +210,115 @@ export const sceneProgramSchema = z
   })
   .strict();
 
+// --- Horror events (design §9) ---------------------------------------------
+
+export const seamSchema = z.enum(['tune-in', 'item-boundary', 'mid-item']);
+
+/**
+ * Event conditions are a recursive data tree (design §9). Zod needs an explicit
+ * type annotation and a getter for the self-referential `all`/`any`/`not` arms.
+ */
+export type ConditionInput =
+  | { all: ConditionInput[] }
+  | { any: ConditionInput[] }
+  | { not: ConditionInput }
+  | { visitsGte: { channel: 2 | 4 | 7 | 13 | 'current'; n: number } }
+  | { distinctChannelsGte: number }
+  | { watchMsGte: number }
+  | { lastChannelIs: 2 | 4 | 7 | 13 }
+  | { eventFired: string }
+  | { sessionCountGte: number }
+  | { localHourBetween: [number, number] };
+
+export const conditionSchema: z.ZodType<ConditionInput> = z.lazy(() =>
+  z.union([
+    z.object({ all: z.array(conditionSchema) }).strict(),
+    z.object({ any: z.array(conditionSchema) }).strict(),
+    z.object({ not: conditionSchema }).strict(),
+    z
+      .object({
+        visitsGte: z
+          .object({
+            channel: z.union([channelIdSchema, z.literal('current')]),
+            n: z.number().int().nonnegative(),
+          })
+          .strict(),
+      })
+      .strict(),
+    z.object({ distinctChannelsGte: z.number().int().nonnegative() }).strict(),
+    z.object({ watchMsGte: z.number().nonnegative() }).strict(),
+    z.object({ lastChannelIs: channelIdSchema }).strict(),
+    z.object({ eventFired: z.string().min(1) }).strict(),
+    z.object({ sessionCountGte: z.number().int().nonnegative() }).strict(),
+    z
+      .object({
+        localHourBetween: z.tuple([
+          z.number().int().min(0).max(23),
+          z.number().int().min(0).max(23),
+        ]),
+      })
+      .strict(),
+  ]),
+);
+
+export const eventStepSchema = z.discriminatedUnion('do', [
+  z.object({ do: z.literal('static'), ms: z.number().int().positive(), look: lookSchema.optional() }).strict(),
+  z
+    .object({
+      do: z.literal('slate'),
+      text: z.string().min(1),
+      fallbackText: z.string().optional(),
+      ms: z.number().int().positive(),
+    })
+    .strict(),
+  z.object({ do: z.literal('scene'), sceneId: z.string().min(1) }).strict(),
+  z
+    .object({
+      do: z.literal('voice'),
+      url: z.string().optional(),
+      stems: z.array(z.string().min(1)).optional(),
+      caption: z.string().min(1),
+      fallbackCaption: z.string().optional(),
+    })
+    .strict(),
+  z.object({ do: z.literal('flashPrevious'), ms: z.number().int().positive() }).strict(),
+  z
+    .object({
+      do: z.literal('shaderPulse'),
+      effect: z.enum(['roll', 'tear', 'collapse']),
+      ms: z.number().int().positive(),
+    })
+    .strict(),
+  z.object({ do: z.literal('silence'), ms: z.number().int().positive() }).strict(),
+  z.object({ do: z.literal('signOff') }).strict(),
+]);
+
+export const horrorEventSchema = z
+  .object({
+    id: z.string().min(1),
+    minAct: z.number().int().min(0).max(4),
+    maxAct: z.number().int().min(0).max(4).optional(),
+    channels: z.union([z.array(channelIdSchema), z.literal('any')]),
+    seams: z.array(seamSchema).min(1),
+    when: conditionSchema,
+    limit: z
+      .object({
+        perViewer: z.number().int().nonnegative().optional(),
+        perSession: z.number().int().nonnegative().optional(),
+      })
+      .strict(),
+    cooldownMs: z.number().int().nonnegative().optional(),
+    priority: z.number().int(),
+    chain: z.boolean().optional(),
+    steps: z.array(eventStepSchema).min(1),
+  })
+  .strict();
+
 // --- Inferred types --------------------------------------------------------
 
+export type SeamInput = z.infer<typeof seamSchema>;
+export type EventStepInput = z.infer<typeof eventStepSchema>;
+export type HorrorEventInput = z.infer<typeof horrorEventSchema>;
 export type RightsInput = z.infer<typeof rightsSchema>;
 export type SceneItemInput = z.infer<typeof sceneItemSchema>;
 export type FileItemInput = z.infer<typeof fileItemSchema>;
