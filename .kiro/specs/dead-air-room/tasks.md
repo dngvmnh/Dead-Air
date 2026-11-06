@@ -19,11 +19,11 @@ Tick a task only when the behaviour has been seen in a real browser, not because
   - [x] 2.1 Implement `core/tearSheet.ts`, with unit tests and the fast-check properties in design section 2.
   - [x] 2.2 Measure step cost and record the chosen grid size.
   - _Requirements: 1.1, 1.2, 1.4, 10.2_
-- [ ] 3. Room canvas and wall tear
-  - [ ] 3.1 Add the room canvas behind the chassis, plus `tearRenderer`: mesh, lighting, fibre edge, flap shadow.
-  - [ ] 3.2 Add pointer input with multi-touch, idle corner, edge lift, and grab cursor.
-  - [ ] 3.3 Add rip audio, the `T` key, context restore, and the 2D fallback.
-  - [ ] 3.4 Real-WebGL Playwright tests: a drag changes pixels in the region, two pointers work, notice blocks tearing, and a check that the room canvas cannot cover the tube (`elementFromPoint`).
+- [x] 3. Room canvas and wall tear
+  - [x] 3.1 Add the room canvas behind the chassis, plus `tearRenderer`: mesh, lighting, fibre edge, flap shadow.
+  - [x] 3.2 Add pointer input with multi-touch, idle corner, edge lift, and grab cursor.
+  - [x] 3.3 Add rip audio, the `T` key, context restore, and the 2D fallback.
+  - [x] 3.4 Real-WebGL Playwright tests: a drag changes pixels in the region, two pointers work, notice blocks tearing, and a check that the room canvas cannot cover the tube (`elementFromPoint`).
   - _Requirements: 1.1–1.9, 8.2, 8.5–8.7_
 - [ ] 4. Room look
   - [ ] 4.1 Bake wallpaper and room objects, and record authorship in `docs/room-assets.md`.

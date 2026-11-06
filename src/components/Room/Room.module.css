@@ -6,18 +6,21 @@
 
 .room {
   position: relative;
+  z-index: 1;
   min-height: 100vh;
   min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: var(--space-8);
-  background:
-    radial-gradient(
-      ellipse at center,
-      transparent 40%,
-      var(--room-vignette) 100%
-    ),
-    var(--room-bg);
+  /* No background: the tearable room canvas behind (z-index 0) IS the backdrop.
+     The layout wrapper must not paint over or hit-test the exposed wall, so it
+     passes pointer events through; the chassis re-enables them for controls.
+     This lets a drag in the margin reach the wall canvas to tear it. */
+  pointer-events: none;
+}
+
+.room > * {
+  pointer-events: auto;
 }
 
 .liveRegion {

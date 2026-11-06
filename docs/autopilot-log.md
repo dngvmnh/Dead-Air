@@ -828,3 +828,58 @@ canvas pixels. Unverified until task 3: the sim is not yet rendered, so its
 real-WebGL pixel tests; the in-browser frame cost is re-confirmed at task 13.
 Not ticking any visual behaviour here — tasks 2.1/2.2 are the non-visual sim and
 its measurement.
+
+## dead-air-room Task 3 — room canvas and wall tear
+
+Full gate green: `npm test` 276, `npm run lint` clean, `npm run build` 125.45 KB
+gzip (budget 300 KB), `validate:catalog` OK, `npx playwright test
+--project=chromium` 35/35 with local retries 0. Seen in a real browser: the wall
+tears and reveals the dark plaster behind (screenshot committed at task 5).
+
+- **3.1 Room canvas + `tearRenderer`.** `src/render/tearRenderer.ts`
+  (`TearGLRenderer`): uploads sheet node positions to a dynamic buffer each
+  frame; a behind-fill pass draws the plaster, then the paper mesh on top, so a
+  torn hole reveals it. A triangle with a broken edge is dropped by rebuilding
+  the element buffer ON BREAK EVENTS ONLY (the broken-count changed) — the
+  cheaper of the two options design §3 offered; positions upload every frame but
+  the element buffer is untouched until the topology changes. `z` lift shades
+  the paper. `src/render/roomWallpaper.ts` bakes an original procedural
+  Halloween wallpaper (olive/umber, faded bats + jack-o'-lanterns, grain) and a
+  dark lath plaster behind. `RoomCanvas.tsx` is a full-viewport canvas at
+  z-index 0 BEHIND the opaque chassis (z-index 1), `aria-hidden`,
+  `touch-action: none` on the canvas only; the room layout wrapper is
+  `pointer-events: none` with children re-enabled so a drag in the margin
+  reaches the wall while controls still work.
+- **3.2 Pointer input.** Mouse + up to two touch points (each pointer maps to
+  the node it grabbed; the tearSheet grab id IS the node index). Idle top-right
+  corner lifts a flap and shows a `grab` cursor; hovering a torn edge also shows
+  `grab`. No text or tutorial. An edge (pinned) node is not draggable.
+- **3.3 Audio, keyboard, restore, fallback.** `AudioEngine.playRip(speed01)` is
+  a filtered noise burst through the SFX bus + master limiter, scaled by drag
+  speed, plus `playDetachThump`; a tear gesture unlocks audio if POWER has not.
+  `T` rips a seeded diagonal path for keyboard users. WebGL context loss is
+  caught and the sheet rebuilds on restore (the loop wakes to redraw). WebGL2
+  absent → a static pre-torn 2D room so the set stays operable.
+- **3.4 Real-WebGL Playwright tests** (`tests/e2e/room-tear.spec.ts`, retries 0,
+  stable over 3 repeats): a drag tears and changes many canvas pixels (diffed
+  in-page, cannot pass on state alone); two independent pointers both tear; the
+  first-run notice blocks tearing; `T` tears; context lost+restored keeps the
+  wall; the 2D fallback draws a non-blank pre-torn room and the set still
+  powers; and `elementFromPoint` across the tube grid never returns the room
+  canvas (clean-feed by construction).
+
+Decisions made alone: (1) **Idle loop.** The always-present room added a second
+rAF+WebGL loop; under the TV's mocked-clock tests `page.clock.runFor` replayed
+it and the long checkpoints timed out. The loop now steps/renders only while a
+drag is live or for ~1.5 s after any tear input, then idles cheaply — a
+legitimate perf win (task 10 budget) that also restored the TV tests' speed;
+reversible. (2) **Room wrapper `pointer-events: none`** with children re-enabled,
+so the exposed wall is reachable without the layout div intercepting; the
+chassis stays fully operable. (3) The `tearSheet` grab id is documented as the
+NODE index (design §2's `grab(sheet, id, …)`), and a real bug was fixed where a
+tear limit could jitter below 1 and rip the sheet apart at rest — limits are now
+always > 1, with a new "resting sheet never tears itself" unit test. (4) Element
+buffer rebuilt on break events (noted above). Unverified: the fibre-edge/flap-
+shadow look is minimal (functional tear, dark reveal); the task-5 STOP is where
+a human judges whether it looks frightening enough before more is built on it.
+In-browser 60 fps with both canvases is re-confirmed at the task 13 budget check.

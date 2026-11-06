@@ -69,6 +69,12 @@ export interface TelevisionApi {
   forgetMe: () => void;
   /** Screen hands its renderer here so owned sources can publish their picture. */
   registerRenderer: (renderer: Renderer | null) => void;
+  /**
+   * The shared procedural audio engine, so the room's paper-rip plays through
+   * the same SFX bus and master limiter (design §9). Lazily created on the
+   * first POWER or tear gesture.
+   */
+  getAudio: () => AudioEngine;
 }
 
 const DEFAULT_SETTINGS: UiSettings = {
@@ -1006,6 +1012,7 @@ export function useTelevision(): TelevisionApi {
       toggleReducedEffects,
       forgetMe,
       registerRenderer,
+      getAudio,
     }),
     [
       state,
@@ -1022,6 +1029,7 @@ export function useTelevision(): TelevisionApi {
       toggleReducedEffects,
       forgetMe,
       registerRenderer,
+      getAudio,
     ],
   );
 }

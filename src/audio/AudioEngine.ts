@@ -225,6 +225,56 @@ export class AudioEngine {
     osc.stop(now + 0.65);
   }
 
+  /**
+   * A procedural paper-rip: a short filtered noise burst through the SFX bus,
+   * its loudness and brightness scaled by drag `speed01` (0..1). Routed through
+   * the master limiter like every cue, so it stays within the safe level
+   * (dead-air-room §9, requirement 1.7). A no-op before unlock.
+   */
+  playRip(speed01: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.sfxBus || !this.noiseBuffer) return;
+    const s = clamp01(speed01);
+    const now = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuffer;
+    // A band-pass that opens brighter with faster drags.
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1200 + s * 2600;
+    bp.Q.value = 0.7;
+    const gain = ctx.createGain();
+    const peak = 0.08 + s * 0.22;
+    const dur = 0.05 + s * 0.08;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(peak, now + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    src.connect(bp);
+    bp.connect(gain);
+    gain.connect(this.sfxBus);
+    src.start(now);
+    src.stop(now + dur + 0.02);
+  }
+
+  /** A short low thump when a piece fully detaches (design §9). */
+  playDetachThump(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.sfxBus) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(90, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.18);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.22, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+    osc.connect(gain);
+    gain.connect(this.sfxBus);
+    osc.start(now);
+    osc.stop(now + 0.22);
+  }
+
   /** The power-off collapse: a descending tone that snaps to silence. */
   playPowerOff(): void {
     const ctx = this.ctx;

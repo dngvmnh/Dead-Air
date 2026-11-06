@@ -5,6 +5,10 @@
  */
 
 .chassis {
+  /* Sit ABOVE the fixed room canvas (z-index 0): the opaque cabinet is the only
+     thing over the tube, keeping the clean-feed rule by construction. */
+  position: relative;
+  z-index: 1;
   width: min(92vw, 1024px);
   background: linear-gradient(
     160deg,

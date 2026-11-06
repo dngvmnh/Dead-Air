@@ -1,0 +1,21 @@
+/*
+ * The tearable wall canvas. Fixed, full viewport, BEHIND the chassis (z-index
+ * 0), so it never overlaps the tube opening or a YouTube surface (design §1,
+ * clean-feed rule). touch-action: none is set here ONLY, so dragging to tear
+ * does not scroll the page while scrolling elsewhere still works.
+ *
+ * No transform/filter/opacity/clip-path/mask/mix-blend-mode on this element or
+ * its ancestors: any room shake happens inside the room shader (design §1).
+ */
+
+.roomCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 0;
+  display: block;
+  touch-action: none;
+  background: var(--room-bg);
+}

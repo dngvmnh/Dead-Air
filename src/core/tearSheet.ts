@@ -49,18 +49,27 @@ export const WALL_ROWS = 30;
 export const TUBE_COLS = 36;
 export const TUBE_ROWS = 28;
 
-/** Gravity per ms^2, tuned so a detached piece falls at a readable pace. */
-const GRAVITY = 0.00004;
+/**
+ * Gravity in grid-units per ms². Rest length is 1 unit and a constraint tears
+ * past ~1.6×, so gravity must be gentle: the sheet sags a little and holds, and
+ * only a viewer's drag (or a detached piece) stretches a constraint to breaking.
+ * At dt≈16.67 ms this adds ~5e-4 units/sub-step — a slow, stable sag.
+ */
+const GRAVITY = 0.0000018;
 /** Verlet damping (slight energy loss so the sheet settles). */
 const DAMPING = 0.98;
 /** Fixed simulation sub-step (design §2). */
 const FIXED_DT_MS = 16.6667;
 /** Constraint-solver iterations per sub-step (design §2). */
 const SOLVER_ITERATIONS = 3;
-/** Base stretch ratio at which a constraint tears, before per-constraint jitter. */
-const BASE_TEAR_LIMIT = 1.6;
-/** How much the seed jitters each constraint's tear limit (± this fraction). */
-const TEAR_JITTER = 0.5;
+/**
+ * Stretch ratio at which a constraint tears. Jittered per constraint by the
+ * seed so tears wander like fibre, but ALWAYS > 1 — a limit below 1 would make
+ * a constraint break at (or near) its rest length, ripping the sheet apart on
+ * its own. Range: [MIN, MIN + RANGE] = [1.35, 1.85].
+ */
+const TEAR_LIMIT_MIN = 1.35;
+const TEAR_LIMIT_RANGE = 0.5;
 
 /** A small deterministic PRNG (mulberry32); seeded, so no Math.random. */
 function mulberry32(seed: number): () => number {
@@ -135,8 +144,8 @@ export function createSheet(cols: number, rows: number, seed: number): TearSheet
     const dx = xs[a]! - xs[b]!;
     const dy = ys[a]! - ys[b]!;
     restLength[k] = Math.hypot(dx, dy);
-    // Jitter in [1 - TEAR_JITTER, 1 + TEAR_JITTER] × BASE, deterministic by seed.
-    tearLimit[k] = BASE_TEAR_LIMIT * (1 + (rand() * 2 - 1) * TEAR_JITTER);
+    // Always > 1 (see TEAR_LIMIT_MIN), deterministic by seed.
+    tearLimit[k] = TEAR_LIMIT_MIN + rand() * TEAR_LIMIT_RANGE;
   }
 
   return {
@@ -157,13 +166,18 @@ export function createSheet(cols: number, rows: number, seed: number): TearSheet
   };
 }
 
-/** Begin dragging node `id` toward `(x, y)`. */
+/**
+ * Begin dragging a node toward `(x, y)`. `id` IS the node index (design §2):
+ * the grabbed node is held at the target each sub-step, so the constraint to a
+ * neighbour stretches and tears. A caller with multiple pointers maps each
+ * pointer to the node it grabbed and passes that node index here.
+ */
 export function grab(sheet: TearSheet, id: number, x: number, y: number): void {
   if (id < 0 || id >= sheet.xs.length) return;
   sheet.grabbed.set(id, { x, y });
 }
 
-/** Move an active grab's target. A no-op if `id` is not grabbed. */
+/** Move an active grab's target. A no-op if node `id` is not grabbed. */
 export function moveGrab(sheet: TearSheet, id: number, x: number, y: number): void {
   const g = sheet.grabbed.get(id);
   if (g) {
@@ -172,7 +186,7 @@ export function moveGrab(sheet: TearSheet, id: number, x: number, y: number): vo
   }
 }
 
-/** Release a grab. */
+/** Release the grab on node `id`. */
 export function release(sheet: TearSheet, id: number): void {
   sheet.grabbed.delete(id);
 }

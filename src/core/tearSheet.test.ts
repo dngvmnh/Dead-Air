@@ -70,14 +70,23 @@ describe('stepSheet', () => {
     expect(allFinite(s)).toBe(true);
   });
 
+  it('a resting sheet never tears itself (stable under gravity alone)', () => {
+    // No grab: gentle gravity must sag, not rip. The wall grid is the real one.
+    const s = createSheet(48, 30, 1);
+    for (let i = 0; i < 600; i += 1) stepSheet(s, 16.67);
+    expect(countBroken(s)).toBe(0);
+    expect(allFinite(s)).toBe(true);
+  });
+
   it('never moves a pinned node', () => {
     const s = createSheet(12, 9, 7);
     const before = snapshotPinned(s);
-    // Grab an interior node and yank it hard, then settle.
-    grab(s, 0, s.xs[nodeIndex(s, 6, 4)]!, s.ys[nodeIndex(s, 6, 4)]!);
-    moveGrab(s, 0, s.xs[nodeIndex(s, 6, 4)]! + 500, s.ys[nodeIndex(s, 6, 4)]! + 500);
+    // Grab an interior node (grab id IS the node index, design §2) and yank it.
+    const n = nodeIndex(s, 6, 4);
+    grab(s, n, s.xs[n]!, s.ys[n]!);
+    moveGrab(s, n, s.xs[n]! + 500, s.ys[n]! + 500);
     for (let i = 0; i < 60; i += 1) stepSheet(s, 16.67);
-    release(s, 0);
+    release(s, n);
     for (let i = 0; i < 60; i += 1) stepSheet(s, 16.67);
     expect(snapshotPinned(s)).toEqual(before);
   });
@@ -85,15 +94,15 @@ describe('stepSheet', () => {
   it('a stretched constraint breaks, and a broken one never rejoins', () => {
     const s = createSheet(16, 12, 99);
     const node = nodeIndex(s, 8, 6);
-    grab(s, 0, s.xs[node]!, s.ys[node]!);
+    grab(s, node, s.xs[node]!, s.ys[node]!);
     // Drag far past any tear limit to guarantee a break.
     for (let i = 0; i < 40; i += 1) {
-      moveGrab(s, 0, s.xs[node]! + 2000, s.ys[node]! - 2000);
+      moveGrab(s, node, s.xs[node]! + 2000, s.ys[node]! - 2000);
       stepSheet(s, 16.67);
     }
     const brokenAfterTear = countBroken(s);
     expect(brokenAfterTear).toBeGreaterThan(0);
-    release(s, 0);
+    release(s, node);
     // Let it settle: the broken count can only grow, never shrink.
     let prev = brokenAfterTear;
     for (let i = 0; i < 120; i += 1) {
@@ -123,9 +132,9 @@ describe('fast-check properties (design §2)', () => {
         (cols, rows, seed, moves) => {
           const s = createSheet(cols, rows, seed);
           const node = nodeIndex(s, Math.floor(cols / 2), Math.floor(rows / 2));
-          grab(s, 0, s.xs[node]!, s.ys[node]!);
+          grab(s, node, s.xs[node]!, s.ys[node]!);
           for (const m of moves) {
-            moveGrab(s, 0, s.xs[node]! + m.dx, s.ys[node]! + m.dy);
+            moveGrab(s, node, s.xs[node]! + m.dx, s.ys[node]! + m.dy);
             stepSheet(s, m.dt);
           }
           expect(allFinite(s)).toBe(true);
@@ -139,8 +148,8 @@ describe('fast-check properties (design §2)', () => {
       fc.property(fc.integer({ min: 0, max: 5000 }), fc.array(fc.double({ min: 1, max: 50, noNaN: true }), { maxLength: 40 }), (seed, dts) => {
         const s = createSheet(10, 8, seed);
         const node = nodeIndex(s, 5, 4);
-        grab(s, 0, s.xs[node]!, s.ys[node]!);
-        moveGrab(s, 0, s.xs[node]! + 5000, s.ys[node]! + 5000);
+        grab(s, node, s.xs[node]!, s.ys[node]!);
+        moveGrab(s, node, s.xs[node]! + 5000, s.ys[node]! + 5000);
         const brokenSet = new Set<number>();
         for (const dt of dts) {
           stepSheet(s, dt);
@@ -160,9 +169,9 @@ describe('fast-check properties (design §2)', () => {
     const run = (): TearSheet => {
       const s = createSheet(12, 9, 2024);
       const node = nodeIndex(s, 6, 4);
-      grab(s, 0, s.xs[node]!, s.ys[node]!);
+      grab(s, node, s.xs[node]!, s.ys[node]!);
       for (let i = 0; i < 20; i += 1) {
-        moveGrab(s, 0, s.xs[node]! + 100 * i, s.ys[node]! + 50 * i);
+        moveGrab(s, node, s.xs[node]! + 100 * i, s.ys[node]! + 50 * i);
         stepSheet(s, 16.67);
       }
       return s;

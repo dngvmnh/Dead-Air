@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useTelevision } from './useTelevision.ts';
 import { useKeyboardControls } from './useKeyboardControls.ts';
 import { Room } from '../components/Room/Room.tsx';
+import { RoomCanvas } from '../components/Room/RoomCanvas.tsx';
 import { Chassis } from '../components/Chassis/Chassis.tsx';
 import { StartNotice } from '../components/StartNotice/StartNotice.tsx';
 
@@ -26,6 +27,11 @@ export function App() {
     <>
       <h1 className="visually-hidden">DEAD AIR</h1>
       <div inert={!noticeSeen}>
+        {/* The tearable wall sits BEHIND the chassis (z-index 0); the chassis is
+            opaque and establishes its own stacking context above it, so the room
+            can never overlap the tube or a YouTube surface (design §1). Tear
+            input is ignored until the notice is acknowledged (requirement 1.8). */}
+        <RoomCanvas interactive={noticeSeen} getAudio={tv.getAudio} />
         <Room announcement={tv.announcement}>
           <Chassis tv={tv} powerRef={powerRef} />
         </Room>
