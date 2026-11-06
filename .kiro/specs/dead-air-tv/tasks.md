@@ -36,10 +36,10 @@ Work in order. Each milestone ends in something runnable. Commit after each comp
 - [x] 8. Broadcast clock
   - [x] 8.1 Implement `resolveBroadcast` with fast-check properties.
   - _Requirements: 3.1, 3.2, 3.4, 3.5_
-- [ ] 9. Scene system
-  - [ ] 9.1 Implement pure `renderScene` and keyframes with image, text, ticker, rect, and noise layers.
-  - [ ] 9.2 Implement `LayerWhen` for visit and act variants, and captions.
-  - [ ] 9.3 Implement `PlaybackAdapter` and `SceneAdapter`.
+- [x] 9. Scene system
+  - [x] 9.1 Implement pure `renderScene` and keyframes with image, text, ticker, rect, and noise layers.
+  - [x] 9.2 Implement `LayerWhen` for visit and act variants, and captions.
+  - [x] 9.3 Implement `PlaybackAdapter` and `SceneAdapter`.
   - _Requirements: 3.3, 8.3, 13.3_
 - [ ] 10. Channel 02 with placeholder art
   - [ ] 10.1 Author the channel 02 rundown from `docs/media-bible.md` using scenes, marked `placeholder: true` where art is temporary.

@@ -283,3 +283,50 @@ done, how it was checked, and anything left unverified.
   dead-item semantics, and asserted as such in the tests.
 - Unverified: real continuity end-to-end (leave a channel, return 60s later)
   is task 11's mocked-clock e2e; here the clock is proven in isolation.
+## Task 9 — Scene system (renderScene, LayerWhen, PlaybackAdapter, SceneAdapter)
+
+- Mode: direct implementation (the `spec-task-execution` subagent is still
+  absent from the registry).
+- Done:
+  - `src/core/scene.ts` (pure, no DOM): `layerVisible` (LayerWhen visit/act
+    inclusive bounds, requirement 8.3), `sampleKeyframes` (lerp numeric fields,
+    hold a one-sided field, step `text`, hold first/last outside the track), and
+    `activeCaptions` (half-open `[atMs, endMs)` windows, requirement 13.3).
+    `Keyframe`/caption types are aliased to the schema's inferred types so the
+    renderer passes parsed scene data straight in under exactOptionalPropertyTypes.
+  - `src/render/sceneRenderer.ts`: `renderScene(ctx2d, program, tMs, vars, opts)`
+    — the thin drawing shell over the pure helpers (design §6/§10 step 1,
+    requirement 3.3). Opaque black base, then each visible layer
+    (image/text/ticker/rect/noise) in order, then a caption band. Time-
+    addressable: a pure function of `tMs` with no retained state (ticker and
+    noise are periodic/seeded in `tMs`). A missing image draws a labelled
+    `[src]` placeholder so missing media never crashes the TV (tech.md). No
+    glow/curvature/scanlines here — all screen effects stay in the shader; this
+    only paints the flat picture that becomes the shader's source texture.
+  - `src/playback/PlaybackAdapter.ts`: the `PlaybackAdapter` interface and
+    `AdapterEvent` union from design §6, plus a `SceneContext` (scene lookup,
+    preloaded images, visit/act vars, `setSource`, injected `now()`).
+  - `src/playback/SceneAdapter.ts`: plays a scene item onto an offscreen canvas
+    and publishes it via `ctx.setSource`. rAF and the canvas factory are
+    injectable so it runs under jsdom. Starts at the clock-given offset
+    (continuity, req 3.2), advances one-for-one with the injected clock, loops a
+    short scene within the item, emits playing/ended (once)/paused/error, and a
+    missing scene emits a non-fatal error and clears the source (degrade to
+    static).
+- Checked: `npm test` 192 passed (29 new: 13 scene-core incl. a fast-check
+  opacity-bounds property, 8 renderer tests via a recording fake 2D context —
+  jsdom has no real 2D ctx — asserting the primitive/skip/placeholder/caption
+  behaviour and determinism, 8 SceneAdapter tests via a controllable clock+frame
+  pump). `npm run lint` clean. `npm run build` clean (JS unchanged, 79.31 KB
+  gzip; the scene code is tree-shaken until wired in task 10). Fixed one
+  exactOptionalPropertyTypes build error by aliasing the core keyframe/caption
+  types to the schema's inferred types (caught by `tsc -b`, then green).
+- Decisions made alone: (1) scene coordinates are in the internal 960×720 space
+  (reuses the render cap constants). (2) `renderScene` takes preloaded bitmaps
+  by `src`; the SceneAdapter will own preloading when channel 02 is authored
+  (task 10). (3) Ticker/noise are deterministic functions of `tMs` to keep
+  scenes seekable. All reversible.
+- Unverified: real on-screen pixels (the scene canvas feeding the shader and
+  showing on the tube) land in task 10 with the first committed Playwright pixel
+  test; here the scene path is proven by fake-context and injected-clock unit
+  tests only.
