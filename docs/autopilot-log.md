@@ -787,3 +787,44 @@ second fire is still possible much later; reversible by editing the JSON.
 ≤ 0.05; reversible. Unverified: nothing new for Task 1 — the divisor-8 change was
 exercised end to end by the milestone-3 checkpoint reaching sign-off (now ~2.8
 min of mocked surfing).
+
+## dead-air-room Task 2 — tear sheet simulation (core/tearSheet.ts)
+
+Full gate green: `npm test` 275 (8 new), `npm run lint` clean, `npm run build`
+119.47 KB gzip (tearSheet tree-shaken until task 3 wires it), `validate:catalog`
+OK, `npx playwright test --project=chromium` 28/28 (unchanged; task 2 is pure
+core, not yet imported by the app).
+
+- **2.1** `src/core/tearSheet.ts`: a pure deterministic Verlet sheet. Grid of
+  nodes with structural + both-diagonal constraints, outer edge pinned, fixed
+  16.67 ms sub-steps, 3 solver iterations, gravity, grab/moveGrab/release, and
+  permanent tearing when a constraint stretches past its seed-jittered limit
+  (`broken` never resets). `attachedToPinned` is the connected-component pass
+  for detached pieces, run on break events. No DOM/Date.now/Math.random — a
+  seeded mulberry32 jitters tear limits. 8 tests incl. the four fast-check
+  properties from design §2: positions always finite, broken never un-breaks,
+  pinned nodes never move, deterministic for a seed.
+- **2.2 Grid size + measured cost.** Design §2 proposed ~96×60 wall / ~48×36
+  tube and said to tune to the 3 ms/frame budget (req 10.2). Measured with `tsx`
+  on this machine (an upper bound vs the browser's V8), driving an active drag:
+
+  | grid | nodes | constraints | ms/frame |
+  |---|---|---|---|
+  | 96×60 (design) | 5760 | 22574 | ~9.2 |
+  | 48×30 (chosen wall) | 1440 | 5528 | ~2.3 |
+  | 36×28 (chosen tube) | 1008 | 3842 | ~1.6 |
+
+  Chosen and exported as `WALL_COLS/WALL_ROWS = 48×30` and
+  `TUBE_COLS/TUBE_ROWS = 36×28`, both under 3 ms each. The design's 96×60 was far
+  over budget, so I tuned down — recorded here per design §2.
+
+Decisions made alone: (1) grid sizes 48×30 / 36×28 to meet req 10.2 (the design
+invited this and asked for it to be recorded; reversible by changing the
+constants). (2) `BASE_TEAR_LIMIT 1.6` with ±0.5 seed jitter, and Verlet damping
+0.98 — tuned so a drag tears rather than stretches forever; reversible.
+(3) Node-space coordinates (one unit per cell); the renderer (task 3) scales to
+canvas pixels. Unverified until task 3: the sim is not yet rendered, so its
+*visible* behaviour (a drag tearing paper on screen) is proven at task 3 with
+real-WebGL pixel tests; the in-browser frame cost is re-confirmed at task 13.
+Not ticking any visual behaviour here — tasks 2.1/2.2 are the non-visual sim and
+its measurement.

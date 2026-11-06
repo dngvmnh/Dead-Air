@@ -15,9 +15,9 @@ Tick a task only when the behaviour has been seen in a real browser, not because
 
 ## Phase B: Tear the wall
 
-- [ ] 2. Sheet simulation
-  - [ ] 2.1 Implement `core/tearSheet.ts`, with unit tests and the fast-check properties in design section 2.
-  - [ ] 2.2 Measure step cost and record the chosen grid size.
+- [x] 2. Sheet simulation
+  - [x] 2.1 Implement `core/tearSheet.ts`, with unit tests and the fast-check properties in design section 2.
+  - [x] 2.2 Measure step cost and record the chosen grid size.
   - _Requirements: 1.1, 1.2, 1.4, 10.2_
 - [ ] 3. Room canvas and wall tear
   - [ ] 3.1 Add the room canvas behind the chassis, plus `tearRenderer`: mesh, lighting, fibre edge, flap shadow.
