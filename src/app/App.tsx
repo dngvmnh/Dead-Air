@@ -36,6 +36,8 @@ export function App() {
           getAudio={tv.getAudio}
           getRoomState={tv.getRoomState}
           getBehindView={tv.getBehindView}
+          registerRoom={tv.registerRoom}
+          onTearEnd={tv.onTearEnd}
           reduced={tv.settings.reducedEffects}
         />
         <Room announcement={tv.announcement}>

@@ -212,7 +212,21 @@ export const sceneProgramSchema = z
 
 // --- Horror events (design §9) ---------------------------------------------
 
-export const seamSchema = z.enum(['tune-in', 'item-boundary', 'mid-item']);
+export const seamSchema = z.enum(['tune-in', 'item-boundary', 'mid-item', 'startle', 'tear']);
+
+/** Procedural sounds an event can play (see `AudioEngine.playCue`). */
+export const sfxCueSchema = z.enum([
+  'stinger',
+  'tapeStop',
+  'heartbeat',
+  'knock',
+  'breath',
+  'whisper',
+  'toyPiano',
+  'phoneRing',
+  'scrape',
+  'drone',
+]);
 
 /**
  * Event conditions are a recursive data tree (design §9). Zod needs an explicit
@@ -291,6 +305,30 @@ export const eventStepSchema = z.discriminatedUnion('do', [
     .strict(),
   z.object({ do: z.literal('silence'), ms: z.number().int().positive() }).strict(),
   z.object({ do: z.literal('signOff') }).strict(),
+  // A sound. Without `ms` the next step starts at once, so a sound can sit on
+  // top of a picture step without adding to the event's length.
+  z
+    .object({
+      do: z.literal('sfx'),
+      cue: sfxCueSchema,
+      gain: z.number().min(0).max(1).optional(),
+      ms: z.number().int().positive().optional(),
+    })
+    .strict(),
+  // A few seconds of a wrong picture on the tube.
+  z
+    .object({
+      do: z.literal('apparition'),
+      kind: z.enum(['anchor', 'gourd', 'operator', 'deadair']),
+      ms: z.number().int().positive(),
+      text: z.string().min(1).optional(),
+      fallbackText: z.string().optional(),
+    })
+    .strict(),
+  // The room's lights sink to `level` over `ms`.
+  z.object({ do: z.literal('roomLights'), level: z.number().min(0).max(1), ms: z.number().int().positive() }).strict(),
+  // Something pale behind the viewer's own tears. Unseen with no tears.
+  z.object({ do: z.literal('roomGlimpse'), ms: z.number().int().positive() }).strict(),
 ]);
 
 export const horrorEventSchema = z
@@ -318,6 +356,7 @@ export const horrorEventSchema = z
 
 export type SeamInput = z.infer<typeof seamSchema>;
 export type EventStepInput = z.infer<typeof eventStepSchema>;
+export type SfxCue = z.infer<typeof sfxCueSchema>;
 export type HorrorEventInput = z.infer<typeof horrorEventSchema>;
 // --- Persisted viewer memory (design §8, requirement 7) --------------------
 

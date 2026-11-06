@@ -61,7 +61,7 @@ export interface Channel {
   rundown: Item[];
 }
 
-export type Seam = 'tune-in' | 'item-boundary' | 'mid-item';
+export type Seam = 'tune-in' | 'item-boundary' | 'mid-item' | 'startle' | 'tear';
 
 /** The broadcast clock's answer: what is on, where in it, and how long is left. */
 export interface Resolved {

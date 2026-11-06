@@ -232,3 +232,22 @@ export function bakeBehindLayer(view: BehindView, reduced: boolean): BehindLayer
     }
   }
 }
+
+/**
+ * Two pale points at the viewer's last tear, on an otherwise empty layer. Seen
+ * only through a hole, because only the behind pass ever samples it.
+ */
+export function bakeGlimpse(x01: number, y01: number): HTMLCanvasElement {
+  const s = surface('#000000');
+  const cx = x01 * W;
+  const cy = y01 * H;
+  for (const dx of [-16, 16]) {
+    const eye = s.ctx.createRadialGradient(cx + dx, cy, 0.5, cx + dx, cy, 9);
+    eye.addColorStop(0, 'rgba(226, 222, 204, 0.95)');
+    eye.addColorStop(0.45, 'rgba(170, 164, 142, 0.38)');
+    eye.addColorStop(1, 'rgba(170, 164, 142, 0)');
+    s.ctx.fillStyle = eye;
+    s.ctx.fillRect(cx + dx - 10, cy - 10, 20, 20);
+  }
+  return s.canvas;
+}

@@ -15,10 +15,11 @@ import {
 } from '../../core/tearSheet.ts';
 import { TearGLRenderer } from '../../render/tearRenderer.ts';
 import { bakeRoom } from '../../render/roomWallpaper.ts';
-import { bakeBehindLayer } from '../../render/behindRenderer.ts';
+import { bakeBehindLayer, bakeGlimpse } from '../../render/behindRenderer.ts';
 import type { AudioEngine } from '../../audio/AudioEngine.ts';
 import type { RoomState } from '../../core/roomState.ts';
 import type { BehindView } from '../../core/behindState.ts';
+import type { RoomEffects } from '../../app/useTelevision.ts';
 
 /**
  * The tearable wall behind the set (design §1, §3). A full-viewport canvas at
@@ -40,6 +41,10 @@ export interface RoomCanvasProps {
   getRoomState: (reduced: boolean, localHour: number, localMinute: number) => RoomState;
   /** What a tear reveals for this viewer now (design §4). */
   getBehindView: (localHour: number, localMinute: number) => BehindView;
+  /** Hands the room's lights and glimpse to the startles, and takes them back. */
+  registerRoom?: (handle: RoomEffects | null) => void;
+  /** The viewer just finished a tear. */
+  onTearEnd?: () => void;
   /** Reduced Effects / reduced motion: calmer light, no auto motion (req 8.4). */
   reduced: boolean;
 }
@@ -52,15 +57,28 @@ interface RoomSeam {
   showHoleMask: (on: boolean) => void;
   /** The act and words currently behind the wall. */
   behind: () => { act: number; tally: number; lines: string[] };
+  /** The room's scripted light level and how visible the glimpse is, 0..1. */
+  level: () => number;
+  glimpseAmount: () => number;
 }
 
 const IDLE_CORNER_RADIUS = 0.12; // fraction of the sheet near the top-right corner
 
-export function RoomCanvas({ interactive, getAudio, getRoomState, getBehindView, reduced }: RoomCanvasProps) {
+export function RoomCanvas({
+  interactive,
+  getAudio,
+  getRoomState,
+  getBehindView,
+  registerRoom,
+  onTearEnd,
+  reduced,
+}: RoomCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const interactiveRef = useRef(interactive);
   const getRoomStateRef = useRef(getRoomState);
   const getBehindViewRef = useRef(getBehindView);
+  const registerRoomRef = useRef(registerRoom);
+  const onTearEndRef = useRef(onTearEnd);
   const reducedRef = useRef(reduced);
   // Sync the latest props into refs from an effect (not during render); the
   // loop and handlers read them live.
@@ -68,8 +86,10 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, getBehindView,
     interactiveRef.current = interactive;
     getRoomStateRef.current = getRoomState;
     getBehindViewRef.current = getBehindView;
+    registerRoomRef.current = registerRoom;
+    onTearEndRef.current = onTearEnd;
     reducedRef.current = reduced;
-  }, [interactive, getRoomState, getBehindView, reduced]);
+  }, [interactive, getRoomState, getBehindView, registerRoom, onTearEnd, reduced]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -169,6 +189,56 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, getBehindView,
         shape.y += (strokeMid.y + (pointer.y - strokeMid.y) * 0.1 - shape.y) * k;
       }
       gl?.setShape(shape.x, shape.y, 1);
+    };
+
+    // The lights sinking and the glimpse (requirement 15). Both ease, so neither
+    // can read as a flash, and they stop costing anything once settled.
+    let levelNow = 1;
+    let levelFrom = 1;
+    let levelTo = 1;
+    let levelStart = 0;
+    let levelMs = 1;
+    let levelMoving = false;
+    let glimpseNow = 0;
+    let glimpseUntil = 0;
+    const GLIMPSE_FADE_MS = 160;
+    const effects: RoomEffects = {
+      setLevel: (level, ms) => {
+        levelFrom = levelNow;
+        levelTo = level;
+        levelStart = performance.now();
+        levelMs = Math.max(1, ms);
+        levelMoving = true;
+      },
+      glimpse: (ms) => {
+        if (ms <= 0) {
+          glimpseUntil = 0;
+          return;
+        }
+        // Eyes where the viewer last tore. With no tear there is nowhere to see them.
+        if (strokeCount === 0) return;
+        gl?.setGlimpse(bakeGlimpse(strokeMid.x, strokeMid.y));
+        glimpseUntil = performance.now() + ms;
+      },
+    };
+    registerRoomRef.current?.(effects);
+    const stepEffects = (now: number, dt: number): boolean => {
+      let changed = false;
+      if (levelMoving) {
+        const t = Math.min(1, (now - levelStart) / levelMs);
+        levelNow = levelFrom + (levelTo - levelFrom) * t * t * (3 - 2 * t);
+        gl?.setLevel(levelNow);
+        if (t >= 1) levelMoving = false;
+        changed = true;
+      }
+      const target = now < glimpseUntil ? 1 : 0;
+      if (glimpseNow !== target) {
+        const delta = dt / GLIMPSE_FADE_MS;
+        glimpseNow = target > glimpseNow ? Math.min(1, glimpseNow + delta) : Math.max(0, glimpseNow - delta);
+        gl?.setGlimpseAmount(glimpseNow);
+        changed = true;
+      }
+      return changed;
     };
 
     const cap = { w: 1280, h: 800 };
@@ -301,6 +371,7 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, getBehindView,
         strokeMid.y = d.points.reduce((sum, p) => sum + p[1], 0) / d.points.length;
       }
       drags.delete(e.pointerId);
+      onTearEndRef.current?.();
       try {
         canvas.releasePointerCapture?.(e.pointerId);
       } catch {
@@ -409,6 +480,7 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, getBehindView,
       last = now;
       const busy = drags.size > 0 || activeFrames > 0;
       updateShape(dt);
+      const effectsMoved = stepEffects(now, dt);
       // Checked whether or not the wall is busy: memory loads during the first
       // painted second, and a tear made then must still show the right act.
       let changedBehind = false;
@@ -429,7 +501,7 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, getBehindView,
           lastLightAt = now;
           redraw = applyLight();
         }
-        if (changedBehind) redraw = true;
+        if (changedBehind || effectsMoved) redraw = true;
         // Movement in the dark only exists once there is a tear to see it through.
         const moving = behindView.act === 3 && strokeCount > 0 && !reducedRef.current;
         if (moving && now - lastShapeDraw >= SHAPE_REDRAW_MS) redraw = true;
@@ -456,6 +528,8 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, getBehindView,
           gl?.render(performance.now());
         },
         behind: () => ({ act: behindView.act, tally: behindView.tally, lines: behindView.lines }),
+        level: () => levelNow,
+        glimpseAmount: () => glimpseNow,
       };
     }
 
@@ -470,6 +544,7 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, getBehindView,
       canvas.removeEventListener('pointercancel', endDrag);
       canvas.removeEventListener('pointerleave', onLeave);
       gl?.dispose();
+      registerRoomRef.current?.(null);
       delete (window as unknown as { __room?: RoomSeam }).__room;
     };
     // Build once; interactive is read through a ref.

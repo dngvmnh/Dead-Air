@@ -26,6 +26,7 @@ import { EventPresenter } from '../playback/EventPresenter.ts';
 import { channelInfo as channelInfoLookup } from '../core/channels.ts';
 import { deriveRoom, type RoomState } from '../core/roomState.ts';
 import { deriveBehind, type BehindView } from '../core/behindState.ts';
+import { isRoomOnly, nextStartleDelay } from '../core/startle.ts';
 import {
   beginSession,
   createMemory,
@@ -85,7 +86,20 @@ export interface TelevisionApi {
   getRoomState: (reduced: boolean, localHour: number, localMinute: number) => RoomState;
   /** What a tear reveals for this viewer now (design §4). Memory stays in here. */
   getBehindView: (localHour: number, localMinute: number) => BehindView;
+  /** The room hands over its lights and glimpse for startles to use. */
+  registerRoom: (handle: RoomEffects | null) => void;
+  /** The viewer just finished a tear. */
+  onTearEnd: () => void;
 }
+
+/** What a startle can do to the room. */
+export interface RoomEffects {
+  setLevel: (level: number, ms: number) => void;
+  glimpse: (ms: number) => void;
+}
+
+/** A finished tear answers back about this often (requirement 15.5). */
+const TEAR_ANSWER_CHANCE = 0.35;
 
 const DEFAULT_SETTINGS: UiSettings = {
   volume: 0.7,
@@ -242,6 +256,16 @@ export function useTelevision(): TelevisionApi {
   const midItemTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const midItemRandomRef = useRef<() => number>(Math.random);
 
+  // Startles (requirement 15). The room is reached through a handle so nothing
+  // here depends on the room's canvas, and room-only events keep their own
+  // cancel flag because they run while the machine stays ON_AIR.
+  const roomEffectsRef = useRef<RoomEffects | null>(null);
+  const roomCancelRef = useRef(false);
+  const roomEventRunningRef = useRef(false);
+  const lastStartleRef = useRef<string | null>(null);
+  const fireStartleRef = useRef<(seam: 'startle' | 'tear', forcedId?: string) => string | null>(() => null);
+  const tearRandomRef = useRef<() => number>(Math.random);
+
   /**
    * Ask the director whether an event fires at `seam` on the current channel.
    * Returns the chosen event (also stashed for the runner) or null. Pure
@@ -387,6 +411,30 @@ export function useTelevision(): TelevisionApi {
           await wait(ms);
           restingStatic();
         },
+        sfx: async (cue, gain, ms) => {
+          const reduced = memoryRef.current.settings.reducedEffects || prefersReducedMotion();
+          audioRef.current?.playCue(cue, reduced ? gain * 0.5 : gain);
+          if (ms !== undefined) await wait(ms);
+        },
+        apparition: async (kind, text, ms) => {
+          restingStatic();
+          if (text) setAnnouncement(text);
+          await presenter.showApparition(
+            kind,
+            text,
+            ms,
+            memoryRef.current.settings.reducedEffects || prefersReducedMotion(),
+            () => eventCancelRef.current,
+          );
+        },
+        roomLights: async (level, ms) => {
+          roomEffectsRef.current?.setLevel(level, ms);
+          await wait(ms);
+        },
+        roomGlimpse: async (ms) => {
+          roomEffectsRef.current?.glimpse(ms);
+          await wait(ms);
+        },
         cancelled: () => eventCancelRef.current,
       };
     },
@@ -404,6 +452,9 @@ export function useTelevision(): TelevisionApi {
       }
       if (step.do === 'voice') {
         return { ...step, caption: renderLine(step.caption, step.fallbackCaption, memoryRef.current, tctx) };
+      }
+      if (step.do === 'apparition' && step.text !== undefined) {
+        return { ...step, text: renderLine(step.text, step.fallbackText, memoryRef.current, tctx) };
       }
       return step;
     });
@@ -494,6 +545,10 @@ export function useTelevision(): TelevisionApi {
           firedEvents: () => string[];
           lastEventText: () => string;
           forceMidItem: () => void;
+          forceStartle: (id: string) => string | null;
+          forceTearAnswer: () => void;
+          lastStartle: () => string | null;
+          roomEventRunning: () => boolean;
           visitTotal: () => number;
         };
       }
@@ -522,6 +577,14 @@ export function useTelevision(): TelevisionApi {
       forceMidItem: () => {
         midItemRandomRef.current = () => 0;
       },
+      // Startles run on real timers and are off under this flag, so the rest of
+      // the suite stays deterministic. These fire them on demand.
+      forceStartle: (id: string) => fireStartleRef.current('startle', id),
+      forceTearAnswer: () => {
+        tearRandomRef.current = () => 0;
+      },
+      lastStartle: () => lastStartleRef.current,
+      roomEventRunning: () => roomEventRunningRef.current,
       // Total recorded visits across channels, read from live memory (not
       // localStorage, which is throttled), so a test can assert tune-complete
       // visit accounting without racing the persistence throttle.
@@ -682,6 +745,102 @@ export function useTelevision(): TelevisionApi {
   // forward-reference problem. Assigned once below.
   const sendRef = useRef<(action: TvAction) => void>(() => {});
 
+  /** Bring the room back, whatever a startle left it doing. */
+  const restoreRoom = useCallback(() => {
+    roomEffectsRef.current?.setLevel(1, 600);
+    roomEffectsRef.current?.glimpse(0);
+  }, []);
+
+  /**
+   * Run an event that stays in the room. The programme carries on under it, so it
+   * goes round the state machine and has no return to make.
+   */
+  const runRoomEvent = useCallback(
+    (event: HorrorEventInput, channel: ChannelId) => {
+      roomEventRunningRef.current = true;
+      roomCancelRef.current = false;
+      sessionFiredRef.current[event.id] = (sessionFiredRef.current[event.id] ?? 0) + 1;
+      dispatchMemory({ type: 'eventFired', eventId: event.id, atMs: Date.now() });
+      const ops = { ...makeEventOps(() => undefined, channel), cancelled: () => roomCancelRef.current };
+      void runEventSteps(resolveSteps(event, channel), ops).then(() => {
+        roomEventRunningRef.current = false;
+        restoreRoom();
+      });
+    },
+    [dispatchMemory, makeEventOps, resolveSteps, restoreRoom],
+  );
+
+  /**
+   * Fire a startle if one is due. The director applies the limits, so this can
+   * safely be asked at any time. Returns the event id, or null if none fired.
+   * Startles leave the story's own gap alone, so they cannot delay its events.
+   */
+  const fireStartle = useCallback(
+    (seam: 'startle' | 'tear', forcedId?: string): string | null => {
+      const st = stateRef.current;
+      if (st.phase !== 'ON_AIR' || !playingRef.current || st.channel === null) return null;
+      if (roomEventRunningRef.current) return null;
+      const channel = st.channel;
+      const chosen =
+        forcedId !== undefined
+          ? (getEvents().find((e) => e.id === forcedId) ?? null)
+          : decideEvent({
+              memory: memoryRef.current,
+              channel,
+              seam,
+              currentSource: 'scene',
+              nowMs: Date.now(),
+              localHour: new Date().getHours(),
+              lastEventAt: null,
+              sessionFired: sessionFiredRef.current,
+              events: getEvents(),
+              random: Math.random,
+              demo,
+            });
+      if (!chosen) return null;
+      lastStartleRef.current = chosen.id;
+      if (isRoomOnly(chosen)) {
+        runRoomEvent(chosen, channel);
+      } else {
+        pendingEventRef.current = chosen;
+        sendRef.current({ type: 'EVENT_START', token: st.tuneToken, seam });
+      }
+      return chosen.id;
+    },
+    [demo, runRoomEvent],
+  );
+
+  useEffect(() => {
+    fireStartleRef.current = fireStartle;
+  }, [fireStartle]);
+
+  // The startle clock. It only asks; `fireStartle` decides. It stays off under
+  // the test flag, where the suite drives startles itself.
+  useEffect(() => {
+    const flagged = (window as unknown as { __CRT_PRESERVE_DRAWING_BUFFER__?: boolean }).__CRT_PRESERVE_DRAWING_BUFFER__;
+    if (flagged) {
+      tearRandomRef.current = () => 1;
+      return undefined;
+    }
+    let timer: ReturnType<typeof setTimeout>;
+    const arm = (first: boolean): void => {
+      timer = setTimeout(() => {
+        if (!document.hidden) fireStartle('startle');
+        arm(false);
+      }, nextStartleDelay(Math.random, demo, first));
+    };
+    arm(true);
+    return () => clearTimeout(timer);
+  }, [demo, fireStartle]);
+
+  const registerRoom = useCallback((handle: RoomEffects | null) => {
+    roomEffectsRef.current = handle;
+  }, []);
+
+  const onTearEnd = useCallback(() => {
+    if (tearRandomRef.current() < TEAR_ANSWER_CHANCE) fireStartle('tear');
+  }, [fireStartle]);
+
   const runEffects = useCallback(
     (effects: Effect[]) => {
       // Resolve the clock and start the scene for `channel`, schedule the item
@@ -809,6 +968,9 @@ export function useTelevision(): TelevisionApi {
             // Cancel any running event so a stale step cannot run after power
             // off (Fix 4), and clear the sign-off timer.
             eventCancelRef.current = true;
+            roomCancelRef.current = true;
+            audioRef.current?.stopCues();
+            restoreRoom();
             if (signOffTimerRef.current !== null) {
               clearTimeout(signOffTimerRef.current);
               signOffTimerRef.current = null;
@@ -828,6 +990,9 @@ export function useTelevision(): TelevisionApi {
             // (Fix 4). A sign-off event that has NOT yet reached SIGN_OFF is
             // thereby abandoned, so E10 fires again on the next visit to 13.
             eventCancelRef.current = true;
+            roomCancelRef.current = true;
+            audioRef.current?.stopCues();
+            restoreRoom();
             // Silence the snow bed between sources during a tune, and stop any
             // owned source so the next tune starts clean.
             audioRef.current?.setStatic(0);
@@ -855,7 +1020,9 @@ export function useTelevision(): TelevisionApi {
             // Stop the underlying programme while the event plays.
             stopPlayback();
             eventCancelRef.current = false;
-            lastEventAtRef.current = Date.now();
+            // A startle leaves the story's gap alone: the two must not delay
+            // each other, or the demo path would drift (requirement 15.4).
+            if (!event.seams.includes('startle')) lastEventAtRef.current = Date.now();
             sessionFiredRef.current[event.id] = (sessionFiredRef.current[event.id] ?? 0) + 1;
             // A sign-off event counts as fired only when it REACHES the sign-off
             // (design §7, Fix 4): recording it here would consume the once-per-
@@ -930,6 +1097,7 @@ export function useTelevision(): TelevisionApi {
       makeEventOps,
       resolveSteps,
       flushWatch,
+      restoreRoom,
     ],
   );
 
@@ -1099,6 +1267,8 @@ export function useTelevision(): TelevisionApi {
       getAudio,
       getRoomState,
       getBehindView,
+      registerRoom,
+      onTearEnd,
     }),
     [
       state,
@@ -1118,6 +1288,8 @@ export function useTelevision(): TelevisionApi {
       getAudio,
       getRoomState,
       getBehindView,
+      registerRoom,
+      onTearEnd,
     ],
   );
 }

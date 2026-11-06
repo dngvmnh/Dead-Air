@@ -11,7 +11,7 @@
  * sequences and degrades.
  */
 
-import type { EventStepInput } from '../content/schema.ts';
+import type { EventStepInput, SfxCue } from '../content/schema.ts';
 import type { Look } from '../core/types.ts';
 
 /**
@@ -40,6 +40,14 @@ export interface EventOps {
   signOff(): Promise<void>;
   /** Degrade: show caption text over static for `ms` when media failed (9.6). */
   captionsOverStatic(caption: string, ms: number): Promise<void>;
+  /** Play a sound. Resolves after `ms` if given, otherwise at once. */
+  sfx(cue: SfxCue, gain: number, ms?: number): Promise<void>;
+  /** Show a wrong picture on the tube for `ms`. */
+  apparition(kind: 'anchor' | 'gourd' | 'operator' | 'deadair', text: string | undefined, ms: number): Promise<void>;
+  /** Sink or restore the room's lights over `ms`. */
+  roomLights(level: number, ms: number): Promise<void>;
+  /** Something pale behind the viewer's tears for `ms`. */
+  roomGlimpse(ms: number): Promise<void>;
   /** True if the run should abort (e.g. the viewer surfed away). */
   cancelled(): boolean;
 }
@@ -91,6 +99,14 @@ function runStep(step: ResolvedStep, ops: EventOps): Promise<void> {
       return ops.silence(step.ms);
     case 'signOff':
       return ops.signOff();
+    case 'sfx':
+      return ops.sfx(step.cue, step.gain ?? 1, step.ms);
+    case 'apparition':
+      return ops.apparition(step.kind, step.text, step.ms);
+    case 'roomLights':
+      return ops.roomLights(step.level, step.ms);
+    case 'roomGlimpse':
+      return ops.roomGlimpse(step.ms);
   }
 }
 
@@ -98,6 +114,7 @@ function runStep(step: ResolvedStep, ops: EventOps): Promise<void> {
 function captionOf(step: ResolvedStep): string | null {
   if (step.do === 'voice') return step.caption;
   if (step.do === 'slate') return step.text;
+  if (step.do === 'apparition') return step.text ?? null;
   return null;
 }
 

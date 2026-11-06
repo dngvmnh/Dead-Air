@@ -87,7 +87,7 @@ export function decideEvent(input: DecideInput): HorrorEventInput | null {
     if (!ev.seams.includes(seam)) return false;
     if (!actInRange(ev, act)) return false;
     // Never fire at mid-item on a YouTube item (requirement 9.3 / design §2).
-    if (seam === 'mid-item' && currentSource === 'youtube') return false;
+    if ((seam === 'mid-item' || seam === 'startle') && currentSource === 'youtube') return false;
     if (!withinLimits(ev, memory, sessionFired)) return false;
     if (!cooldownOk(ev, memory, nowMs, divisor)) return false;
     // The global gap applies unless the event is a chain link.

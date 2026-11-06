@@ -142,3 +142,15 @@ The goal for a judge: within 30 seconds they have discovered the tear without be
 2. The tear simulation SHALL take under 3 ms per frame on integrated graphics, and the page SHALL hold 60 fps with both canvases active.
 3. Art SHALL be procedural or under 5 MB per file, with original authorship recorded in `docs/room-assets.md`.
 4. No code or art SHALL be copied from Tearable UI or any other reference. Its source licence is unknown.
+
+## Requirement 15: Startles
+
+Short, spontaneous scares that break up the slow dread and then return to normal.
+
+1. A startle SHALL last no more than 6 seconds and SHALL return to the programme at its clock position. The catalogue validator enforces the length.
+2. Every startle SHALL have a per-session or per-viewer limit, and the first SHALL NOT fire within 45 seconds of the page opening (15 to 35 seconds apart under demo mode's divisor).
+3. A startle that changes the picture SHALL NOT fire on a YouTube item, and a tear SHALL only ever answer in the room. The room's own startles MAY play over any source, because they do not touch the tube.
+4. Startles SHALL NOT use or reset the story events' global gap, so they cannot delay the sign-off path.
+5. About a third of finished tears MAY answer back with a sound, subject to the same limits.
+6. Channel change and power off SHALL stop a running startle at once, cut its sounds and restore the room's lights.
+7. Reduced effects SHALL halve startle sound levels and hold figures still. Startles SHALL NOT flash or strobe, and all sound SHALL pass through the master limiter. No cue imitates a real alert tone. Apparitions imply and SHALL NOT show gore or real people.

@@ -12,6 +12,7 @@
  * mid-item rule, channel 13's media basis) on the validated data.
  */
 
+import { eventLengthMs, isRoomOnly, STARTLE_MAX_MS } from '../core/startle.ts';
 import {
   channelSchema,
   horrorEventSchema,
@@ -230,7 +231,9 @@ export function validateCatalog(
   );
   const anyChannelHasYouTube = youTubeChannelIds.size > 0;
   for (const e of events) {
-    if (!e.seams.includes('mid-item')) continue;
+    // A startle interrupts the same way, unless it stays in the room.
+    const interruptsPicture = e.seams.includes('mid-item') || (e.seams.includes('startle') && !isRoomOnly(e));
+    if (!interruptsPicture) continue;
     const firesOnYouTubeChannel =
       e.channels === 'any' ? anyChannelHasYouTube : e.channels.some((id) => youTubeChannelIds.has(id));
     if (firesOnYouTubeChannel) {
@@ -239,6 +242,21 @@ export function validateCatalog(
         where: `event ${e.id}`,
         message: 'can fire at mid-item on a channel carrying a YouTube item',
       });
+    }
+  }
+
+  // --- Rule 15: startles stay short and rare, and a tear never cuts the picture ---
+  for (const e of events) {
+    const isStartle = e.seams.includes('startle') || e.seams.includes('tear');
+    if (!isStartle) continue;
+    if (eventLengthMs(e) > STARTLE_MAX_MS) {
+      errors.push({ rule: '15.1', where: `event ${e.id}`, message: `runs longer than ${STARTLE_MAX_MS} ms` });
+    }
+    if (e.limit.perSession === undefined && e.limit.perViewer === undefined) {
+      errors.push({ rule: '15.2', where: `event ${e.id}`, message: 'has no limit, so it could repeat all session' });
+    }
+    if (e.seams.includes('tear') && !isRoomOnly(e)) {
+      errors.push({ rule: '15.3', where: `event ${e.id}`, message: 'fires on a tear but touches the picture' });
     }
   }
 

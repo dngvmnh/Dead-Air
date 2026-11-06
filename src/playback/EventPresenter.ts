@@ -15,6 +15,7 @@
  * presenter runs under jsdom in unit tests and in a real browser unchanged.
  */
 
+import { drawApparition, type ApparitionKind } from '../render/apparition.ts';
 import { INTERNAL_HEIGHT, INTERNAL_WIDTH } from '../render/looks.ts';
 import {
   drawCaptionsOverStatic,
@@ -143,6 +144,41 @@ export class EventPresenter {
         .join('\n');
       this.publish();
     };
+    drawFrame();
+    return new Promise<void>((resolve) => {
+      const loop = (): void => {
+        if (cancelled() || this.deps.now() - start >= durationMs) {
+          this.stopSceneLoop();
+          resolve();
+          return;
+        }
+        drawFrame();
+        this.sceneFrame = this.requestFrame(loop);
+      };
+      this.sceneFrame = this.requestFrame(loop);
+    });
+  }
+
+  /**
+   * Show a wrong picture for `durationMs`. Resolves when it ends or is cancelled.
+   */
+  showApparition(
+    kind: ApparitionKind,
+    text: string | undefined,
+    durationMs: number,
+    reduced: boolean,
+    cancelled: () => boolean = () => false,
+  ): Promise<void> {
+    this.stopSceneLoop();
+    const start = this.deps.now();
+    const size = { width: INTERNAL_WIDTH, height: INTERNAL_HEIGHT, reduced };
+    const drawFrame = (): void => {
+      const t = this.deps.now() - start;
+      drawApparition(this.ctx, kind, text, t, durationMs, size);
+      this.lastTextValue = text ?? '';
+      this.publish();
+    };
+    this.paintBase = () => drawApparition(this.ctx, kind, undefined, durationMs, durationMs, size);
     drawFrame();
     return new Promise<void>((resolve) => {
       const loop = (): void => {

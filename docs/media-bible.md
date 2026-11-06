@@ -143,6 +143,22 @@ Copy for `src/content/events/events.json`. `{…}` values come only from real me
 
 **Writing rules:** every line must be possible on real TV, understated, and short. Threats stay implied and never instruct the viewer to do anything. Prefer one wrong detail to five.
 
+### Startles
+
+A few seconds each, procedural, then back to the programme. These run on their own clock, separate from the story events above.
+
+| ID | Where | From act | What happens |
+|---|---|---|---|
+| S01 | Ch 2 | 1 | Tape stops, snow, stinger. The anchor's face is wrong. Ticker: ALDER RD |
+| S02 | Ch 4 | 1 | The jingle goes flat and slows, stinger. A gourd too close to the lens. JUST ONE. |
+| S03 | Ch 7 | 1 | The order line rings, someone breathes. A shape rises. OUR OPERATORS ARE WATCHING. |
+| S04 | Ch 13 | 1 | Snow and whispering. A face settles in it. No text. |
+| S05 | Room | 0 | Three knocks and the lights dip. The picture carries on. |
+| S06 | Room | 2 | The lights sink, something scrapes, and pale eyes show behind the viewer's own tears. |
+| S07 | Room | 1 | The lights sink slowly over a heartbeat. |
+| T01 | Room, on a tear | 1 | The wall knocks back. |
+| T02 | Room, on a tear | 3 | Breathing, and eyes behind the tear just made. |
+
 ## 9. Sign-off
 
 Exact text; no other wording:

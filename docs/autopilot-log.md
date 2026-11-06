@@ -1082,3 +1082,15 @@ the unlit plaster was the brightest thing on screen.
 - Marks and text repeat across the wall because a rip shows only a slot of it.
 - The layer re-bakes only when its key changes, checked on the idle tick. Act 3
   redraws at 5 Hz only once a tear exists.
+
+## Startles (requirement 15, requested by the owner)
+
+- Short scares that come back to normal: four picture apparitions, three room
+  events, two answers to a tear. Data in `events.json`, so adding one needs no
+  engine branch.
+- Ten procedural cues through the SFX bus and limiter. Existing story events also
+  gain sounds, with no added length.
+- Picture startles use the normal event path, so EVENT_DONE returns to the clock
+  position. Room startles skip the state machine, so the programme keeps playing.
+- Startles do not touch the story's global gap, so the sign-off path is unaffected.
+- The timer stays off under the test flag. Tests fire startles through `__tv`.

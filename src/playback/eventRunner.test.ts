@@ -45,6 +45,22 @@ function recorder(fail?: { scene?: boolean; voice?: boolean }): Recorder {
       calls.push(`degrade:${caption}:${ms}`);
       return Promise.resolve();
     },
+    sfx: (cue, gain, ms) => {
+      calls.push(`sfx:${cue}:${gain}:${ms ?? 0}`);
+      return Promise.resolve();
+    },
+    apparition: (kind, text, ms) => {
+      calls.push(`apparition:${kind}:${text ?? ''}:${ms}`);
+      return Promise.resolve();
+    },
+    roomLights: (level, ms) => {
+      calls.push(`lights:${level}:${ms}`);
+      return Promise.resolve();
+    },
+    roomGlimpse: (ms) => {
+      calls.push(`glimpse:${ms}`);
+      return Promise.resolve();
+    },
     cancelled: () => false,
   };
 }
@@ -96,6 +112,27 @@ describe('runEventSteps', () => {
       ops,
     );
     expect(ops.calls).toContain('silence:50');
+  });
+
+  it('runs the startle steps in order', async () => {
+    const ops = recorder();
+    await runEventSteps(
+      [
+        { do: 'sfx', cue: 'stinger' },
+        { do: 'apparition', kind: 'gourd', ms: 1800, text: 'JUST ONE.' },
+        { do: 'roomLights', level: 0.4, ms: 300 },
+        { do: 'roomGlimpse', ms: 900 },
+        { do: 'sfx', cue: 'knock', gain: 0.5, ms: 200 },
+      ],
+      ops,
+    );
+    expect(ops.calls).toEqual([
+      'sfx:stinger:1:0',
+      'apparition:gourd:JUST ONE.:1800',
+      'lights:0.4:300',
+      'glimpse:900',
+      'sfx:knock:0.5:200',
+    ]);
   });
 
   it('stops early when cancelled', async () => {

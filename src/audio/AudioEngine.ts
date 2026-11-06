@@ -20,6 +20,8 @@
  * a lightweight fake, without a real browser audio device.
  */
 
+import type { SfxCue } from '../content/schema.ts';
+
 /** A factory for an AudioContext, injectable for tests. */
 export type AudioContextFactory = () => AudioContext;
 
@@ -36,6 +38,9 @@ const LIMITER = {
   attack: 0.003,
   release: 0.12,
 };
+
+/** No single cue voice goes above this, whatever gain it is given. */
+export const PEAK_CAP = 0.6;
 
 /** Analog voice/file band: roughly 200 Hz–8 kHz (design §11). */
 export const ANALOG_BAND = { lowHz: 200, highHz: 8000 };
@@ -58,6 +63,9 @@ export class AudioEngine {
   private staticGain: GainNode | null = null;
   private staticSource: AudioBufferSourceNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
+
+  /** Cue voices still sounding, so a channel change can cut them. */
+  private cues: Array<{ node: AudioScheduledSourceNode; until: number }> = [];
 
   // Volume state (applied to the master gain).
   private volume01 = 0.7;
@@ -273,6 +281,171 @@ export class AudioEngine {
     gain.connect(this.sfxBus);
     osc.start(now);
     osc.stop(now + 0.22);
+  }
+
+  /**
+   * A horror cue through the SFX bus, so the master limiter still caps it. All
+   * procedural: nothing here is a recording, and none of it is modelled on a real
+   * alert tone. `gain` scales the cue, and each voice stays under PEAK_CAP.
+   */
+  playCue(cue: SfxCue, gain = 1): void {
+    if (!this.ctx || !this.sfxBus) return;
+    const g = clamp01(gain);
+    this.pruneCues();
+    switch (cue) {
+      case 'stinger': {
+        // A tight, detuned cluster that hits at once and hangs.
+        for (const f of [207, 220, 233, 311, 466]) this.cueTone('sawtooth', f, f * 0.97, 0.1 * g, 0, 0.012, 1.1);
+        this.cueNoise('highpass', 900, 0.7, 0.26 * g, 0, 0.008, 0.45);
+        break;
+      }
+      case 'tapeStop': {
+        this.cueTone('sawtooth', 440, 28, 0.2 * g, 0, 0.01, 0.75);
+        this.cueTone('sine', 220, 22, 0.2 * g, 0, 0.01, 0.75);
+        break;
+      }
+      case 'heartbeat': {
+        for (const beat of [0, 0.82, 1.64]) {
+          this.cueTone('sine', 62, 34, 0.42 * g, beat, 0.012, 0.2);
+          this.cueTone('sine', 54, 30, 0.32 * g, beat + 0.26, 0.012, 0.2);
+        }
+        break;
+      }
+      case 'knock': {
+        for (const hit of [0, 0.24, 0.47]) {
+          this.cueTone('sine', 150, 62, 0.46 * g, hit, 0.003, 0.14);
+          this.cueNoise('bandpass', 620, 1.1, 0.3 * g, hit, 0.002, 0.07);
+        }
+        break;
+      }
+      case 'breath': {
+        this.cueNoise('bandpass', 1050, 0.8, 0.1 * g, 0, 0.75, 1.1);
+        this.cueNoise('bandpass', 720, 0.9, 0.07 * g, 1.12, 0.5, 1.5);
+        break;
+      }
+      case 'whisper': {
+        // Consonant-like bursts with no words in them: the listener supplies those.
+        let t = 0;
+        for (const [f, d] of [[3400, 0.11], [5200, 0.07], [2600, 0.14], [4700, 0.09], [3100, 0.17], [5600, 0.06], [2900, 0.2]] as const) {
+          this.cueNoise('bandpass', f, 5, 0.13 * g, t, 0.02, d);
+          t += d + 0.05;
+        }
+        break;
+      }
+      case 'toyPiano': {
+        // A jingle going flat and slowing down, as if the spring were running out.
+        let t = 0;
+        let step = 0.2;
+        for (const f of [659, 784, 659, 523, 587, 494, 440, 392]) {
+          const flat = 1 - t * 0.022;
+          this.cueTone('triangle', f * flat, f * flat * 0.995, 0.17 * g, t, 0.004, step * 1.5);
+          this.cueTone('sine', f * flat * 3.02, f * flat * 3, 0.05 * g, t, 0.002, 0.09);
+          t += step;
+          step *= 1.17;
+        }
+        break;
+      }
+      case 'phoneRing': {
+        for (const start of [0, 0.62]) {
+          this.cueTone('square', 880, 880, 0.045 * g, start, 0.008, 0.46);
+          this.cueTone('square', 930, 930, 0.045 * g, start, 0.008, 0.46);
+        }
+        break;
+      }
+      case 'scrape': {
+        this.cueNoise('bandpass', 340, 1.4, 0.26 * g, 0, 0.2, 0.75, 1250);
+        this.cueNoise('bandpass', 1250, 1.4, 0.2 * g, 0.72, 0.1, 0.8, 300);
+        break;
+      }
+      case 'drone': {
+        this.cueTone('sine', 49, 47, 0.2 * g, 0, 0.7, 3.4);
+        this.cueTone('sine', 52, 50, 0.16 * g, 0, 0.7, 3.4);
+        this.cueTone('sawtooth', 98, 94, 0.035 * g, 0, 1, 3.2);
+        break;
+      }
+    }
+  }
+
+  /** Cut every sounding cue: the channel changed or the set went off. */
+  stopCues(): void {
+    for (const { node } of this.cues) {
+      try {
+        node.stop();
+      } catch {
+        // Already finished.
+      }
+    }
+    this.cues = [];
+  }
+
+  private pruneCues(): void {
+    const now = this.ctx?.currentTime ?? 0;
+    this.cues = this.cues.filter((c) => c.until > now);
+  }
+
+  /** One enveloped oscillator voice, `start` seconds from now. */
+  private cueTone(
+    type: OscillatorType,
+    fromHz: number,
+    toHz: number,
+    peak: number,
+    start: number,
+    attack: number,
+    dur: number,
+  ): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.sfxBus || peak <= 0) return;
+    const t = ctx.currentTime + start;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(fromHz, t);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, toHz), t + dur);
+    this.envelope(gain, peak, t, attack, dur);
+    osc.connect(gain);
+    gain.connect(this.sfxBus);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
+    this.cues.push({ node: osc, until: t + dur + 0.02 });
+  }
+
+  /** One enveloped band of noise, optionally sweeping to `toHz`. */
+  private cueNoise(
+    type: BiquadFilterType,
+    hz: number,
+    q: number,
+    peak: number,
+    start: number,
+    attack: number,
+    dur: number,
+    toHz?: number,
+  ): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.sfxBus || !this.noiseBuffer || peak <= 0) return;
+    const t = ctx.currentTime + start;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuffer;
+    src.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.setValueAtTime(hz, t);
+    if (toHz !== undefined) filter.frequency.exponentialRampToValueAtTime(toHz, t + dur);
+    filter.Q.value = q;
+    const gain = ctx.createGain();
+    this.envelope(gain, peak, t, attack, dur);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxBus);
+    src.start(t);
+    src.stop(t + dur + 0.02);
+    this.cues.push({ node: src, until: t + dur + 0.02 });
+  }
+
+  private envelope(gain: GainNode, peak: number, t: number, attack: number, dur: number): void {
+    const capped = Math.min(peak, PEAK_CAP);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(capped, t + attack);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   }
 
   /** The power-off collapse: a descending tone that snaps to silence. */

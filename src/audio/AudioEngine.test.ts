@@ -36,6 +36,7 @@ class FakeNode {
   readonly connectedTo: FakeNode[] = [];
   gain = makeParam(1);
   frequency = makeParam(440);
+  Q = makeParam(1);
   threshold = makeParam(0);
   knee = makeParam(0);
   ratio = makeParam(1);
@@ -256,5 +257,22 @@ describe('AudioEngine lifecycle', () => {
     await engine.close();
     expect(engine.context).toBeNull();
     expect(ctx.state).toBe('closed');
+  });
+
+  describe('horror cues', () => {
+    const CUES = ['stinger', 'tapeStop', 'heartbeat', 'knock', 'breath', 'whisper', 'toyPiano', 'phoneRing', 'scrape', 'drone'] as const;
+
+    it('every cue plays, and stopping them is safe', async () => {
+      const { engine } = newEngine();
+      await engine.unlock();
+      for (const cue of CUES) expect(() => engine.playCue(cue, 1)).not.toThrow();
+      expect(() => engine.stopCues()).not.toThrow();
+      expect(() => engine.stopCues()).not.toThrow();
+    });
+
+    it('is a no-op before the audio is unlocked', () => {
+      const { engine } = newEngine();
+      expect(() => engine.playCue('stinger')).not.toThrow();
+    });
   });
 });

@@ -20,6 +20,9 @@ copied from Tearable UI or any other reference (its licence is unknown).
 | Scratched history, far televisions (Act 2) | `render/behindRenderer.ts` | Procedural; real values only | original |
 | Moving dark and a shape (Act 3) | `render/tearRenderer.ts` | Shader | original |
 | Rows of televisions with the fixed sign-off text (Act 4) | `render/behindRenderer.ts` | Procedural | original |
+| Glimpse behind a tear | `render/behindRenderer.ts` | Procedural | original |
+| Apparitions: anchor, gourd, operator, face in the snow | `render/apparition.ts` | Procedural; figures, not people | original |
+| Startle sounds: stinger, tape stop, heartbeat, knock, breath, whisper, toy piano, phone, scrape, drone | `audio/AudioEngine.ts` | Synthesised with Web Audio | original |
 
 Notes:
 

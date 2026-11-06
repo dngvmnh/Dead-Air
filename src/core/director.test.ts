@@ -176,8 +176,39 @@ describe('decideEvent: global 90s gap (requirement 9.7)', () => {
     expect(decideEvent(input)).toBeNull();
     expect(decideEvent({ ...input, demo: true })?.id).toBe('E');
   });
+
+  it('never fires a startle over a YouTube item', () => {
+    const startle = { ...baseEventForStartle(), seams: ['startle' as const] };
+    const input = {
+      memory: createMemory(0),
+      channel: 2 as const,
+      seam: 'startle' as const,
+      nowMs: 1000,
+      localHour: 12,
+      lastEventAt: null,
+      sessionFired: {},
+      events: [startle],
+      random: () => 0,
+    };
+    expect(decideEvent({ ...input, currentSource: 'scene' })?.id).toBe('S');
+    expect(decideEvent({ ...input, currentSource: 'youtube' })).toBeNull();
+  });
 });
 
 // Keep the Item/Seam imports meaningful to the type-checker.
 const _types: { s: Seam; src: Item['source'] } = { s: 'tune-in', src: 'scene' };
 void _types;
+
+function baseEventForStartle() {
+  return {
+    id: 'S',
+    minAct: 0,
+    channels: 'any' as const,
+    seams: ['startle' as const],
+    when: { distinctChannelsGte: 0 },
+    limit: { perSession: 1 },
+    priority: 0,
+    chain: true,
+    steps: [{ do: 'sfx' as const, cue: 'knock' as const }],
+  };
+}
