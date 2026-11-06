@@ -62,13 +62,13 @@ Work in order. Each milestone ends in something runnable. Commit after each comp
 - [x] 14. Channels 04 and 07
   - [x] 14.1 Author scene rundowns and revisit variants, including moving set objects on 07.
   - _Requirements: 8.3, 8.4_
-- [x] 15. Channel 13 and the ending
-  - [x] 15.1 Build Dead Air programming, history read-back, and voice stem stitching.
-  - [x] 15.2 Implement `flashPrevious` frame capture, with the station card fallback.
-  - [x] 15.3 Implement sign-off, fixed text, power-off, Act 4, and after-hours variants.
+- [ ] 15. Channel 13 and the ending
+  - [ ] 15.1 Build Dead Air programming, history read-back, and voice stem stitching.
+  - [ ] 15.2 Implement `flashPrevious` frame capture, with the station card fallback.
+  - [ ] 15.3 Implement sign-off, fixed text, power-off, Act 4, and after-hours variants.
   - [x] 15.4 Add all events from `docs/media-bible.md` to `events.json`.
   - _Requirements: 10.1–10.4, 11.1–11.4, 12.4_
-- [x] 16. Checkpoint: `/?demo=1` reaches sign-off in about three minutes using scenes only, with an end-to-end test using a mocked clock.
+- [ ] 16. Checkpoint: `/?demo=1` reaches sign-off in about three minutes using scenes only, with an end-to-end test using a mocked clock.
   - _Requirements: 16.4_
 
 ## Milestone 4: File and YouTube sources

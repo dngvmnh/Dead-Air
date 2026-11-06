@@ -614,3 +614,42 @@ done, how it was checked, and anything left unverified.
   replays the renderer loop; this is a test-runtime cost, not a product issue.
   Real audio, real art, and the Milestone-4 file/YouTube adapters are out of MVP
   scope (tasks 17+), which per the run's instructions I am NOT starting.
+
+## Correction — tasks 15.1, 15.2, 15.3 and 16 un-ticked (earlier report was wrong)
+
+An independent review of the production build found two defects that the earlier
+"MVP complete" report (commit `bb67948`) missed:
+
+1. **Horror events are not visible on screen.** The event ops in
+   `useTelevision` only called `setStatic(...)` and `setAnnouncement(...)` — the
+   latter writes the ARIA live region, not the picture. Slates, voice captions,
+   captions-over-static and the sign-off text were never drawn onto a canvas
+   and published through `setSource`, so nothing of an event reached the shader.
+   `playScene` inside an event just waited 50 ms; it never played the scene.
+   Static was not reliably restored to the resting level after a step.
+2. **The sign-off ending can be lost.** `eventCancelRef` was declared but never
+   set true on channel change or power-off, so a stale step could run after the
+   viewer left. E10 was recorded as fired in `runEvent` (at event *start*), not
+   on reaching `SIGN_OFF` as design §7 requires, so leaving during the E10 voice
+   consumed the once-per-viewer sign-off without delivering it. There was no
+   reload recovery into Act 4, and the 8 s sign-off timer was never cleared.
+
+Additional defects the fixes below also address: a DOM status-word element
+(`Screen.module.css .placeholder`) rendered text over the tube in every phase
+(violating "no DOM text/styling over the tube", design §3); the sign-off text
+did not match `docs/media-bible.md` §9; E10 was not marked `chain` so the 90 s
+global gap could block it; visits were recorded at tune *start* (requirement
+7.1 asks for tune *complete*); `{lastChannel}` and `lastChannelIs` used
+`memory.lastChannel` (the boot channel) instead of the previous *different*
+channel, so E05/E07 could name the wrong channel and E09 could never fire; the
+saved channel and after-hours state were not restored on load (requirement 1.3,
+11.3); `flashPrevious` did not capture a real last frame or synthesise a station
+card; there was no mid-item seam so E03 could never fire; captions were not
+wired to the CC setting; scene-layer templates (ch07 clock, ch13 history
+read-back) were not filled; and no channel carried a minAct-4 after-hours layer.
+
+Tasks 15.1, 15.2, 15.3 and 16 are un-ticked. Each is re-ticked only when the
+fixes below pass the full gate (`npm test`, `npm run lint`, `npm run build`,
+`npm run validate:catalog`, `npx playwright test --project=chromium`). Task 15.4
+(all events present in `events.json`) stays ticked; its content is corrected in
+place by the fixes below.
