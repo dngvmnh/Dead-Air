@@ -146,6 +146,25 @@ export function bakeRoom(
   // at both 1440x900 and 1280x720. The wall texture maps 1:1 to the viewport, so
   // these fractions are where each object lands on screen.
 
+  // Someone taped a note to the wall. It is the only hint the set gives, so it
+  // sits where the television's light reaches it, and it says the wrong thing.
+  ctx.save();
+  ctx.translate(w * 0.082, h * 0.57);
+  ctx.rotate(-0.05);
+  ctx.fillStyle = '#d8cfa8';
+  ctx.fillRect(-58, -44, 116, 88);
+  ctx.fillStyle = 'rgba(214, 205, 160, 0.55)';
+  ctx.fillRect(-20, -52, 40, 14);
+  ctx.fillStyle = '#231a12';
+  ctx.font = 'bold 15px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('PLEASE DO', 0, -26);
+  ctx.fillText('NOT PICK', 0, -7);
+  ctx.fillText('AT THE', 0, 12);
+  ctx.fillText('WALLPAPER', 0, 31);
+  ctx.restore();
+
   // Window onto darkness, high in the LEFT band.
   ctx.save();
   ctx.fillStyle = '#0a0d14';

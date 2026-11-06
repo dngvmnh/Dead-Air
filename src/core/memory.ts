@@ -98,20 +98,20 @@ export function naturalAct(mem: ViewerMemory, demo: boolean): Act {
   const d = demo ? DEMO_DIVISOR : 1;
   const min = (minutes: number): number => (minutes * 60 * 1000) / d;
 
-  // Act 3 — Terminal: ≥14 min, all four channels, and E07 fired.
-  if (mem.totalWatchMs >= min(14) && allFourVisited(mem) && (mem.firedEvents['E07']?.count ?? 0) > 0) {
+  // Act 3 — Terminal: ≥4 min, all four channels, and E07 fired.
+  if (mem.totalWatchMs >= min(4) && allFourVisited(mem) && (mem.firedEvents['E07']?.count ?? 0) > 0) {
     return 3;
   }
-  // Act 2 — Aware: ≥8 min and ≥3 distinct channels, OR ≥2 sessions and ≥2 distinct.
+  // Act 2 — Aware: ≥2 min and ≥3 distinct channels, OR ≥2 sessions and ≥2 distinct.
   const distinct = distinctChannels(mem);
   if (
-    (mem.totalWatchMs >= min(8) && distinct >= 3) ||
+    (mem.totalWatchMs >= min(2) && distinct >= 3) ||
     (mem.sessionCount >= 2 && distinct >= 2)
   ) {
     return 2;
   }
-  // Act 1 — Unease: ≥3 min total, or a channel revisited.
-  if (mem.totalWatchMs >= min(3) || anyRevisited(mem)) {
+  // Act 1 — Unease: ≥45 s total, or a channel revisited.
+  if (mem.totalWatchMs >= min(0.75) || anyRevisited(mem)) {
     return 1;
   }
   return 0;

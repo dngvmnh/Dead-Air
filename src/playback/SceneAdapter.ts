@@ -9,6 +9,7 @@
  * under jsdom in unit tests and in a real browser unchanged.
  */
 
+import type { SceneProgramInput } from '../content/schema.ts';
 import type { Item } from '../core/types.ts';
 import { INTERNAL_HEIGHT, INTERNAL_WIDTH } from '../render/looks.ts';
 import { renderScene, type Ctx2D } from '../render/sceneRenderer.ts';
@@ -40,6 +41,9 @@ function defaultCreateCanvas(w: number, h: number): { ctx: Ctx2D; source: unknow
   return { ctx, source: canvas };
 }
 
+/** A cue counts as just begun within this long of its start. */
+const CUE_START_WINDOW_MS = 400;
+
 export class SceneAdapter implements PlaybackAdapter {
   readonly surface = 'canvas' as const;
 
@@ -61,6 +65,7 @@ export class SceneAdapter implements PlaybackAdapter {
   private readonly redrawIntervalMs: number;
   /** ctx.now() of the last actual redraw; -Infinity forces the first draw. */
   private lastDrawAt = -Infinity;
+  private lastCueKey: string | null = null;
 
   constructor(deps: SceneAdapterDeps = {}) {
     this.redrawIntervalMs = deps.redrawIntervalMs ?? 50;
@@ -190,6 +195,19 @@ export class SceneAdapter implements PlaybackAdapter {
       ...(resolveText ? { resolveText } : {}),
     });
     this.ctxApp.setSource(this.sourceCanvas as never);
+    this.speakNewCue(scene, tMs);
+  }
+
+  /**
+   * Say a cue only as it begins. Tuning in mid-sentence stays silent until the
+   * next line, the way real television would not restart the sentence for you.
+   */
+  private speakNewCue(scene: SceneProgramInput, tMs: number): void {
+    const cue = (scene.captions ?? []).find((c) => tMs >= c.atMs && tMs < c.endMs);
+    const key = cue ? `${scene.id}:${cue.atMs}` : null;
+    if (key === this.lastCueKey) return;
+    this.lastCueKey = key;
+    if (cue && this.running && tMs - cue.atMs < CUE_START_WINDOW_MS) this.ctxApp?.speakCue?.(cue.text);
   }
 
   private emit(e: AdapterEvent): void {

@@ -9,7 +9,10 @@
       "title": "Station ID",
       "kind": "interstitial",
       "durationMs": 8000,
-      "rights": { "basis": "original", "note": "Placeholder scene art; original KDA-TV identity." },
+      "rights": {
+        "basis": "original",
+        "note": "Placeholder scene art; original KDA-TV identity."
+      },
       "placeholder": true,
       "source": "scene",
       "sceneId": "ch02-station-id",
@@ -20,10 +23,28 @@
       "title": "Nightly News: Bulletin A",
       "kind": "programme",
       "durationMs": 40000,
-      "rights": { "basis": "original", "note": "Placeholder scene art; original anchor Martin Vale." },
+      "rights": {
+        "basis": "original",
+        "note": "Placeholder scene art; original anchor Martin Vale."
+      },
       "placeholder": true,
       "source": "scene",
       "sceneId": "ch02-bulletin-a",
+      "look": "broadcast"
+    },
+    {
+      "id": "ch02-film-1",
+      "title": "KDA Newsreel Archive",
+      "kind": "programme",
+      "durationMs": 120000,
+      "rights": {
+        "basis": "public-domain",
+        "source": "https://archive.org/details/SpotNews1937",
+        "licence": "Public domain marking in the item metadata",
+        "note": "See docs/rights-log.md"
+      },
+      "source": "file",
+      "url": "/film/spot-news.mp4",
       "look": "broadcast"
     },
     {
@@ -31,7 +52,10 @@
       "title": "Council Notice",
       "kind": "interstitial",
       "durationMs": 10000,
-      "rights": { "basis": "original", "note": "Placeholder scene art; fictional council notice." },
+      "rights": {
+        "basis": "original",
+        "note": "Placeholder scene art; fictional council notice."
+      },
       "placeholder": true,
       "source": "scene",
       "sceneId": "ch02-council-notice",
@@ -42,7 +66,10 @@
       "title": "Hollow Creek Forecast",
       "kind": "programme",
       "durationMs": 20000,
-      "rights": { "basis": "original", "note": "Placeholder scene art; fictional forecast." },
+      "rights": {
+        "basis": "original",
+        "note": "Placeholder scene art; fictional forecast."
+      },
       "placeholder": true,
       "source": "scene",
       "sceneId": "ch02-weather",
@@ -53,7 +80,10 @@
       "title": "Stay Tuned Bumper",
       "kind": "interstitial",
       "durationMs": 6000,
-      "rights": { "basis": "original", "note": "Placeholder scene art; original bumper." },
+      "rights": {
+        "basis": "original",
+        "note": "Placeholder scene art; original bumper."
+      },
       "placeholder": true,
       "source": "scene",
       "sceneId": "ch02-stay-tuned",
@@ -64,7 +94,10 @@
       "title": "Station ID (late)",
       "kind": "interstitial",
       "durationMs": 8000,
-      "rights": { "basis": "original", "note": "Placeholder scene art; original KDA-TV identity." },
+      "rights": {
+        "basis": "original",
+        "note": "Placeholder scene art; original KDA-TV identity."
+      },
       "placeholder": true,
       "source": "scene",
       "sceneId": "ch02-station-id",

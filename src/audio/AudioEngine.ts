@@ -39,6 +39,27 @@ const LIMITER = {
   release: 0.12,
 };
 
+export type ProgrammeBed = 'news' | 'kids' | 'shop' | 'deadair';
+
+interface BedPattern {
+  stepMs: number;
+  wave: OscillatorType;
+  notes: ReadonlyArray<number | 0>;
+  noteLevel: number;
+  pad?: readonly number[];
+  padEvery: number;
+  padLevel: number;
+  tick?: number;
+}
+
+/** Original, simple patterns. Quiet enough to sit under a voice. */
+const BEDS: Record<ProgrammeBed, BedPattern> = {
+  news: { stepMs: 260, wave: 'sine', notes: [147, 0, 0, 0, 175, 0, 0, 0], noteLevel: 0.05, pad: [73, 110], padEvery: 16, padLevel: 0.035, tick: 0.022 },
+  kids: { stepMs: 340, wave: 'triangle', notes: [523, 659, 784, 659, 587, 698, 880, 698], noteLevel: 0.065, padEvery: 8, padLevel: 0 },
+  shop: { stepMs: 420, wave: 'sine', notes: [392, 494, 587, 740, 659, 523, 440, 494], noteLevel: 0.06, pad: [98, 147], padEvery: 16, padLevel: 0.03 },
+  deadair: { stepMs: 1400, wave: 'sine', notes: [55, 0, 0, 52], noteLevel: 0.06, pad: [50], padEvery: 4, padLevel: 0.04 },
+};
+
 /** No single cue voice goes above this, whatever gain it is given. */
 export const PEAK_CAP = 0.6;
 
@@ -64,6 +85,8 @@ export class AudioEngine {
   private staticSource: AudioBufferSourceNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
 
+  private bedTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly routed = new WeakSet<HTMLMediaElement>();
   /** Cue voices still sounding, so a channel change can cut them. */
   private cues: Array<{ node: AudioScheduledSourceNode; until: number }> = [];
 
@@ -299,6 +322,16 @@ export class AudioEngine {
         this.cueNoise('highpass', 900, 0.7, 0.26 * g, 0, 0.008, 0.45);
         break;
       }
+      case 'jumpHit': {
+        // The lunge: a body blow under a shriek that climbs. Through the limiter,
+        // which is what holds it at a level that startles rather than hurts.
+        this.cueTone('sine', 86, 30, 0.6 * g, 0, 0.004, 0.5);
+        for (const [from, to] of [[196, 760], [233, 905], [311, 1210], [415, 1620]] as const) {
+          this.cueTone('sawtooth', from, to, 0.17 * g, 0, 0.006, 0.8);
+        }
+        this.cueNoise('highpass', 1500, 0.6, 0.4 * g, 0, 0.004, 0.55);
+        break;
+      }
       case 'tapeStop': {
         this.cueTone('sawtooth', 440, 28, 0.2 * g, 0, 0.01, 0.75);
         this.cueTone('sine', 220, 22, 0.2 * g, 0, 0.01, 0.75);
@@ -363,6 +396,52 @@ export class AudioEngine {
         this.cueTone('sawtooth', 98, 94, 0.035 * g, 0, 1, 3.2);
         break;
       }
+    }
+  }
+
+  /**
+   * The sound under a programme, so a channel is never dead air until it means to
+   * be. `unease` (0..1) slowly detunes the bed as the story goes on.
+   */
+  setBed(bed: ProgrammeBed | null, unease = 0): void {
+    if (this.bedTimer !== null) {
+      clearInterval(this.bedTimer);
+      this.bedTimer = null;
+    }
+    if (!bed || !this.ctx || !this.sfxBus) return;
+    const pattern = BEDS[bed];
+    const flat = 1 - Math.min(1, Math.max(0, unease)) * 0.05;
+    let step = 0;
+    const tick = (): void => {
+      this.pruneCues();
+      const stepSeconds = pattern.stepMs / 1000;
+      if (pattern.pad && step % pattern.padEvery === 0) {
+        const hold = (pattern.padEvery * pattern.stepMs) / 1000 + 0.6;
+        for (const f of pattern.pad) this.cueTone('sine', f * flat, f * flat, pattern.padLevel, 0, 0.5, hold);
+      }
+      const note = pattern.notes[step % pattern.notes.length];
+      if (note) this.cueTone(pattern.wave, note * flat, note * flat * 0.995, pattern.noteLevel, 0, 0.006, stepSeconds * 1.5);
+      if (pattern.tick && step % 2 === 0) this.cueNoise('highpass', 3800, 0.7, pattern.tick, 0, 0.002, 0.03);
+      step += 1;
+    };
+    tick();
+    this.bedTimer = setInterval(tick, pattern.stepMs);
+  }
+
+  /**
+   * Send a film's sound through the analog band, so it matches the picture.
+   * Once only, because a media element can be captured a single time.
+   */
+  routeElement(element: HTMLMediaElement): boolean {
+    if (!this.ctx || this.routed.has(element)) return this.routed.has(element);
+    const input = this.createAnalogChain();
+    if (!input) return false;
+    try {
+      this.ctx.createMediaElementSource(element).connect(input);
+      this.routed.add(element);
+      return true;
+    } catch {
+      return false;
     }
   }
 

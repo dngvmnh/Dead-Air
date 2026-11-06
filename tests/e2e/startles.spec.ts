@@ -62,6 +62,34 @@ test.describe('startles', () => {
     await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 7000 }).toBe('ON_AIR');
   });
 
+  test('a jump fills the window, takes no clicks, and goes away', async ({ page }) => {
+    await seed(page, 0);
+    await onAir(page);
+    await page.evaluate(() => (window as unknown as { __tv: Tv }).__tv.forceStartle('S01'));
+    const jump = page.locator('[data-testid="jump-scare"]');
+    await expect(jump).toHaveCount(1, { timeout: 5000 });
+    const box = await jump.boundingBox();
+    expect(box?.width).toBe(page.viewportSize()?.width);
+    expect(await jump.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none');
+    await expect(jump).toHaveCount(0, { timeout: 3000 });
+    await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 5000 }).toBe('ON_AIR');
+  });
+
+  test('reduced effects keeps the sound and drops the lunge', async ({ page }) => {
+    await seed(page, 0, true);
+    await onAir(page);
+    await page.evaluate(() => {
+      (window as unknown as { __sawJump: boolean }).__sawJump = false;
+      new MutationObserver(() => {
+        if (document.querySelector('[data-testid="jump-scare"]')) (window as unknown as { __sawJump: boolean }).__sawJump = true;
+      }).observe(document.body, { childList: true });
+      (window as unknown as { __tv: Tv }).__tv.forceStartle('S01');
+    });
+    await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 3000 }).toBe('EVENT');
+    await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 8000 }).toBe('ON_AIR');
+    expect(await page.evaluate(() => (window as unknown as { __sawJump: boolean }).__sawJump)).toBe(false);
+  });
+
   test('a room startle leaves the picture alone and restores the lights', async ({ page }) => {
     await seed(page, 0);
     await onAir(page);
@@ -109,7 +137,7 @@ test.describe('startles', () => {
     await page.mouse.down();
     for (let i = 1; i <= 12; i += 1) await page.mouse.move(x, 200 + i * 20);
     await page.mouse.up();
-    await expect.poll(() => tv(page, (t) => t.lastStartle()), { timeout: 3000 }).toBe('T01');
+    await expect.poll(() => tv(page, (t) => t.lastStartle()), { timeout: 3000 }).toBe('T03');
     expect(await tv(page, (t) => t.phase())).toBe('ON_AIR');
   });
 

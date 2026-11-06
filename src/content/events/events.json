@@ -407,7 +407,7 @@
     },
     {
       "id": "S01",
-      "minAct": 1,
+      "minAct": 0,
       "channels": [
         2
       ],
@@ -415,8 +415,9 @@
         "startle"
       ],
       "limit": {
-        "perSession": 1
+        "perSession": 3
       },
+      "priority": 2,
       "steps": [
         {
           "do": "sfx",
@@ -424,28 +425,38 @@
         },
         {
           "do": "static",
-          "ms": 350
+          "ms": 300
         },
         {
           "do": "sfx",
-          "cue": "stinger"
+          "cue": "drone",
+          "gain": 0.8
         },
         {
           "do": "apparition",
           "kind": "anchor",
-          "ms": 2200,
+          "ms": 1500,
           "text": "ALDER RD"
+        },
+        {
+          "do": "sfx",
+          "cue": "jumpHit"
+        },
+        {
+          "do": "jump",
+          "kind": "anchor",
+          "ms": 750
         }
       ],
       "when": {
         "distinctChannelsGte": 0
       },
-      "priority": 0,
-      "chain": true
+      "chain": true,
+      "cooldownMs": 70000
     },
     {
       "id": "S02",
-      "minAct": 1,
+      "minAct": 0,
       "channels": [
         4
       ],
@@ -453,34 +464,40 @@
         "startle"
       ],
       "limit": {
-        "perSession": 1
+        "perSession": 3
       },
+      "priority": 2,
       "steps": [
         {
           "do": "sfx",
           "cue": "toyPiano",
-          "ms": 1500
-        },
-        {
-          "do": "sfx",
-          "cue": "stinger"
+          "ms": 1300
         },
         {
           "do": "apparition",
           "kind": "gourd",
-          "ms": 2000,
+          "ms": 1100,
           "text": "JUST ONE."
+        },
+        {
+          "do": "sfx",
+          "cue": "jumpHit"
+        },
+        {
+          "do": "jump",
+          "kind": "gourd",
+          "ms": 750
         }
       ],
       "when": {
         "distinctChannelsGte": 0
       },
-      "priority": 0,
-      "chain": true
+      "chain": true,
+      "cooldownMs": 70000
     },
     {
       "id": "S03",
-      "minAct": 1,
+      "minAct": 0,
       "channels": [
         7
       ],
@@ -488,13 +505,14 @@
         "startle"
       ],
       "limit": {
-        "perSession": 1
+        "perSession": 3
       },
+      "priority": 2,
       "steps": [
         {
           "do": "sfx",
           "cue": "phoneRing",
-          "ms": 1200
+          "ms": 1000
         },
         {
           "do": "sfx",
@@ -503,19 +521,28 @@
         {
           "do": "apparition",
           "kind": "operator",
-          "ms": 2600,
+          "ms": 1500,
           "text": "OUR OPERATORS ARE WATCHING."
+        },
+        {
+          "do": "sfx",
+          "cue": "jumpHit"
+        },
+        {
+          "do": "jump",
+          "kind": "operator",
+          "ms": 750
         }
       ],
       "when": {
         "distinctChannelsGte": 0
       },
-      "priority": 0,
-      "chain": true
+      "chain": true,
+      "cooldownMs": 70000
     },
     {
       "id": "S04",
-      "minAct": 1,
+      "minAct": 0,
       "channels": [
         13
       ],
@@ -523,12 +550,13 @@
         "startle"
       ],
       "limit": {
-        "perSession": 1
+        "perSession": 3
       },
+      "priority": 2,
       "steps": [
         {
           "do": "static",
-          "ms": 500
+          "ms": 350
         },
         {
           "do": "sfx",
@@ -537,14 +565,23 @@
         {
           "do": "apparition",
           "kind": "deadair",
-          "ms": 2800
+          "ms": 1500
+        },
+        {
+          "do": "sfx",
+          "cue": "jumpHit"
+        },
+        {
+          "do": "jump",
+          "kind": "deadair",
+          "ms": 750
         }
       ],
       "when": {
         "distinctChannelsGte": 0
       },
-      "priority": 0,
-      "chain": true
+      "chain": true,
+      "cooldownMs": 70000
     },
     {
       "id": "S05",
@@ -554,8 +591,9 @@
         "startle"
       ],
       "limit": {
-        "perSession": 2
+        "perSession": 4
       },
+      "priority": 1,
       "steps": [
         {
           "do": "sfx",
@@ -563,7 +601,7 @@
         },
         {
           "do": "roomLights",
-          "level": 0.55,
+          "level": 0.45,
           "ms": 450
         },
         {
@@ -575,23 +613,24 @@
       "when": {
         "distinctChannelsGte": 0
       },
-      "priority": 0,
-      "chain": true
+      "chain": true,
+      "cooldownMs": 40000
     },
     {
       "id": "S06",
-      "minAct": 2,
+      "minAct": 1,
       "channels": "any",
       "seams": [
         "startle"
       ],
       "limit": {
-        "perSession": 1
+        "perSession": 3
       },
+      "priority": 1,
       "steps": [
         {
           "do": "roomLights",
-          "level": 0.25,
+          "level": 0.2,
           "ms": 500
         },
         {
@@ -611,23 +650,24 @@
       "when": {
         "distinctChannelsGte": 0
       },
-      "priority": 0,
-      "chain": true
+      "chain": true,
+      "cooldownMs": 40000
     },
     {
       "id": "S07",
-      "minAct": 1,
+      "minAct": 0,
       "channels": "any",
       "seams": [
         "startle"
       ],
       "limit": {
-        "perSession": 1
+        "perSession": 3
       },
+      "priority": 1,
       "steps": [
         {
           "do": "roomLights",
-          "level": 0.35,
+          "level": 0.3,
           "ms": 1000
         },
         {
@@ -644,36 +684,12 @@
       "when": {
         "distinctChannelsGte": 0
       },
-      "priority": 0,
-      "chain": true
+      "chain": true,
+      "cooldownMs": 40000
     },
     {
-      "id": "T01",
-      "minAct": 1,
-      "channels": "any",
-      "seams": [
-        "tear"
-      ],
-      "limit": {
-        "perSession": 2
-      },
-      "steps": [
-        {
-          "do": "sfx",
-          "cue": "knock",
-          "gain": 0.7
-        }
-      ],
-      "when": {
-        "distinctChannelsGte": 0
-      },
-      "priority": 0,
-      "chain": true
-    },
-    {
-      "id": "T02",
-      "minAct": 3,
-      "maxAct": 3,
+      "id": "T03",
+      "minAct": 0,
       "channels": "any",
       "seams": [
         "tear"
@@ -681,6 +697,59 @@
       "limit": {
         "perSession": 1
       },
+      "priority": 3,
+      "steps": [
+        {
+          "do": "sfx",
+          "cue": "jumpHit"
+        },
+        {
+          "do": "jump",
+          "kind": "anchor",
+          "ms": 650,
+          "from": "tear"
+        }
+      ],
+      "when": {
+        "distinctChannelsGte": 0
+      },
+      "chain": true
+    },
+    {
+      "id": "T01",
+      "minAct": 0,
+      "channels": "any",
+      "seams": [
+        "tear"
+      ],
+      "limit": {
+        "perSession": 4
+      },
+      "priority": 1,
+      "steps": [
+        {
+          "do": "sfx",
+          "cue": "knock",
+          "gain": 0.8
+        }
+      ],
+      "when": {
+        "distinctChannelsGte": 0
+      },
+      "chain": true,
+      "cooldownMs": 15000
+    },
+    {
+      "id": "T02",
+      "minAct": 1,
+      "channels": "any",
+      "seams": [
+        "tear"
+      ],
+      "limit": {
+        "perSession": 3
+      },
+      "priority": 2,
       "steps": [
         {
           "do": "sfx",
@@ -694,8 +763,8 @@
       "when": {
         "distinctChannelsGte": 0
       },
-      "priority": 0,
-      "chain": true
+      "chain": true,
+      "cooldownMs": 25000
     }
   ]
 }

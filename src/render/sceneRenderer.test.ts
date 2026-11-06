@@ -26,6 +26,18 @@ function fakeCtx(): { ctx: Ctx2D; calls: Call[] } {
     strokeRect: rec('strokeRect'),
     fillText: rec('fillText'),
     drawImage: rec('drawImage'),
+    translate: rec('translate'),
+    scale: rec('scale'),
+    beginPath: rec('beginPath'),
+    closePath: rec('closePath'),
+    moveTo: rec('moveTo'),
+    lineTo: rec('lineTo'),
+    quadraticCurveTo: rec('quadraticCurveTo'),
+    ellipse: rec('ellipse'),
+    fill: rec('fill'),
+    stroke: rec('stroke'),
+    createLinearGradient: () => ({ addColorStop: () => undefined }),
+    createRadialGradient: () => ({ addColorStop: () => undefined }),
     set fillStyle(v: string) {
       calls.push({ op: 'fillStyle', args: [v] });
     },

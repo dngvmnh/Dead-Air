@@ -9,7 +9,10 @@
       "title": "Pumpkin Hour Bumper",
       "kind": "interstitial",
       "durationMs": 8000,
-      "rights": { "basis": "original", "note": "Placeholder scene art; original Pumpkin Hour identity." },
+      "rights": {
+        "basis": "original",
+        "note": "Placeholder scene art; original Pumpkin Hour identity."
+      },
       "placeholder": true,
       "source": "scene",
       "sceneId": "ch04-jingle",
@@ -20,10 +23,28 @@
       "title": "The Pumpkin Hour: Counting",
       "kind": "programme",
       "durationMs": 45000,
-      "rights": { "basis": "original", "note": "Placeholder scene art; original Mister Gourd and Dot." },
+      "rights": {
+        "basis": "original",
+        "note": "Placeholder scene art; original Mister Gourd and Dot."
+      },
       "placeholder": true,
       "source": "scene",
       "sceneId": "ch04-pumpkin-a",
+      "look": "broadcast"
+    },
+    {
+      "id": "ch04-film-1",
+      "title": "Story Time",
+      "kind": "programme",
+      "durationMs": 150000,
+      "rights": {
+        "basis": "public-domain",
+        "source": "https://archive.org/details/MotherGooseS",
+        "licence": "Public domain marking in the item metadata",
+        "note": "See docs/rights-log.md"
+      },
+      "source": "file",
+      "url": "/film/mother-goose.mp4",
       "look": "broadcast"
     },
     {
@@ -31,10 +52,28 @@
       "title": "Pumpkin Hour Bumper (late)",
       "kind": "interstitial",
       "durationMs": 8000,
-      "rights": { "basis": "original", "note": "Placeholder scene art; original Pumpkin Hour identity." },
+      "rights": {
+        "basis": "original",
+        "note": "Placeholder scene art; original Pumpkin Hour identity."
+      },
       "placeholder": true,
       "source": "scene",
       "sceneId": "ch04-jingle",
+      "look": "broadcast"
+    },
+    {
+      "id": "ch04-film-2",
+      "title": "Bedtime With Mister Gourd",
+      "kind": "programme",
+      "durationMs": 120000,
+      "rights": {
+        "basis": "public-domain",
+        "source": "https://archive.org/details/Sleepfor1950",
+        "licence": "Public domain marking in the item metadata",
+        "note": "See docs/rights-log.md"
+      },
+      "source": "file",
+      "url": "/film/sleep-for-health.mp4",
       "look": "broadcast"
     }
   ]

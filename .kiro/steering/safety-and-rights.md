@@ -42,6 +42,10 @@ Rules:
 - The demo video must use only `original`, `ai-generated`, `public-domain`, or properly licensed `cc` material.
 - Never invent YouTube IDs, durations, or source URLs. Leave a catalogue slot empty until a human supplies it.
 
+Exception (owner, 2026-11-07): five public-domain Prelinger films may show real people and products, as recorded in `docs/rights-log.md`, pending the review noted there. Everything made for the project still follows the rules above.
+
 ## Media storage
 
 No media binaries in git. GitHub rejects blobs over 100 MB, and history cannot be easily cleaned. `public/media` is for small images and short audio, each under 5 MB. Long video goes to object storage with HTTP range support and CORS allowing the site's origin; WebGL cannot sample a cross-origin video without CORS.
+
+The public-domain clips are cut by `npm run fetch:media` into `public/film` (gitignored) and served from the site's own origin, which avoids the CORS requirement. Run it before a deploy. A deploy without it still works: a missing clip is skipped.

@@ -17,6 +17,7 @@ import type { LayerInput, SceneProgramInput } from '../content/schema.ts';
 import { activeCaptions, layerVisible, sampleKeyframes, type SceneVars } from '../core/scene.ts';
 import { INTERNAL_HEIGHT, INTERNAL_WIDTH } from './looks.ts';
 import { wrap } from './overlayRenderer.ts';
+import { drawSceneArt } from './sceneArt.ts';
 
 /** Minimal 2D context surface used here (keeps the module testable). */
 export type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -106,7 +107,7 @@ function drawLayer(
       const y = kf.y ?? 0;
       const bitmap = images?.get(layer.src);
       if (bitmap) ctx.drawImage(bitmap, x, y, w, h);
-      else drawImagePlaceholder(ctx, layer.src, x, y, w, h);
+      else if (!drawSceneArt(ctx, layer.src, tMs, x, y, w, h)) drawImagePlaceholder(ctx, layer.src, x, y, w, h);
       break;
     }
     case 'rect': {

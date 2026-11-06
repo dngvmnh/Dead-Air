@@ -13,7 +13,7 @@ import { AudioEngine } from '../audio/AudioEngine.ts';
 import { broadcastPosition, resolveBroadcast } from '../core/clock.ts';
 import { getChannel, getEvents, getScene } from '../content/catalog.ts';
 import { SceneAdapter } from '../playback/SceneAdapter.ts';
-import { type SceneContext } from '../playback/PlaybackAdapter.ts';
+import { type PlaybackAdapter, type SceneContext } from '../playback/PlaybackAdapter.ts';
 import { decideEvent } from '../core/director.ts';
 import { renderLine, fillTemplate } from '../core/template.ts';
 import { runEventSteps, type EventOps, type ResolvedStep } from '../playback/eventRunner.ts';
@@ -26,7 +26,11 @@ import { EventPresenter } from '../playback/EventPresenter.ts';
 import { channelInfo as channelInfoLookup } from '../core/channels.ts';
 import { deriveRoom, type RoomState } from '../core/roomState.ts';
 import { deriveBehind, type BehindView } from '../core/behindState.ts';
-import { isRoomOnly, nextStartleDelay } from '../core/startle.ts';
+import { keepsProgramme, nextStartleDelay, SURF_SETTLE_MS, SURF_TRIGGER, TEAR_ANSWER_CHANCE } from '../core/startle.ts';
+import { playJump } from '../render/jumpScare.ts';
+import { FileAdapter } from '../playback/FileAdapter.ts';
+import { hush, say, spokenMs } from '../audio/speech.ts';
+import type { ProgrammeBed } from '../audio/AudioEngine.ts';
 import {
   beginSession,
   createMemory,
@@ -92,14 +96,17 @@ export interface TelevisionApi {
   onTearEnd: () => void;
 }
 
+/** The sound under each channel's original programmes. Films bring their own. */
+const CHANNEL_BED: Record<ChannelId, ProgrammeBed> = { 2: 'news', 4: 'kids', 7: 'shop', 13: 'deadair' };
+
 /** What a startle can do to the room. */
 export interface RoomEffects {
   setLevel: (level: number, ms: number) => void;
   glimpse: (ms: number) => void;
+  /** Where the viewer last tore, as viewport fractions. */
+  lastTear: () => { x: number; y: number };
 }
 
-/** A finished tear answers back about this often (requirement 11.5). */
-const TEAR_ANSWER_CHANCE = 0.35;
 
 const DEFAULT_SETTINGS: UiSettings = {
   volume: 0.7,
@@ -167,10 +174,14 @@ export function useTelevision(): TelevisionApi {
   // sample the picture colour to light the wall (design §5). Null when off or
   // on a YouTube item — the player is never sampled (requirement 5.3). A tiny
   // 8×8 scratch canvas does the averaging.
-  const lastSourceRef = useRef<HTMLCanvasElement | null>(null);
+  const lastSourceRef = useRef<HTMLCanvasElement | HTMLVideoElement | null>(null);
   const sampleCanvasRef = useRef<{ canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null>(null);
   // The current owned-source adapter (scenes now; file/YouTube in Milestone 4).
   const sceneAdapterRef = useRef<SceneAdapter | null>(null);
+  const fileAdapterRef = useRef<FileAdapter | null>(null);
+  // Clips that failed this session, such as on a checkout with no media fetched.
+  // The clock skips them, so the channel carries on with its other programmes.
+  const deadItemsRef = useRef<Set<string>>(new Set());
   // Unsubscribe for the current adapter's event listener.
   const adapterOffRef = useRef<(() => void) | null>(null);
   // Timer that fires ITEM_ENDED when the current item's remaining time elapses.
@@ -265,6 +276,7 @@ export function useTelevision(): TelevisionApi {
   const lastStartleRef = useRef<string | null>(null);
   const fireStartleRef = useRef<(seam: 'startle' | 'tear', forcedId?: string) => string | null>(() => null);
   const tearRandomRef = useRef<() => number>(Math.random);
+  const tearsRef = useRef(0);
 
   /**
    * Ask the director whether an event fires at `seam` on the current channel.
@@ -364,7 +376,12 @@ export function useTelevision(): TelevisionApi {
           restingStatic();
           presenter.showCaption(o.caption);
           setAnnouncement(o.caption);
-          await wait(1800);
+          // Lower and slower than any presenter: this is not one of them talking.
+          {
+            const { volume, muted } = memoryRef.current.settings;
+            say(o.caption, { volume: muted ? 0 : volume, rate: 0.72, pitch: 0.35 });
+          }
+          await wait(spokenMs(o.caption));
         },
         flashPrevious: async (ms) => {
           // Flash the captured last frame of the previous owned source, or a
@@ -427,6 +444,24 @@ export function useTelevision(): TelevisionApi {
             () => eventCancelRef.current,
           );
         },
+        jump: async (kind, ms, from) => {
+          const reduced = memoryRef.current.settings.reducedEffects || prefersReducedMotion();
+          // Reduced effects keeps the sound and drops the lunge: no full-window
+          // motion for a viewer who asked for none.
+          if (reduced) {
+            await wait(ms);
+            return;
+          }
+          const tube = document.querySelector('[data-testid="tube-opening"]')?.getBoundingClientRect();
+          const tear = roomEffectsRef.current?.lastTear();
+          const origin =
+            from === 'tear' && tear
+              ? { x: tear.x, y: tear.y }
+              : tube
+                ? { x: (tube.left + tube.width / 2) / window.innerWidth, y: (tube.top + tube.height / 2) / window.innerHeight }
+                : { x: 0.5, y: 0.5 };
+          await playJump({ kind, ms, originX: origin.x, originY: origin.y });
+        },
         roomLights: async (level, ms) => {
           roomEffectsRef.current?.setLevel(level, ms);
           await wait(ms);
@@ -463,6 +498,21 @@ export function useTelevision(): TelevisionApi {
   const getSceneAdapter = useCallback((): SceneAdapter => {
     if (!sceneAdapterRef.current) sceneAdapterRef.current = new SceneAdapter();
     return sceneAdapterRef.current;
+  }, []);
+
+  const getFileAdapter = useCallback((): FileAdapter => {
+    if (!fileAdapterRef.current) fileAdapterRef.current = new FileAdapter();
+    const { video } = fileAdapterRef.current;
+    // Through the analog chain once audio exists. Until then the element plays
+    // on its own, at the viewer's volume.
+    if (audioRef.current?.routeElement(video)) {
+      video.volume = 1;
+      video.muted = false;
+    } else {
+      const { volume, muted } = memoryRef.current.settings;
+      fileAdapterRef.current.setVolume(volume, muted);
+    }
+    return fileAdapterRef.current;
   }, []);
 
   const clearItemEndTimer = useCallback(() => {
@@ -507,12 +557,17 @@ export function useTelevision(): TelevisionApi {
           return missing.length > 0 ? null : text;
         },
         setSource: (source) => {
-          // Remember the owned-source canvas for room lighting; an HTMLCanvas
-          // is a scene/file picture (sampleable), anything else is cleared.
-          lastSourceRef.current = source instanceof HTMLCanvasElement ? source : null;
+          // Remember the owned picture for room lighting. Films are self-hosted,
+          // so sampling one cannot taint anything; anything else is cleared.
+          lastSourceRef.current =
+            source instanceof HTMLCanvasElement || source instanceof HTMLVideoElement ? source : null;
           rendererRef.current?.setSource(source as CrtSource | null);
         },
         setLook: (look: Look) => rendererRef.current?.setLook(look),
+        speakCue: (text: string) => {
+          const { volume, muted } = memoryRef.current.settings;
+          say(text, { volume: muted ? 0 : volume });
+        },
         now: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
       };
     }
@@ -609,22 +664,33 @@ export function useTelevision(): TelevisionApi {
     (channel: ChannelId, onEnded: () => void): number | null => {
       const ch = getChannel(channel);
       if (!ch) return null;
-      const resolved: Resolved | null = resolveBroadcast(ch, Date.now(), () => true);
+      const resolved: Resolved | null = resolveBroadcast(ch, Date.now(), (item) => !deadItemsRef.current.has(item.id));
       if (!resolved) return null;
-      // File/YouTube adapters arrive in Milestone 4; only scenes play for now.
-      if (resolved.item.source !== 'scene') return null;
-      const adapter = getSceneAdapter();
+      // The YouTube adapter is not built yet, so a YouTube item cannot play.
+      if (resolved.item.source === 'youtube') return null;
+      const itemId = resolved.item.id;
+      const isFilm = resolved.item.source === 'file';
+      const adapter: PlaybackAdapter = isFilm ? getFileAdapter() : getSceneAdapter();
+      // One source at a time: leave the other adapter with nothing to publish.
+      if (isFilm) sceneAdapterRef.current?.stop();
+      else fileAdapterRef.current?.stop();
+      hush();
+      audioRef.current?.setBed(isFilm ? null : CHANNEL_BED[channel], memoryRef.current.act / 4);
       // Swap the event listener to this play session.
       adapterOffRef.current?.();
       adapterOffRef.current = adapter.on((e) => {
         if (e.type === 'ended') onEnded();
+        if (e.type === 'error' && e.fatal) {
+          deadItemsRef.current.add(itemId);
+          onEnded();
+        }
       });
       void adapter.load(resolved.item, resolved.offsetMs, getSceneCtx()).then(() => {
         void adapter.play();
       });
       return resolved.remainingMs;
     },
-    [getSceneAdapter, getSceneCtx],
+    [getFileAdapter, getSceneAdapter, getSceneCtx],
   );
 
   const stopPlayback = useCallback(() => {
@@ -643,6 +709,9 @@ export function useTelevision(): TelevisionApi {
     adapterOffRef.current?.();
     adapterOffRef.current = null;
     sceneAdapterRef.current?.stop();
+    fileAdapterRef.current?.stop();
+    audioRef.current?.setBed(null);
+    hush();
   }, [clearItemEndTimer]);
 
   // Sample the current owned picture's average colour (8×8 downscale) for room
@@ -652,7 +721,8 @@ export function useTelevision(): TelevisionApi {
   const getRoomPicture = useCallback((): { r: number; g: number; b: number } | null => {
     if (stateRef.current.phase === 'OFF') return null;
     const src = lastSourceRef.current;
-    if (!src || src.width === 0 || src.height === 0) return null;
+    if (!src) return null;
+    if (src instanceof HTMLVideoElement ? src.videoWidth === 0 : src.width === 0 || src.height === 0) return null;
     if (!sampleCanvasRef.current) {
       const c = document.createElement('canvas');
       c.width = 8;
@@ -799,7 +869,7 @@ export function useTelevision(): TelevisionApi {
             });
       if (!chosen) return null;
       lastStartleRef.current = chosen.id;
-      if (isRoomOnly(chosen)) {
+      if (keepsProgramme(chosen)) {
         runRoomEvent(chosen, channel);
       } else {
         pendingEventRef.current = chosen;
@@ -814,23 +884,44 @@ export function useTelevision(): TelevisionApi {
     fireStartleRef.current = fireStartle;
   }, [fireStartle]);
 
-  // The startle clock. It only asks; `fireStartle` decides. It stays off under
-  // the test flag, where the suite drives startles itself.
+  // The startle clock. It only asks; `fireStartle` decides. It starts counting at
+  // the first picture, not at page load, and channel-hopping brings it forward,
+  // because a viewer flicking through channels is looking for something to happen.
+  // It stays off under the test flag, where the suite drives startles itself.
   useEffect(() => {
     const flagged = (window as unknown as { __CRT_PRESERVE_DRAWING_BUFFER__?: boolean }).__CRT_PRESERVE_DRAWING_BUFFER__;
     if (flagged) {
       tearRandomRef.current = () => 1;
       return undefined;
     }
-    let timer: ReturnType<typeof setTimeout>;
-    const arm = (first: boolean): void => {
-      timer = setTimeout(() => {
-        if (!document.hidden) fireStartle('startle');
-        arm(false);
-      }, nextStartleDelay(Math.random, demo, first));
-    };
-    arm(true);
-    return () => clearTimeout(timer);
+    let dueAt: number | null = null;
+    let surfs = 0;
+    let lastChannel: ChannelId | null = null;
+    const timer = setInterval(() => {
+      const { phase, channel } = stateRef.current;
+      if (phase !== 'ON_AIR' || channel === null || document.hidden) {
+        if (phase === 'OFF') dueAt = null;
+        return;
+      }
+      const now = Date.now();
+      if (lastChannel !== null && channel !== lastChannel) {
+        surfs += 1;
+        if (surfs >= SURF_TRIGGER) {
+          surfs = 0;
+          dueAt = now + SURF_SETTLE_MS;
+        }
+      }
+      lastChannel = channel;
+      if (dueAt === null) {
+        dueAt = now + nextStartleDelay(Math.random, demo, true);
+        return;
+      }
+      if (now >= dueAt) {
+        fireStartle('startle');
+        dueAt = now + nextStartleDelay(Math.random, demo, false);
+      }
+    }, 500);
+    return () => clearInterval(timer);
   }, [demo, fireStartle]);
 
   const registerRoom = useCallback((handle: RoomEffects | null) => {
@@ -838,7 +929,11 @@ export function useTelevision(): TelevisionApi {
   }, []);
 
   const onTearEnd = useCallback(() => {
-    if (tearRandomRef.current() < TEAR_ANSWER_CHANCE) fireStartle('tear');
+    // The first tear always answers: it is the moment the viewer finds out the
+    // wall is not just a wall.
+    tearsRef.current += 1;
+    const chance = tearsRef.current === 1 ? 1 : TEAR_ANSWER_CHANCE;
+    if (tearRandomRef.current() < chance) fireStartle('tear');
   }, [fireStartle]);
 
   const runEffects = useCallback(
@@ -936,8 +1031,8 @@ export function useTelevision(): TelevisionApi {
               }
               // Playable iff the clock resolves a (scene) item for this channel.
               const ch = getChannel(tuneChannel);
-              const resolved = ch ? resolveBroadcast(ch, Date.now(), () => true) : null;
-              const playable = resolved !== null && resolved.item.source === 'scene';
+              const resolved = ch ? resolveBroadcast(ch, Date.now(), (item) => !deadItemsRef.current.has(item.id)) : null;
+              const playable = resolved !== null && resolved.item.source !== 'youtube';
               sendRef.current({ type: 'TUNE_RESOLVED', token, playable });
             }, TUNE_MS);
             break;

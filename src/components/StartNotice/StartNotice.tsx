@@ -33,7 +33,7 @@ export function StartNotice({ onAcknowledge }: StartNoticeProps) {
         </p>
         <ul className={styles.list}>
           <li>Flashing lights and sudden visual static</li>
-          <li>Sudden and unsettling sounds</li>
+          <li>Jump scares: sudden loud sounds and a face filling the screen</li>
           <li>Horror themes and a slow, creeping dread</li>
         </ul>
         <p className={styles.body}>

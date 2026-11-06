@@ -1,19 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { eventLengthMs, isRoomOnly, nextStartleDelay } from './startle.ts';
+import { eventLengthMs, isRoomOnly, keepsProgramme, nextStartleDelay } from './startle.ts';
 
 describe('nextStartleDelay', () => {
-  it('holds the first startle back, then spaces the rest widely', () => {
-    expect(nextStartleDelay(() => 0, false, true)).toBe(45_000);
-    expect(nextStartleDelay(() => 1, false, true)).toBe(90_000);
-    expect(nextStartleDelay(() => 0, false, false)).toBe(60_000);
-    expect(nextStartleDelay(() => 1, false, false)).toBe(180_000);
+  it('brings the first startle on quickly, then keeps them coming unevenly', () => {
+    expect(nextStartleDelay(() => 0, false, true)).toBe(12_000);
+    expect(nextStartleDelay(() => 1, false, true)).toBe(25_000);
+    expect(nextStartleDelay(() => 0, false, false)).toBe(25_000);
+    expect(nextStartleDelay(() => 1, false, false)).toBe(60_000);
   });
 
-  it('has its own range under demo mode, first or not', () => {
-    for (const first of [true, false]) {
-      expect(nextStartleDelay(() => 0, true, first)).toBe(15_000);
-      expect(nextStartleDelay(() => 1, true, first)).toBe(35_000);
-    }
+  it('runs faster still under demo mode', () => {
+    expect(nextStartleDelay(() => 0, true, true)).toBe(8_000);
+    expect(nextStartleDelay(() => 1, true, false)).toBe(30_000);
+  });
+});
+
+describe('keepsProgramme', () => {
+  it('lets a jump play over the programme, but not a picture step', () => {
+    expect(keepsProgramme({ steps: [{ do: 'jump', kind: 'anchor', ms: 600 }] })).toBe(true);
+    expect(keepsProgramme({ steps: [{ do: 'apparition', kind: 'anchor', ms: 600 }] })).toBe(false);
+    expect(isRoomOnly({ steps: [{ do: 'jump', kind: 'anchor', ms: 600 }] })).toBe(false);
   });
 });
 

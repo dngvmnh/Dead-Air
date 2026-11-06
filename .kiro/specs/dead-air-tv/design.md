@@ -249,9 +249,9 @@ Key `deadair.memory.v1`. Reads go through Zod; on failure, start fresh. All acce
 | Act | Name | Enter when (monotonic) |
 |---|---|---|
 | 0 | Normal | Default |
-| 1 | Unease | Total watch ≥ 3 min, **or** a channel has been revisited |
-| 2 | Aware | Total watch ≥ 8 min and ≥ 3 distinct channels, **or** session count ≥ 2 and ≥ 2 distinct channels |
-| 3 | Terminal | Total watch ≥ 14 min, all 4 channels visited, and E07 has fired |
+| 1 | Unease | Total watch ≥ 45 s, **or** a channel has been revisited |
+| 2 | Aware | Total watch ≥ 2 min and ≥ 3 distinct channels, **or** session count ≥ 2 and ≥ 2 distinct channels |
+| 3 | Terminal | Total watch ≥ 4 min, all 4 channels visited, and E07 has fired |
 | 4 | After hours | Sign-off completed |
 
 `?demo=1` divides time thresholds and cooldowns by 8 in memory only. Fourteen minutes becomes 1 min 45 s. A divisor of 6 was measured at 4 min 12 s to sign-off on a naive surf path, so it was too slow.
@@ -268,7 +268,7 @@ export interface HorrorEvent {
   limit: { perViewer?: number; perSession?: number };
   cooldownMs?: number;
   priority: number;
-  chain?: boolean;      // exempt from the 90 s gap
+  chain?: boolean;      // exempt from the 45 s gap
   steps: EventStep[];
 }
 

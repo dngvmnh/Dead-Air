@@ -260,7 +260,7 @@ describe('AudioEngine lifecycle', () => {
   });
 
   describe('horror cues', () => {
-    const CUES = ['stinger', 'tapeStop', 'heartbeat', 'knock', 'breath', 'whisper', 'toyPiano', 'phoneRing', 'scrape', 'drone'] as const;
+    const CUES = ['stinger', 'jumpHit', 'tapeStop', 'heartbeat', 'knock', 'breath', 'whisper', 'toyPiano', 'phoneRing', 'scrape', 'drone'] as const;
 
     it('every cue plays, and stopping them is safe', async () => {
       const { engine } = newEngine();
@@ -268,6 +268,18 @@ describe('AudioEngine lifecycle', () => {
       for (const cue of CUES) expect(() => engine.playCue(cue, 1)).not.toThrow();
       expect(() => engine.stopCues()).not.toThrow();
       expect(() => engine.stopCues()).not.toThrow();
+    });
+
+    it('starts and stops a programme bed', async () => {
+      const { engine, ctx } = newEngine();
+      await engine.unlock();
+      const before = ctx.created.length;
+      engine.setBed('news', 0.5);
+      expect(ctx.created.length).toBeGreaterThan(before);
+      engine.setBed(null);
+      const after = ctx.created.length;
+      await new Promise((r) => setTimeout(r, 300));
+      expect(ctx.created.length).toBe(after);
     });
 
     it('is a no-op before the audio is unlocked', () => {

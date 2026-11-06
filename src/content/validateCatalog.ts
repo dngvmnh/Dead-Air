@@ -12,7 +12,7 @@
  * mid-item rule, channel 13's media basis) on the validated data.
  */
 
-import { eventLengthMs, isRoomOnly, STARTLE_MAX_MS } from '../core/startle.ts';
+import { eventLengthMs, isRoomOnly, keepsProgramme, STARTLE_MAX_MS } from '../core/startle.ts';
 import {
   channelSchema,
   horrorEventSchema,
@@ -255,8 +255,8 @@ export function validateCatalog(
     if (e.limit.perSession === undefined && e.limit.perViewer === undefined) {
       errors.push({ rule: '11.2', where: `event ${e.id}`, message: 'has no limit, so it could repeat all session' });
     }
-    if (e.seams.includes('tear') && !isRoomOnly(e)) {
-      errors.push({ rule: '11.3', where: `event ${e.id}`, message: 'fires on a tear but touches the picture' });
+    if (e.seams.includes('tear') && !keepsProgramme(e)) {
+      errors.push({ rule: '11.3', where: `event ${e.id}`, message: 'fires on a tear but stops the programme' });
     }
   }
 

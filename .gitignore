@@ -18,3 +18,7 @@ media-src/
 *.wav
 
 # Never ignore .kiro/ — it is part of the project and the hackathon submission.
+
+# Rebuilt by scripts/fetch-media.mjs; no media binaries in git.
+.media-cache/
+public/film/

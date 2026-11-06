@@ -9,10 +9,28 @@
       "title": "Ever-Lasting Night Light",
       "kind": "programme",
       "durationMs": 50000,
-      "rights": { "basis": "original", "note": "Placeholder scene art; original host Candy Marlowe and product." },
+      "rights": {
+        "basis": "original",
+        "note": "Placeholder scene art; original host Candy Marlowe and product."
+      },
       "placeholder": true,
       "source": "scene",
       "sceneId": "ch07-shopping-a",
+      "look": "broadcast"
+    },
+    {
+      "id": "ch07-film-1",
+      "title": "Tonight In The Store",
+      "kind": "programme",
+      "durationMs": 90000,
+      "rights": {
+        "basis": "public-domain",
+        "source": "https://archive.org/details/dollar_store",
+        "licence": "Public domain marking in the item metadata",
+        "note": "See docs/rights-log.md"
+      },
+      "source": "file",
+      "url": "/film/store.mp4",
       "look": "broadcast"
     },
     {
@@ -20,10 +38,28 @@
       "title": "Mattress Barn Commercial",
       "kind": "interstitial",
       "durationMs": 12000,
-      "rights": { "basis": "original", "note": "Placeholder scene art; fictional local commercial." },
+      "rights": {
+        "basis": "original",
+        "note": "Placeholder scene art; fictional local commercial."
+      },
       "placeholder": true,
       "source": "scene",
       "sceneId": "ch07-mattress",
+      "look": "broadcast"
+    },
+    {
+      "id": "ch07-film-2",
+      "title": "Home Appliance Hour",
+      "kind": "programme",
+      "durationMs": 120000,
+      "rights": {
+        "basis": "public-domain",
+        "source": "https://archive.org/details/HomeElec1944",
+        "licence": "Public domain marking in the item metadata",
+        "note": "See docs/rights-log.md"
+      },
+      "source": "file",
+      "url": "/film/appliances.mp4",
       "look": "broadcast"
     }
   ]

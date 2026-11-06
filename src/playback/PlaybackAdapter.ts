@@ -41,6 +41,8 @@ export interface SceneContext {
    * null to hide the layer when a value is missing with no fallback.
    */
   resolveText?(raw: string): string | null;
+  /** A caption just began during play, so a presenter can say it. */
+  speakCue?(text: string): void;
   /** Monotonic clock in ms, injected so adapters stay testable (no Date.now). */
   now(): number;
 }

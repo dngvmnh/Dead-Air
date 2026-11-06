@@ -1094,3 +1094,17 @@ the unlit plaster was the brightest thing on screen.
   position. Room startles skip the state machine, so the programme keeps playing.
 - Startles do not touch the story's global gap, so the sign-off path is unaffected.
 - The timer stays off under the test flag. Tests fire startles through `__tv`.
+
+## Owner feedback: nothing to watch, too slow, not scary (2026-11-07)
+
+- Real media: five public-domain clips play through a new FileAdapter and the CRT.
+  They are cut by `npm run fetch:media`, kept out of git, and skipped if missing.
+- Original shows now have procedural art, a sound bed per channel and spoken lines
+  from the browser's voices. The placeholder labels are gone.
+- Pacing: acts at 45 s, 2 min and 4 min (they were 3, 8 and 14), a 45 s story gap,
+  and a first startle 12 to 25 s after the picture. Three channel changes bring the
+  next one forward. The first tear always answers.
+- Jump scares: a figure lunges out of the set and fills the window for under a
+  second with a much harder hit. The one thing allowed in front of the set; it
+  exists only while running and is never used over YouTube.
+- Hint: a note on the wall asks the viewer not to pick at the wallpaper.

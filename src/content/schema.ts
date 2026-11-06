@@ -217,6 +217,7 @@ export const seamSchema = z.enum(['tune-in', 'item-boundary', 'mid-item', 'start
 /** Procedural sounds an event can play (see `AudioEngine.playCue`). */
 export const sfxCueSchema = z.enum([
   'stinger',
+  'jumpHit',
   'tapeStop',
   'heartbeat',
   'knock',
@@ -323,6 +324,15 @@ export const eventStepSchema = z.discriminatedUnion('do', [
       ms: z.number().int().positive(),
       text: z.string().min(1).optional(),
       fallbackText: z.string().optional(),
+    })
+    .strict(),
+  // The figure comes out of the picture and fills the whole window for `ms`.
+  z
+    .object({
+      do: z.literal('jump'),
+      kind: z.enum(['anchor', 'gourd', 'operator', 'deadair']),
+      ms: z.number().int().positive().max(1200),
+      from: z.enum(['tube', 'tear']).optional(),
     })
     .strict(),
   // The room's lights sink to `level` over `ms`.

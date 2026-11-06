@@ -8,16 +8,17 @@
  * cooldown, and the global gap; reject `mid-item` when the current source is
  * YouTube (requirement 9.3); choose the highest priority; break ties with
  * `random`. Sign-off is high priority and, like any `chain` event, bypasses the
- * 90 s gap.
+ * global gap.
  */
 
 import type { HorrorEventInput } from '../content/schema.ts';
 import { evaluateCondition } from './conditions.ts';
+import { isRoomOnly } from './startle.ts';
 import { DEMO_DIVISOR, effectiveAct, type ViewerMemory } from './memory.ts';
 import type { ChannelId, Item, Seam } from './types.ts';
 
 /** The global minimum gap between events (requirement 9.7), `chain` exempt. */
-export const GLOBAL_GAP_MS = 90_000;
+export const GLOBAL_GAP_MS = 45_000;
 
 export interface DecideInput {
   memory: ViewerMemory;
@@ -88,6 +89,8 @@ export function decideEvent(input: DecideInput): HorrorEventInput | null {
     if (!actInRange(ev, act)) return false;
     // Never fire at mid-item on a YouTube item (requirement 9.3 / design §2).
     if ((seam === 'mid-item' || seam === 'startle') && currentSource === 'youtube') return false;
+    // A tear may answer over YouTube only by staying in the room.
+    if (seam === 'tear' && currentSource === 'youtube' && !isRoomOnly(ev)) return false;
     if (!withinLimits(ev, memory, sessionFired)) return false;
     if (!cooldownOk(ev, memory, nowMs, divisor)) return false;
     // The global gap applies unless the event is a chain link.

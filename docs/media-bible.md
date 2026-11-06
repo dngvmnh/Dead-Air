@@ -13,7 +13,7 @@ Do not make four finished videos. Make reusable parts and let the scene engine a
 | Voices | Team recording or text-to-speech whose terms allow this use | `public/media/vo` |
 | Jingles | Team-composed, or music generator whose terms allow it | `public/media/audio` |
 | Static, tuning, boot sounds, CRT look | Code | Nothing to produce |
-| Long programming | Verified public-domain or licensed film; permitted YouTube embeds | Object storage or catalogue |
+| Long programming | Verified public-domain or licensed film; permitted YouTube embeds | `public/film`, cut by `npm run fetch:media` (see `docs/rights-log.md`) |
 
 Before using any generator publicly, check its current terms, then record the tool in `rights.source`.
 
@@ -145,19 +145,20 @@ Copy for `src/content/events/events.json`. `{…}` values come only from real me
 
 ### Startles
 
-A few seconds each, procedural, then back to the programme. These run on their own clock, separate from the story events above.
+A few seconds each, then back to the programme. These run on their own clock, separate from the story events above, and from Act 0.
 
 | ID | Where | From act | What happens |
 |---|---|---|---|
-| S01 | Ch 2 | 1 | Tape stops, snow, stinger. The anchor's face is wrong. Ticker: ALDER RD |
-| S02 | Ch 4 | 1 | The jingle goes flat and slows, stinger. A gourd too close to the lens. JUST ONE. |
-| S03 | Ch 7 | 1 | The order line rings, someone breathes. A shape rises. OUR OPERATORS ARE WATCHING. |
-| S04 | Ch 13 | 1 | Snow and whispering. A face settles in it. No text. |
-| S05 | Room | 0 | Three knocks and the lights dip. The picture carries on. |
-| S06 | Room | 2 | The lights sink, something scrapes, and pale eyes show behind the viewer's own tears. |
-| S07 | Room | 1 | The lights sink slowly over a heartbeat. |
-| T01 | Room, on a tear | 1 | The wall knocks back. |
-| T02 | Room, on a tear | 3 | Breathing, and eyes behind the tear just made. |
+| S01 | Ch 2 | 0 | Tape stops, snow. The anchor's face goes wrong under ALDER RD, then it lunges out of the set. |
+| S02 | Ch 4 | 0 | The jingle goes flat and slows. A gourd too close to the lens, JUST ONE., then it lunges. |
+| S03 | Ch 7 | 0 | The order line rings, someone breathes. A shape rises, OUR OPERATORS ARE WATCHING., then it lunges. |
+| S04 | Ch 13 | 0 | Snow and whispering. A face settles in it, then it lunges. |
+| S05 | Room | 0 | Three knocks and the lights dip. The programme carries on. |
+| S06 | Room | 1 | The lights sink, something scrapes, and pale eyes show behind the viewer's own tears. |
+| S07 | Room | 0 | The lights sink slowly over a heartbeat. |
+| T03 | Room, first tear | 0 | The face comes out of the tear the viewer just made. |
+| T01 | Room, on a tear | 0 | The wall knocks back. |
+| T02 | Room, on a tear | 1 | Breathing, and eyes behind the tear just made. |
 
 ## 9. Sign-off
 

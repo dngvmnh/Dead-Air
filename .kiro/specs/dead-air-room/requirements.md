@@ -145,12 +145,14 @@ The goal for a judge: within 30 seconds they have discovered the tear without be
 
 ## Requirement 11: Startles
 
-Short, spontaneous scares that break up the slow dread and then return to normal.
+Short, frequent scares that keep the viewer on edge and then return to normal. The owner asked for this after finding the first version too rare and not frightening (2026-11-07).
 
 1. A startle SHALL last no more than 6 seconds and SHALL return to the programme at its clock position. The catalogue validator enforces the length.
-2. Every startle SHALL have a per-session or per-viewer limit, and the first SHALL NOT fire within 45 seconds of the page opening. Later checks SHALL be 60 to 180 seconds apart. Under demo mode every check SHALL be 15 to 35 seconds apart.
-3. A startle that changes the picture SHALL NOT fire on a YouTube item, and a tear SHALL only ever answer in the room. The room's own startles MAY play over any source, because they do not touch the tube.
+2. The first startle SHALL come 12 to 25 seconds after the first picture, and later checks SHALL be 25 to 60 seconds apart (8 to 15, then 15 to 30, under demo mode). Three channel changes SHALL bring the next one forward to about 1.5 seconds after landing. Every startle SHALL still have a per-session or per-viewer limit.
+3. A startle SHALL NOT fire on a YouTube item, and nothing SHALL draw in front of a YouTube item. A tear MAY answer over YouTube only by staying in the room.
 4. Startles SHALL NOT use or reset the story events' global gap, so they cannot delay the sign-off path.
-5. About a third of finished tears MAY answer back with a sound, subject to the same limits.
-6. Channel change and power off SHALL stop a running startle at once, cut its sounds and restore the room's lights.
-7. Reduced effects SHALL halve startle sound levels and hold figures still. Startles SHALL NOT flash or strobe, and all sound SHALL pass through the master limiter. No cue imitates a real alert tone. Apparitions imply and SHALL NOT show gore or real people.
+5. The first tear of a session SHALL answer. About 60 percent of later tears MAY answer, subject to the same limits.
+6. Channel change and power off SHALL stop a running startle, cut its sounds and restore the room's lights.
+7. A jump SHALL rise in brightness once and cut to black once. It SHALL NOT strobe, go full-field white or use saturated red, and startles stay within the three-flashes-per-second limit. All cues SHALL pass through the master limiter, and none imitates a real alert tone. Apparitions imply and SHALL NOT show gore or real people.
+8. Reduced effects SHALL halve startle sound levels, hold figures still and remove the full-window lunge. The first-run notice SHALL warn of jump scares.
+9. The room SHALL carry an in-world hint that the wall can be torn. It SHALL NOT become a tutorial or an objective.

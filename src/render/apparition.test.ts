@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { drawApparition, type ApparitionKind } from './apparition.ts';
+import { drawApparition, twitchAt, type ApparitionKind } from './apparition.ts';
+import { lungeProgress } from './jumpScare.ts';
 import type { Ctx2D } from './overlayRenderer.ts';
 
 function fakeCtx(): { ctx: Ctx2D; calls: Array<[string, unknown[]]> } {
@@ -39,11 +40,18 @@ describe('drawApparition', () => {
   });
 
   it('holds the figure still under reduced effects', () => {
-    const at = (tMs: number) => {
-      const { ctx, calls } = fakeCtx();
-      drawApparition(ctx, 'anchor', undefined, tMs, 1_000_000_000, { ...SIZE, reduced: true });
-      return JSON.stringify(calls.filter(([op]) => op === 'ellipse').map(([, a]) => Math.round(Number(a[0]))));
-    };
-    expect(at(100)).toEqual(at(900));
+    expect(twitchAt(100, true)).toBe(0);
+    expect(twitchAt(900, true)).toBe(0);
+    expect(twitchAt(100, false)).not.toBe(twitchAt(900, false));
+  });
+});
+
+describe('lungeProgress', () => {
+  it('starts at the origin, arrives fast, and keeps creeping', () => {
+    expect(lungeProgress(0)).toBe(0);
+    expect(lungeProgress(85)).toBeLessThan(0.2);
+    expect(lungeProgress(170)).toBe(1);
+    expect(lungeProgress(600)).toBeGreaterThan(1);
+    expect(lungeProgress(600)).toBeLessThan(1.2);
   });
 });
