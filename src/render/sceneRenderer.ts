@@ -16,6 +16,7 @@
 import type { LayerInput, SceneProgramInput } from '../content/schema.ts';
 import { activeCaptions, layerVisible, sampleKeyframes, type SceneVars } from '../core/scene.ts';
 import { INTERNAL_HEIGHT, INTERNAL_WIDTH } from './looks.ts';
+import { wrap } from './overlayRenderer.ts';
 
 /** Minimal 2D context surface used here (keeps the module testable). */
 export type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -177,20 +178,38 @@ function drawNoiseBand(ctx: Ctx2D, intensity: number, tMs: number, W: number, H:
   ctx.globalAlpha = 1;
 }
 
-function drawCaptionBand(ctx: Ctx2D, lines: string[], W: number, H: number): void {
+/** Courier New at 34 px on the 960 px picture, less a margin each side. */
+const CAPTION_MAX_CHARS = 44;
+const CAPTION_LINE_H = 44;
+const CAPTION_PAD = 12;
+/** Clear of the bottom ticker. */
+const CAPTION_BOTTOM_GAP = 60;
+
+/** A cue longer than the picture is wide wraps, or both its ends are lost. */
+export function captionLines(cues: readonly string[]): string[] {
+  return cues.flatMap((cue) => wrap(cue, CAPTION_MAX_CHARS));
+}
+
+/**
+ * The top of the caption band. Scene text has to stay above this, which
+ * `scenes.test.ts` checks against each scene's longest cue.
+ */
+export function captionBandTop(lineCount: number, H: number): number {
+  return H - (lineCount * CAPTION_LINE_H + CAPTION_PAD * 2) - CAPTION_BOTTOM_GAP;
+}
+
+function drawCaptionBand(ctx: Ctx2D, cues: string[], W: number, H: number): void {
+  const lines = captionLines(cues);
   if (lines.length === 0) return;
-  const lineH = 44;
-  const pad = 12;
-  const bandH = lines.length * lineH + pad * 2;
-  const y = H - bandH - 60;
+  const y = captionBandTop(lines.length, H);
   ctx.fillStyle = 'rgba(0,0,0,0.72)';
-  ctx.fillRect(0, y, W, bandH);
+  ctx.fillRect(0, y, W, lines.length * CAPTION_LINE_H + CAPTION_PAD * 2);
   ctx.fillStyle = '#ffffff';
   ctx.font = '34px "Courier New", monospace';
   ctx.textBaseline = 'top';
   ctx.textAlign = 'center';
   lines.forEach((line, i) => {
-    ctx.fillText(line, W / 2, y + pad + i * lineH);
+    ctx.fillText(line, W / 2, y + CAPTION_PAD + i * CAPTION_LINE_H);
   });
   ctx.textAlign = 'left';
 }

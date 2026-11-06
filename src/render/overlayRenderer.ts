@@ -148,7 +148,7 @@ function paintText(
 }
 
 /** Word-wrap a caption to roughly `max` characters per line (1+ lines). */
-function wrap(text: string, max: number): string[] {
+export function wrap(text: string, max: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length === 0) return [''];
   const out: string[] = [];

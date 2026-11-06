@@ -7,8 +7,8 @@
     { "id": "dot", "type": "image", "src": "img/ch04/dot.png", "when": { "maxVisits": 1 } },
     { "id": "gourd-turned", "type": "image", "src": "img/ch04/gourd-turned.png", "when": { "minVisits": 2 } },
     { "id": "title", "type": "text", "text": "THE PUMPKIN HOUR", "x": 60, "y": 48, "size": 48, "colour": "#ff8a2a" },
-    { "id": "revisit-line", "type": "text", "text": "Dot is resting. We can count without her.", "x": 60, "y": 620, "size": 30, "colour": "#e6d6ff", "when": { "minVisits": 2, "maxAct": 3 } },
-    { "id": "afterhours-line", "type": "text", "text": "You came back. We counted you.", "x": 60, "y": 620, "size": 30, "colour": "#ff8a2a", "when": { "minAct": 4 } }
+    { "id": "revisit-line", "type": "text", "text": "Dot is resting. We can count without her.", "x": 60, "y": 500, "size": 30, "colour": "#e6d6ff", "when": { "minVisits": 2, "maxAct": 3 } },
+    { "id": "afterhours-line", "type": "text", "text": "You came back. We counted you.", "x": 60, "y": 500, "size": 30, "colour": "#ff8a2a", "when": { "minAct": 4 } }
   ],
   "captions": [
     { "atMs": 0, "endMs": 7000, "text": "Hello, hello, boys and ghouls! It's the Pumpkin Hour!" },
