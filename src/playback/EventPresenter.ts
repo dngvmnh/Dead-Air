@@ -63,6 +63,15 @@ export class EventPresenter {
   /** The last text drawn (joined with \n), for a test seam. */
   private lastTextValue = '';
   private sceneFrame: number | null = null;
+  /**
+   * Repaints what a caption sits on, without any caption. The canvas keeps its
+   * last frame, so a caption drawn straight onto it lands on top of the caption
+   * before it, and a shorter band leaves the old lines showing.
+   */
+  private paintBase: () => void = () => {
+    this.ctx.fillStyle = '#000000';
+    this.ctx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+  };
 
   constructor(deps: EventPresenterDeps) {
     this.deps = deps;
@@ -83,7 +92,8 @@ export class EventPresenter {
   /** Draw a slate (one line per `\n`) and publish it. */
   showSlate(text: string): void {
     this.stopSceneLoop();
-    drawSlate(this.ctx, text, { width: INTERNAL_WIDTH, height: INTERNAL_HEIGHT });
+    this.paintBase = () => drawSlate(this.ctx, text, { width: INTERNAL_WIDTH, height: INTERNAL_HEIGHT });
+    this.paintBase();
     this.lastTextValue = text;
     this.publish();
   }
@@ -91,6 +101,7 @@ export class EventPresenter {
   /** Draw a caption over a static field and publish it (voice/degradation). */
   showCaption(caption: string): void {
     this.stopSceneLoop();
+    this.paintBase();
     drawCaptionsOverStatic(this.ctx, caption, { width: INTERNAL_WIDTH, height: INTERNAL_HEIGHT });
     this.lastTextValue = caption;
     this.publish();
@@ -123,10 +134,9 @@ export class EventPresenter {
     const drawFrame = (): void => {
       const elapsed = this.deps.now() - start;
       const tMs = scene.durationMs > 0 ? elapsed % scene.durationMs : 0;
-      renderScene(this.ctx, scene, tMs, vars, {
-        drawCaptions,
-        ...(images ? { images } : {}),
-      });
+      const options = { ...(images ? { images } : {}) };
+      renderScene(this.ctx, scene, tMs, vars, { ...options, drawCaptions });
+      this.paintBase = () => renderScene(this.ctx, scene, tMs, vars, { ...options, drawCaptions: false });
       this.lastTextValue = (scene.captions ?? [])
         .filter((c) => tMs >= c.atMs && tMs < c.endMs)
         .map((c) => c.text)
@@ -151,6 +161,10 @@ export class EventPresenter {
   /** Clear the published picture (back to black/static). */
   clear(): void {
     this.stopSceneLoop();
+    this.paintBase = () => {
+      this.ctx.fillStyle = '#000000';
+      this.ctx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+    };
     this.deps.publish(null);
   }
 

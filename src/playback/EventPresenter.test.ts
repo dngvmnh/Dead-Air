@@ -53,6 +53,23 @@ function makePresenter() {
 }
 
 describe('EventPresenter', () => {
+  it('repaints under each caption, so captions never stack on earlier ones', () => {
+    const { presenter, made } = makePresenter();
+    presenter.showSlate('YOU ARE STILL UP.');
+    presenter.showCaption('A viewer in this broadcast area has not gone to bed.');
+    made.calls.length = 0;
+    presenter.showCaption('...Excuse me.');
+    const ops = made.calls.map((c) => c.op);
+    const firstText = ops.indexOf('fillText');
+    expect(made.calls[0]).toEqual({ op: 'fillRect', args: [0, 0, 960, 720] });
+    const texts = made.calls.filter((c) => c.op === 'fillText').map((c) => c.args[0]);
+    // The slate survives under the new caption, and the old caption is gone.
+    expect(firstText).toBeGreaterThan(0);
+    expect(texts).toContain('YOU ARE STILL UP.');
+    expect(texts).toContain('...Excuse me.');
+    expect(texts.join(' ')).not.toContain('not gone to bed');
+  });
+
   it('publishes the canvas and records the drawn text for a slate', () => {
     const { presenter, made, published } = makePresenter();
     presenter.showSlate('UNAUTHORISED VIEWER DETECTED');
