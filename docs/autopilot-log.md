@@ -459,3 +459,40 @@ done, how it was checked, and anything left unverified.
   acts are computed and stored but no event fires on them until the director and
   channels 04/07/13 land. Watch-time visibility gating is exercised by unit
   logic; the real document.hidden path is only lightly covered.
+## Task 13 — Horror director (conditions, templates, decideEvent, step runner)
+
+- Mode: direct implementation (the `spec-task-execution` subagent is still
+  absent from the registry).
+- Done (all pure except the runner's injected ops):
+  - `src/core/conditions.ts` (13.1): `evaluateCondition` over the recursive
+    `Condition` tree (all/any/not + visitsGte[current]/distinctChannelsGte/
+    watchMsGte/lastChannelIs/eventFired/sessionCountGte/localHourBetween with a
+    midnight-wrapping window).
+  - `src/core/template.ts` (13.1): `fillTemplate`/`renderLine` filling
+    {lastChannel,lastChannelName,visitedList,mostWatchedChannel,totalMinutes,
+    visitCountCurrent,localTime} from REAL memory only, reporting missing vars so
+    the caller uses the fallback line and never invents a value (requirement 9.5).
+  - `src/core/director.ts` (13.2): `decideEvent` — a pure function of memory,
+    context, events, time and injected `random`. Filters by channel, seam, act
+    window, condition, perViewer/perSession limits, cooldown and the global 90s
+    gap (chain-exempt), REJECTS mid-item when the current source is YouTube
+    (requirement 9.3), picks highest priority, breaks ties with the seed. `demo`
+    shortens cooldowns and the gap by six.
+  - `src/playback/eventRunner.ts` (13.3): `runEventSteps` sequences the step
+    list against injected `EventOps`; a failed media step degrades to that
+    step's caption over static and continues, never throwing (requirement 9.6).
+- Checked: `npm test` 248 passed (29 new: conditions 6, template 6, director 11
+  incl. two fast-check properties — NEVER selects a mid-item event while YouTube
+  plays, and a non-chain event never fires inside the 90s gap — and eventRunner
+  6 incl. the degradation paths). `npm run lint` clean (fixed an unused import
+  and a prefer-const in the new test). `npm run build` clean (JS unchanged,
+  112.95 KB gzip; the director is tree-shaken until wired into useTelevision).
+- Decisions made alone: the event-step runner takes already-template-filled text
+  (templates resolve against memory before steps run), keeping the runner a pure
+  sequencer with injected effects — directly unit-testable and matching design
+  §9 ("templates filled from real memory"). Reversible.
+- Unverified: the director is not yet wired into the seam flow in useTelevision
+  (tune-in / item-boundary / mid-item seams and the event phase) — that
+  integration rides with the channel work (14/15) and is proven end to end at the
+  task 16 MVP checkpoint (sign-off reached via `/?demo=1`). Here each piece is
+  proven in isolation.

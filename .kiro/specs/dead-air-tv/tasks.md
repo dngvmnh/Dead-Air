@@ -54,10 +54,10 @@ Work in order. Each milestone ends in something runnable. Commit after each comp
   - [x] 12.2 Implement `memoryStore` with versioning, throttling, fallback, session detection, `?reset=1`, and Forget me.
   - [x] 12.3 Track watch time only while visible, on air, and playing.
   - _Requirements: 7.1–7.7, 8.1, 8.2_
-- [ ] 13. Director
-  - [ ] 13.1 Implement conditions and templates with tests.
-  - [ ] 13.2 Implement `decideEvent` with tests and property tests, including the YouTube rule and global gap.
-  - [ ] 13.3 Implement the event step runner, including captions-only degradation.
+- [x] 13. Director
+  - [x] 13.1 Implement conditions and templates with tests.
+  - [x] 13.2 Implement `decideEvent` with tests and property tests, including the YouTube rule and global gap.
+  - [x] 13.3 Implement the event step runner, including captions-only degradation.
   - _Requirements: 9.1–9.7_
 - [ ] 14. Channels 04 and 07
   - [ ] 14.1 Author scene rundowns and revisit variants, including moving set objects on 07.
