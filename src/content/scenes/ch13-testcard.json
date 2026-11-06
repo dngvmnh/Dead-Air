@@ -1,0 +1,15 @@
+{
+  "id": "ch13-testcard",
+  "durationMs": 15000,
+  "layers": [
+    { "id": "bg", "type": "rect", "x": 0, "y": 0, "w": 960, "h": 720, "colour": "#101010" },
+    { "id": "barA", "type": "rect", "x": 60, "y": 120, "w": 120, "h": 360, "colour": "#c0c0c0" },
+    { "id": "barB", "type": "rect", "x": 180, "y": 120, "w": 120, "h": 360, "colour": "#c0c000" },
+    { "id": "barC", "type": "rect", "x": 300, "y": 120, "w": 120, "h": 360, "colour": "#00c0c0" },
+    { "id": "barD", "type": "rect", "x": 420, "y": 120, "w": 120, "h": 360, "colour": "#00c000" },
+    { "id": "barE", "type": "rect", "x": 540, "y": 120, "w": 120, "h": 360, "colour": "#c000c0" },
+    { "id": "barF", "type": "rect", "x": 660, "y": 120, "w": 120, "h": 360, "colour": "#c00000" },
+    { "id": "barG", "type": "rect", "x": 780, "y": 120, "w": 120, "h": 360, "colour": "#0000c0" },
+    { "id": "label", "type": "text", "text": "KDA-TV 13", "x": 380, "y": 540, "size": 40, "colour": "#e8e8e0" }
+  ]
+}

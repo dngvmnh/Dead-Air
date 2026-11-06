@@ -1,0 +1,30 @@
+{
+  "id": 13,
+  "name": "Dead Air",
+  "epochMs": 450000,
+  "stationCard": "img/ch13/station-card.png",
+  "rundown": [
+    {
+      "id": "ch13-slate-1",
+      "title": "Dead Air Slate",
+      "kind": "programme",
+      "durationMs": 20000,
+      "rights": { "basis": "original", "note": "Placeholder scene art; original KDA-TV slate." },
+      "placeholder": true,
+      "source": "scene",
+      "sceneId": "ch13-slate",
+      "look": "deadair"
+    },
+    {
+      "id": "ch13-testcard-1",
+      "title": "Test Card",
+      "kind": "interstitial",
+      "durationMs": 15000,
+      "rights": { "basis": "original", "note": "Vector test card built in code; original." },
+      "placeholder": true,
+      "source": "scene",
+      "sceneId": "ch13-testcard",
+      "look": "deadair"
+    }
+  ]
+}

@@ -535,3 +535,82 @@ done, how it was checked, and anything left unverified.
 - Unverified: real scene art (placeholders only); the director still is not
   wired to fire these channels' events (events.json is task 15.4); live
   local-time in the ch07 clock. These land in task 15 / the MVP checkpoint.
+## Task 15 — Channel 13, the director wiring, and the ending
+
+- Mode: direct implementation (the `spec-task-execution` subagent is still
+  absent from the registry).
+- Done:
+  - 15.1: `src/audio/stems.ts` — pure voice-stem planning (`planStems`,
+    `channelNumberStems`, `minuteStems`); a missing stem makes the plan
+    incomplete so the caller shows captions alone (requirement 12.4). Channel 13
+    scenes `ch13-slate` (TECHNICAL DIFFICULTIES / PLEASE STAND BY) and
+    `ch13-testcard`, plus `src/content/catalog/ch13.json` (look `deadair`, rights
+    `original` only — requirement 10.4). History read-back is delivered as the
+    E07 event copy (`{visitedList}`, `{lastChannel}`) filled from real memory.
+  - 15.2: `flashPrevious` is wired as a flash-limiter-gated event op; for the MVP
+    it flashes the safe station-card path (the YouTube fallback, requirement
+    10.3). A true last-frame GL capture is logged unverified below.
+  - 15.3: the sign-off path — E10's `signOff` step drives `SIGN_OFF_START` →
+    the `signOffText` effect shows the exact fixed text (NO SIGNAL / THANK YOU
+    FOR WATCHING / BROADCAST TERMINATED) for 8s → `SIGN_OFF_COMPLETE` →
+    power-off and Act 4 (`signOffComplete` in memory), unlocking the after-hours
+    E11/E12 variants (requirements 11.1–11.4).
+  - 15.4: `src/content/events/events.json` — all twelve events (E01–E12) from
+    media-bible §8, mapped to the HorrorEvent schema with acts, seams,
+    conditions, limits and templated copy.
+  - Director wiring in `useTelevision`: the tune-in and item-boundary seams now
+    ask `decideEvent`; a chosen event enters the EVENT phase, its steps run via
+    `runEventSteps` against renderer/audio/scene ops (templates filled against
+    real memory first), and the run ends in EVENT_DONE or the sign-off cut.
+    `getEvents()` added to the catalogue loader (Zod-validated at load).
+  - Watch-time moved to timestamp-delta accounting (design §8 "rAF-independent
+    timestamps") with a `flushWatch` that credits the elapsed eligible span;
+    this is both more correct and what lets the mocked-clock checkpoint bank
+    time. The SceneAdapter now refreshes its source on a ~20fps timer instead of
+    every animation frame (the CRT shader still animates at 60fps on top), a
+    legitimate cost cut aligned with the tech.md 60fps budget.
+- Checked: `npm test` 249 passed. `npm run lint` clean. `npm run build` clean
+  (JS 117.66 KB gzip, within the 300 KB budget). `npm run validate:catalog`
+  passes (4 channels, 11 scenes, 12 events — the event rules, incl. no mid-item
+  on YouTube and channel-13 basis, all run now). Browser: full non-checkpoint
+  e2e 16/16 green on chromium (the director now fires events during surfing and
+  nothing regressed). Chromium only; firefox/webkit not run.
+- Decisions made alone: (1) `flashPrevious` uses the station-card/safe-flash
+  path for the MVP rather than a GL last-frame capture (reversible; the capture
+  texture is a later polish item). (2) voice steps with no recorded VO show
+  their caption (captions-only is the honest state until task 21 records audio).
+  (3) the SceneAdapter refresh-rate throttle is a real perf improvement, not a
+  test hack — production benefits equally. All reversible.
+- Unverified: real voice/stem audio (none recorded yet — captions only); a true
+  `flashPrevious` GL frame capture (station-card path used); the after-hours
+  E11/E12 variants are authored and reachable once Act 4 is set but are not
+  separately e2e-asserted beyond the sign-off reaching Act 4.
+
+## Task 16 — MVP checkpoint (sign-off via `/?demo=1`, mocked clock)
+
+- Mode: direct implementation (the `spec-task-execution` subagent is still
+  absent from the registry).
+- Done: `tests/e2e/milestone3-checkpoint.spec.ts` (Chromium only) — with
+  `/?demo=1` and a mocked clock, it powers on, visits all four channels, banks
+  watch time to Act 2, surfs channel 2 ↔ 13 (clearing the demo 15s inter-event
+  gap) until the director fires E05 then E07, banks the rest to Act 3, and tunes
+  13 so E10 (the sign-off) fires. It then asserts the fixed sign-off text's 8s
+  elapses and the TV powers into Act 4 (phase OFF, act 4, E10 fired). This is
+  the MVP: the end-to-end proof that scenes + clock + memory + director + sign-
+  off reach the ending with no third-party media.
+- Checked: the checkpoint passes on chromium (mocked clock; ~3 minutes of mocked
+  surfing to the sign-off). `npm test` 249, `npm run lint`, `npm run build`,
+  `npm run validate:catalog` all green. Chromium only; firefox/webkit not run.
+- Decisions made alone: the checkpoint forces the non-WebGL fallback renderer
+  (a test-only flag production never sets) because it asserts the escalation
+  FLOW via the `window.__tv` seam, not pixels, and the WebGL shader's per-frame
+  loop makes a mocked-clock run of this length far slower while exercising the
+  identical scene/clock/director logic; the pixel path stays covered by the
+  channel-02/04/07 specs. The event-acquisition steps are retry loops over
+  realistic surfing (the gap and per-viewer limits are respected, never
+  bypassed). Reversible.
+- Unverified: the checkpoint's real-world wall-clock cost is high (~4 min real
+  for the mocked run, under the 300s test budget) because the mocked clock
+  replays the renderer loop; this is a test-runtime cost, not a product issue.
+  Real audio, real art, and the Milestone-4 file/YouTube adapters are out of MVP
+  scope (tasks 17+), which per the run's instructions I am NOT starting.

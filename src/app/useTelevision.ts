@@ -11,9 +11,14 @@ import { channelInfo } from '../core/channels.ts';
 import { BOOT_MS, TUNE_MS } from './timing.ts';
 import { AudioEngine } from '../audio/AudioEngine.ts';
 import { broadcastPosition, resolveBroadcast } from '../core/clock.ts';
-import { getChannel, getScene } from '../content/catalog.ts';
+import { getChannel, getEvents, getScene } from '../content/catalog.ts';
 import { SceneAdapter } from '../playback/SceneAdapter.ts';
 import { type SceneContext } from '../playback/PlaybackAdapter.ts';
+import { decideEvent } from '../core/director.ts';
+import { renderLine } from '../core/template.ts';
+import { runEventSteps, type EventOps, type ResolvedStep } from '../playback/eventRunner.ts';
+import type { HorrorEventInput } from '../content/schema.ts';
+import type { Seam } from '../core/types.ts';
 import { type Renderer } from '../render/Renderer.ts';
 import { type CrtSource } from '../render/CrtRenderer.ts';
 import { type SceneVars } from '../core/scene.ts';
@@ -139,6 +144,9 @@ export function useTelevision(): TelevisionApi {
   // the adapter is playing (requirement 7.2). `playingRef` tracks that.
   const playingRef = useRef(false);
   const watchTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Timestamp when the current eligible watch span began, or null when not
+  // accruing. The ticker credits now - watchSince on each fire.
+  const watchSinceRef = useRef<number | null>(null);
   // True once memory has loaded, so the settings effect does not write the
   // default settings over the persisted ones before the load runs.
   const memoryReadyRef = useRef(false);
@@ -156,6 +164,163 @@ export function useTelevision(): TelevisionApi {
     },
     [demo, getStore],
   );
+
+  /**
+   * Credit the watch time elapsed since the current span began, if watch is
+   * eligible right now (visible, on air, playing). Timestamp-based (design §8),
+   * so one call after a long time-jump credits the whole span. Resets the span
+   * anchor. Safe to call often; a non-eligible or zero-length span is a no-op.
+   */
+  const flushWatch = useCallback(() => {
+    const visible = typeof document === 'undefined' || document.visibilityState === 'visible';
+    const onAir = stateRef.current.phase === 'ON_AIR';
+    const channel = stateRef.current.channel;
+    const now = Date.now();
+    if (visible && onAir && playingRef.current && channel !== null) {
+      if (watchSinceRef.current === null) watchSinceRef.current = now;
+      const delta = now - watchSinceRef.current;
+      if (delta > 0) {
+        dispatchMemory({ type: 'watch', channel, deltaMs: delta });
+        watchSinceRef.current = now;
+      }
+    } else {
+      watchSinceRef.current = null;
+    }
+  }, [dispatchMemory]);
+
+  // --- Horror director (task 13 wiring) ----------------------------------
+  // Events fired this session (for perSession limits), the last event time, the
+  // event the director chose and is running now, and a cancel flag for the runner.
+  const sessionFiredRef = useRef<Record<string, number>>({});
+  const lastEventAtRef = useRef<number | null>(null);
+  const pendingEventRef = useRef<HorrorEventInput | null>(null);
+  const eventCancelRef = useRef(false);
+
+  /**
+   * Ask the director whether an event fires at `seam` on the current channel.
+   * Returns the chosen event (also stashed for the runner) or null. Pure
+   * decision; firing is driven by the EVENT_START action the caller dispatches.
+   */
+  const decideSeamEvent = useCallback(
+    (channel: ChannelId, seam: Seam): HorrorEventInput | null => {
+      const d = new Date();
+      const chosen = decideEvent({
+        memory: memoryRef.current,
+        channel,
+        seam,
+        currentSource: playingRef.current ? 'scene' : null,
+        nowMs: Date.now(),
+        localHour: d.getHours(),
+        lastEventAt: lastEventAtRef.current,
+        sessionFired: sessionFiredRef.current,
+        events: getEvents(),
+        random: Math.random,
+        demo,
+      });
+      pendingEventRef.current = chosen;
+      return chosen;
+    },
+    [demo],
+  );
+
+  // Build the injected effect operations an event's steps run against. Pure
+  // wiring over the renderer, audio and scene adapter; `onSignOff` is called
+  // when a signOff step runs so the caller can drive the state machine.
+  const makeEventOps = useCallback(
+    (onSignOff: () => void): EventOps => {
+      const wait = (ms: number): Promise<void> =>
+        new Promise((r) => setTimeout(r, Math.max(0, ms)));
+      return {
+        showStatic: async (ms) => {
+          rendererRef.current?.setStatic(1);
+          audioRef.current?.setStatic(1);
+          await wait(ms);
+          rendererRef.current?.setStatic(0.08);
+          audioRef.current?.setStatic(0.08);
+        },
+        showSlate: async (text, ms) => {
+          // A slate is a scene-free caption over a dim field; reuse static bed.
+          rendererRef.current?.setStatic(0.3);
+          setAnnouncement(text);
+          await wait(ms);
+        },
+        playScene: async (sceneId) => {
+          if (!getScene(sceneId)) throw new Error(`missing scene ${sceneId}`);
+          // Scenes inside events are brief; the adapter already renders scenes.
+          await wait(50);
+        },
+        speak: async (o) => {
+          // No recorded VO yet (task 21); captions-only is the honest path, so a
+          // voice step with no url/stems "succeeds" by showing its caption.
+          setAnnouncement(o.caption);
+          await wait(1800);
+        },
+        flashPrevious: async (ms) => {
+          // Gated by the flash limiter (requirement 13.1). For the MVP we flash
+          // the station card (the safe path and the YouTube fallback, req 10.3);
+          // a true last-frame GL capture is a later polish item.
+          const r = rendererRef.current;
+          if (r && 'requestFlash' in r) {
+            (r as unknown as { requestFlash: (n: number, a?: () => void) => boolean }).requestFlash(
+              Date.now(),
+              () => r.setStatic(1),
+            );
+          }
+          await wait(ms);
+          rendererRef.current?.setStatic(0.08);
+        },
+        shaderPulse: async (effect, ms) => {
+          const r = rendererRef.current as unknown as {
+            requestFlash?: (n: number, a?: () => void) => boolean;
+            setRoll?: (a: number) => void;
+            setTear?: (a: number) => void;
+          } | null;
+          if (r?.requestFlash) {
+            r.requestFlash(Date.now(), () => {
+              if (effect === 'roll') r.setRoll?.(0.6);
+              else if (effect === 'tear') r.setTear?.(0.6);
+              else rendererRef.current?.setStatic(0.6);
+            });
+          }
+          await wait(ms);
+          r?.setRoll?.(0);
+          r?.setTear?.(0);
+        },
+        silence: async (ms) => {
+          audioRef.current?.setStatic(0);
+          await wait(ms);
+        },
+        signOff: async () => {
+          onSignOff();
+          await wait(10);
+        },
+        captionsOverStatic: async (caption, ms) => {
+          rendererRef.current?.setStatic(0.5);
+          setAnnouncement(caption);
+          await wait(ms);
+          rendererRef.current?.setStatic(0.08);
+        },
+        cancelled: () => eventCancelRef.current,
+      };
+    },
+    [],
+  );
+
+  // Resolve an event's step templates against real memory (requirement 9.5),
+  // so the runner sequences already-filled text.
+  const resolveSteps = useCallback((event: HorrorEventInput, channel: ChannelId): ResolvedStep[] => {
+    const d = new Date();
+    const tctx = { channel, localHour: d.getHours(), localMinute: d.getMinutes() };
+    return event.steps.map((step): ResolvedStep => {
+      if (step.do === 'slate') {
+        return { ...step, text: renderLine(step.text, step.fallbackText, memoryRef.current, tctx) };
+      }
+      if (step.do === 'voice') {
+        return { ...step, caption: renderLine(step.caption, step.fallbackCaption, memoryRef.current, tctx) };
+      }
+      return step;
+    });
+  }, []);
 
   const getSceneAdapter = useCallback((): SceneAdapter => {
     if (!sceneAdapterRef.current) sceneAdapterRef.current = new SceneAdapter();
@@ -212,7 +377,13 @@ export function useTelevision(): TelevisionApi {
     }
     (
       window as unknown as {
-        __tv?: { channel: () => ChannelId | null; broadcastPositionMs: () => number | null };
+        __tv?: {
+          channel: () => ChannelId | null;
+          broadcastPositionMs: () => number | null;
+          act: () => number;
+          phase: () => string;
+          firedEvents: () => string[];
+        };
       }
     ).__tv = {
       channel: () => stateRef.current.channel,
@@ -221,8 +392,16 @@ export function useTelevision(): TelevisionApi {
         const channel = ch === null ? undefined : getChannel(ch);
         return channel ? broadcastPosition(channel, Date.now(), () => true) : null;
       },
+      act: () => {
+        // Flush any pending watch span so a test that jumped the clock sees the
+        // up-to-date act without waiting for the next ticker fire.
+        flushWatch();
+        return memoryRef.current.act;
+      },
+      phase: () => stateRef.current.phase,
+      firedEvents: () => Object.keys(memoryRef.current.firedEvents),
     };
-  }, []);
+  }, [flushWatch]);
 
   /**
    * Resolve the broadcast clock for `channel` now and start playing the
@@ -259,6 +438,7 @@ export function useTelevision(): TelevisionApi {
   const stopPlayback = useCallback(() => {
     clearItemEndTimer();
     playingRef.current = false;
+    watchSinceRef.current = null;
     adapterOffRef.current?.();
     adapterOffRef.current = null;
     sceneAdapterRef.current?.stop();
@@ -310,7 +490,16 @@ export function useTelevision(): TelevisionApi {
       // is playable. Defined here so dispatch stays local to runEffects, the
       // one place that owns `sendRef`.
       const playFromClock = (channel: ChannelId, token: number): void => {
-        const dispatchEnded = (): void => sendRef.current({ type: 'ITEM_ENDED', token });
+        // Credit the watch span of the item that just finished before the next
+        // one starts, so a long item's time is not lost at the boundary.
+        flushWatch();
+        const dispatchEnded = (): void => {
+          // Item boundary seam: ask the director first (requirement 9.1). An
+          // event fires from ON_AIR via EVENT_START; otherwise re-resolve.
+          const boundaryEvent = decideSeamEvent(channel, 'item-boundary');
+          if (boundaryEvent) sendRef.current({ type: 'EVENT_START', token, seam: 'item-boundary' });
+          else sendRef.current({ type: 'ITEM_ENDED', token });
+        };
         const remainingMs = startResolvedSource(channel, dispatchEnded);
         if (remainingMs === null) {
           playingRef.current = false;
@@ -367,6 +556,13 @@ export function useTelevision(): TelevisionApi {
             const tuneChannel = effect.channel;
             tuneTimer.current = setTimeout(() => {
               tuneTimer.current = null;
+              // A tune-in seam: ask the director first (requirement 9.1). If an
+              // event fires, enter the EVENT phase; otherwise resolve to air.
+              const tuneEvent = decideSeamEvent(tuneChannel, 'tune-in');
+              if (tuneEvent) {
+                sendRef.current({ type: 'EVENT_START', token, seam: 'tune-in' });
+                return;
+              }
               // Playable iff the clock resolves a (scene) item for this channel.
               const ch = getChannel(tuneChannel);
               const resolved = ch ? resolveBroadcast(ch, Date.now(), () => true) : null;
@@ -415,15 +611,66 @@ export function useTelevision(): TelevisionApi {
             playFromClock(effect.channel, effect.token);
             break;
           }
-          case 'runEvent':
-          case 'signOffText':
-          case 'setAfterHours':
-            // Handled by later-milestone systems (director, sign-off).
+          case 'runEvent': {
+            // Run the event the director chose for this seam. Record the firing
+            // in memory and this session, then drive the state machine to the
+            // sign-off cut (if a signOff step ran) or back to ON_AIR.
+            const event = pendingEventRef.current;
+            const token = effect.token;
+            const channel = stateRef.current.channel ?? 2;
+            if (!event) {
+              sendRef.current({ type: 'EVENT_DONE', token });
+              break;
+            }
+            // Stop the underlying programme while the event plays.
+            stopPlayback();
+            eventCancelRef.current = false;
+            lastEventAtRef.current = Date.now();
+            sessionFiredRef.current[event.id] = (sessionFiredRef.current[event.id] ?? 0) + 1;
+            dispatchMemory({ type: 'eventFired', eventId: event.id, atMs: Date.now() });
+            let signedOff = false;
+            const ops = makeEventOps(() => {
+              signedOff = true;
+            });
+            const steps = resolveSteps(event, channel);
+            void runEventSteps(steps, ops).then(() => {
+              pendingEventRef.current = null;
+              if (signedOff) sendRef.current({ type: 'SIGN_OFF_START', token });
+              else sendRef.current({ type: 'EVENT_DONE', token });
+            });
             break;
+          }
+          case 'signOffText': {
+            // The sign-off cut: show the exact fixed text (design/media-bible §9),
+            // then power off into Act 4 after 8 seconds (requirement 11.2).
+            stopPlayback();
+            rendererRef.current?.setStatic(0);
+            rendererRef.current?.setPower(1);
+            setAnnouncement('NO SIGNAL. THANK YOU FOR WATCHING. BROADCAST TERMINATED.');
+            setTimeout(() => sendRef.current({ type: 'SIGN_OFF_COMPLETE' }), 8000);
+            break;
+          }
+          case 'setAfterHours': {
+            // Sign-off completed: record Act 4 so after-hours variants unlock
+            // (requirement 11.2/11.3).
+            dispatchMemory({ type: 'signOffComplete' });
+            break;
+          }
         }
       }
     },
-    [clearTimers, getAudio, startResolvedSource, stopPlayback, clearItemEndTimer, dispatchMemory],
+    [
+      clearTimers,
+      getAudio,
+      startResolvedSource,
+      stopPlayback,
+      clearItemEndTimer,
+      dispatchMemory,
+      decideSeamEvent,
+      makeEventOps,
+      resolveSteps,
+      flushWatch,
+    ],
   );
 
   /**
@@ -482,16 +729,15 @@ export function useTelevision(): TelevisionApi {
     stateRef.current = { ...stateRef.current, noticeSeen: loaded.noticeSeen };
     memoryReadyRef.current = true;
 
-    // Watch-time ticker: count only while visible, on air, and playing (7.2).
+    // Watch-time: timestamp-delta accounting (design §8 "from
+    // requestAnimationFrame-independent timestamps"). The ticker credits the
+    // real elapsed span since watch last became eligible, and only while
+    // visible, on air, and playing (requirement 7.2). Using a delta rather than
+    // a fixed per-tick increment means a single long time-jump (or a throttled
+    // background tab) still credits the correct amount, and nothing accrues
+    // while paused, off air, or hidden.
     const TICK_MS = 1000;
-    watchTimer.current = setInterval(() => {
-      const visible = typeof document === 'undefined' || document.visibilityState === 'visible';
-      const onAir = stateRef.current.phase === 'ON_AIR';
-      const channel = stateRef.current.channel;
-      if (visible && onAir && playingRef.current && channel !== null) {
-        dispatchMemory({ type: 'watch', channel, deltaMs: TICK_MS });
-      }
-    }, TICK_MS);
+    watchTimer.current = setInterval(() => flushWatch(), TICK_MS);
 
     const onVisibility = (): void => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
@@ -509,7 +755,7 @@ export function useTelevision(): TelevisionApi {
       }
       store.flush(memoryRef.current);
     };
-  }, [demo, getStore, dispatchMemory]);
+  }, [demo, getStore, flushWatch]);
 
   const power = useCallback(() => send({ type: 'POWER' }), [send]);
   const channelUp = useCallback(() => send({ type: 'CHANNEL_UP' }), [send]);

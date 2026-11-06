@@ -21,6 +21,14 @@ export interface SceneAdapterDeps {
   cancelFrame?: (handle: number) => void;
   /** Make the offscreen draw surface. Defaults to a document canvas. */
   createCanvas?: (w: number, h: number) => { ctx: Ctx2D; source: unknown };
+  /**
+   * Minimum ms between source-texture redraws (default ~50 ms ≈ 20 fps). The
+   * CRT shader runs at 60 fps independently; the scene's flat picture only
+   * needs refreshing a few times a second (ticker/noise motion stays smooth
+   * enough), which keeps GPU/CPU cost down (tech.md 60 fps budget). The rAF
+   * loop still runs every frame to detect the item boundary promptly.
+   */
+  redrawIntervalMs?: number;
 }
 
 function defaultCreateCanvas(w: number, h: number): { ctx: Ctx2D; source: unknown } {
@@ -50,11 +58,21 @@ export class SceneAdapter implements PlaybackAdapter {
   private running = false;
   private endedEmitted = false;
   private readonly listeners = new Set<(e: AdapterEvent) => void>();
+  private readonly redrawIntervalMs: number;
+  /** ctx.now() of the last actual redraw; -Infinity forces the first draw. */
+  private lastDrawAt = -Infinity;
 
   constructor(deps: SceneAdapterDeps = {}) {
+    this.redrawIntervalMs = deps.redrawIntervalMs ?? 50;
+    // The scene source is a flat picture refreshed a few times a second (the
+    // CRT shader animates at 60 fps on top), so we drive the refresh on a
+    // timer at the redraw interval rather than requestAnimationFrame every
+    // frame. This caps the source-texture work (tech.md 60 fps budget) and
+    // keeps the loop cheap. Tests inject their own scheduler.
+    const interval = this.redrawIntervalMs;
     this.requestFrame =
-      deps.requestFrame ?? ((cb) => requestAnimationFrame((t) => cb(t)));
-    this.cancelFrame = deps.cancelFrame ?? ((h) => cancelAnimationFrame(h));
+      deps.requestFrame ?? ((cb) => setTimeout(() => cb(Date.now()), interval) as unknown as number);
+    this.cancelFrame = deps.cancelFrame ?? ((h) => clearTimeout(h as unknown as ReturnType<typeof setTimeout>));
     const made = (deps.createCanvas ?? defaultCreateCanvas)(INTERNAL_WIDTH, INTERNAL_HEIGHT);
     this.ctx = made.ctx;
     this.sourceCanvas = made.source;
@@ -72,6 +90,7 @@ export class SceneAdapter implements PlaybackAdapter {
     this.endedEmitted = false;
     ctx.setLook?.(item.look);
     // Draw the first frame immediately so a paused load still shows the picture.
+    this.lastDrawAt = ctx.now();
     this.drawAt(this.startOffsetMs);
     return Promise.resolve();
   }
@@ -132,7 +151,13 @@ export class SceneAdapter implements PlaybackAdapter {
         }
         return;
       }
-      this.drawAt(pos);
+      // Throttle the source redraw to redrawIntervalMs; the loop still runs
+      // every frame so the boundary above is detected promptly.
+      const nowClock = this.ctxApp.now();
+      if (nowClock - this.lastDrawAt >= this.redrawIntervalMs) {
+        this.lastDrawAt = nowClock;
+        this.drawAt(pos);
+      }
       this.loop();
     });
   }

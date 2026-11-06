@@ -10,13 +10,21 @@
  * which the TV shows as a stand-by slate.
  */
 
-import { channelSchema, sceneProgramSchema, toChannel, type SceneProgramInput } from './schema.ts';
+import {
+  channelSchema,
+  horrorEventSchema,
+  sceneProgramSchema,
+  toChannel,
+  type HorrorEventInput,
+  type SceneProgramInput,
+} from './schema.ts';
 import type { Channel, ChannelId } from '../core/types.ts';
 
 // Eagerly import every catalogue and scene JSON file. Vite resolves these at
 // build time; the shapes are validated below.
 const channelModules = import.meta.glob('./catalog/*.json', { eager: true, import: 'default' });
 const sceneModules = import.meta.glob('./scenes/*.json', { eager: true, import: 'default' });
+const eventModules = import.meta.glob('./events/*.json', { eager: true, import: 'default' });
 
 function buildChannels(): Map<ChannelId, Channel> {
   const map = new Map<ChannelId, Channel>();
@@ -42,8 +50,26 @@ function buildScenes(): Map<string, SceneProgramInput> {
   return map;
 }
 
+function buildEvents(): HorrorEventInput[] {
+  const out: HorrorEventInput[] = [];
+  for (const [path, raw] of Object.entries(eventModules)) {
+    const list = Array.isArray(raw)
+      ? raw
+      : raw && typeof raw === 'object' && 'events' in raw
+        ? (raw as { events: unknown[] }).events
+        : [raw];
+    for (const item of list) {
+      const parsed = horrorEventSchema.safeParse(item);
+      if (!parsed.success) throw new Error(`Invalid event in ${path}: ${parsed.error.message}`);
+      out.push(parsed.data);
+    }
+  }
+  return out;
+}
+
 const CHANNELS = buildChannels();
 const SCENES = buildScenes();
+const EVENTS = buildEvents();
 
 export function getChannel(id: ChannelId): Channel | undefined {
   return CHANNELS.get(id);
@@ -56,4 +82,9 @@ export function getScene(sceneId: string): SceneProgramInput | undefined {
 /** All authored channel ids, for diagnostics and tests. */
 export function authoredChannelIds(): ChannelId[] {
   return [...CHANNELS.keys()];
+}
+
+/** The authored horror events (design §9). */
+export function getEvents(): HorrorEventInput[] {
+  return EVENTS;
 }

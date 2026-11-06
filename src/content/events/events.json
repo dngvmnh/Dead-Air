@@ -1,0 +1,164 @@
+{
+  "events": [
+    {
+      "id": "E01",
+      "minAct": 1,
+      "channels": [2],
+      "seams": ["item-boundary"],
+      "when": { "visitsGte": { "channel": 2, "n": 2 } },
+      "limit": { "perViewer": 1 },
+      "priority": 2,
+      "steps": [
+        { "do": "silence", "ms": 6000 },
+        { "do": "voice", "caption": "...Excuse me." }
+      ]
+    },
+    {
+      "id": "E02",
+      "minAct": 1,
+      "channels": "any",
+      "seams": ["tune-in"],
+      "when": { "distinctChannelsGte": 0 },
+      "limit": { "perSession": 2 },
+      "priority": 1,
+      "steps": [
+        { "do": "static", "ms": 800 },
+        { "do": "voice", "caption": "there you are." }
+      ]
+    },
+    {
+      "id": "E03",
+      "minAct": 1,
+      "channels": [4],
+      "seams": ["mid-item"],
+      "when": { "visitsGte": { "channel": 4, "n": 2 } },
+      "limit": { "perViewer": 1 },
+      "priority": 2,
+      "steps": [
+        { "do": "silence", "ms": 1200 },
+        { "do": "voice", "caption": "Shh. They're back." }
+      ]
+    },
+    {
+      "id": "E04",
+      "minAct": 1,
+      "channels": [7],
+      "seams": ["item-boundary"],
+      "when": { "visitsGte": { "channel": 7, "n": 2 } },
+      "limit": { "perViewer": 1 },
+      "priority": 2,
+      "steps": [
+        { "do": "voice", "caption": "Our operators are waiting." },
+        { "do": "voice", "caption": "Our operators are waiting." },
+        { "do": "voice", "caption": "Our operators are waiting." },
+        { "do": "voice", "caption": "Our operators are waiting." }
+      ]
+    },
+    {
+      "id": "E05",
+      "minAct": 2,
+      "channels": [13],
+      "seams": ["tune-in"],
+      "when": { "distinctChannelsGte": 2 },
+      "limit": { "perViewer": 2 },
+      "priority": 3,
+      "steps": [
+        { "do": "flashPrevious", "ms": 300 },
+        { "do": "slate", "text": "UNAUTHORISED VIEWER DETECTED", "fallbackText": "UNAUTHORISED VIEWER DETECTED", "ms": 3000 },
+        { "do": "slate", "text": "LAST TUNED: CHANNEL {lastChannel}", "fallbackText": "LAST TUNED: CHANNEL UNKNOWN", "ms": 3000 }
+      ]
+    },
+    {
+      "id": "E06",
+      "minAct": 2,
+      "channels": [2],
+      "seams": ["item-boundary"],
+      "when": { "distinctChannelsGte": 3 },
+      "limit": { "perViewer": 1 },
+      "priority": 3,
+      "steps": [
+        { "do": "voice", "caption": "A viewer in this broadcast area has been watching for {totalMinutes} minutes.", "fallbackCaption": "A viewer in this broadcast area has been watching for some time." },
+        { "do": "silence", "ms": 1500 },
+        { "do": "voice", "caption": "We'd like them to know that's fine." }
+      ]
+    },
+    {
+      "id": "E07",
+      "minAct": 2,
+      "channels": [13],
+      "seams": ["tune-in"],
+      "when": { "all": [{ "distinctChannelsGte": 3 }, { "eventFired": "E05" }] },
+      "limit": { "perViewer": 1 },
+      "priority": 4,
+      "steps": [
+        { "do": "voice", "caption": "Emergency transmission. This viewer has watched channels {visitedList}. Most recently, channel {lastChannel}.", "fallbackCaption": "Emergency transmission. This viewer has watched this network." },
+        { "do": "slate", "text": "DO NOT CHANGE THE CHANNEL", "ms": 3000 }
+      ]
+    },
+    {
+      "id": "E08",
+      "minAct": 2,
+      "channels": "any",
+      "seams": ["tune-in"],
+      "when": { "localHourBetween": [0, 4] },
+      "limit": { "perSession": 1 },
+      "priority": 2,
+      "steps": [
+        { "do": "slate", "text": "IT IS {localTime}.", "fallbackText": "IT IS LATE.", "ms": 1500 },
+        { "do": "slate", "text": "YOU ARE STILL UP.", "ms": 1500 }
+      ]
+    },
+    {
+      "id": "E09",
+      "minAct": 2,
+      "channels": [4],
+      "seams": ["item-boundary"],
+      "when": { "lastChannelIs": 13 },
+      "limit": { "perViewer": 1 },
+      "priority": 3,
+      "steps": [
+        { "do": "voice", "caption": "You went to the bad channel. We saw." }
+      ]
+    },
+    {
+      "id": "E10",
+      "minAct": 3,
+      "channels": [13],
+      "seams": ["tune-in"],
+      "when": { "distinctChannelsGte": 0 },
+      "limit": { "perViewer": 1 },
+      "priority": 100,
+      "steps": [
+        { "do": "voice", "caption": "This concludes tonight's broadcast. Thank you for your attention. We have enjoyed yours." },
+        { "do": "shaderPulse", "effect": "collapse", "ms": 1200 },
+        { "do": "signOff" }
+      ]
+    },
+    {
+      "id": "E11",
+      "minAct": 4,
+      "channels": [2],
+      "seams": ["tune-in"],
+      "when": { "distinctChannelsGte": 0 },
+      "limit": { "perViewer": 1 },
+      "priority": 3,
+      "steps": [
+        { "do": "static", "ms": 600 },
+        { "do": "voice", "caption": "Welcome back." }
+      ]
+    },
+    {
+      "id": "E12",
+      "minAct": 4,
+      "channels": [13],
+      "seams": ["tune-in"],
+      "when": { "sessionCountGte": 2 },
+      "limit": { "perSession": 1 },
+      "priority": 3,
+      "steps": [
+        { "do": "slate", "text": "YOU CAME BACK.", "ms": 2000 },
+        { "do": "slate", "text": "VISIT {visitCountCurrent}.", "fallbackText": "VISIT.", "ms": 2000 }
+      ]
+    }
+  ]
+}

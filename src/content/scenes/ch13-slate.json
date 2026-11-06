@@ -1,0 +1,14 @@
+{
+  "id": "ch13-slate",
+  "durationMs": 20000,
+  "layers": [
+    { "id": "bg", "type": "rect", "x": 0, "y": 0, "w": 960, "h": 720, "colour": "#000000" },
+    { "id": "l1", "type": "text", "text": "KDA-TV", "x": 360, "y": 250, "size": 56, "colour": "#e8e8e0" },
+    { "id": "l2", "type": "text", "text": "TECHNICAL DIFFICULTIES", "x": 230, "y": 340, "size": 40, "colour": "#e8b84a" },
+    { "id": "l3", "type": "text", "text": "PLEASE STAND BY", "x": 300, "y": 410, "size": 36, "colour": "#e8e8e0" },
+    { "id": "grain", "type": "noise", "intensity": 0.25 }
+  ],
+  "captions": [
+    { "atMs": 0, "endMs": 20000, "text": "Please stand by." }
+  ]
+}
