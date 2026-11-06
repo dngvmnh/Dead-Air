@@ -1,0 +1,41 @@
+{
+  "id": 4,
+  "name": "Pumpkin Hour",
+  "epochMs": 120000,
+  "stationCard": "img/ch04/station-card.png",
+  "rundown": [
+    {
+      "id": "ch04-jingle-1",
+      "title": "Pumpkin Hour Bumper",
+      "kind": "interstitial",
+      "durationMs": 8000,
+      "rights": { "basis": "original", "note": "Placeholder scene art; original Pumpkin Hour identity." },
+      "placeholder": true,
+      "source": "scene",
+      "sceneId": "ch04-jingle",
+      "look": "broadcast"
+    },
+    {
+      "id": "ch04-pumpkin-1",
+      "title": "The Pumpkin Hour: Counting",
+      "kind": "programme",
+      "durationMs": 45000,
+      "rights": { "basis": "original", "note": "Placeholder scene art; original Mister Gourd and Dot." },
+      "placeholder": true,
+      "source": "scene",
+      "sceneId": "ch04-pumpkin-a",
+      "look": "broadcast"
+    },
+    {
+      "id": "ch04-jingle-2",
+      "title": "Pumpkin Hour Bumper (late)",
+      "kind": "interstitial",
+      "durationMs": 8000,
+      "rights": { "basis": "original", "note": "Placeholder scene art; original Pumpkin Hour identity." },
+      "placeholder": true,
+      "source": "scene",
+      "sceneId": "ch04-jingle",
+      "look": "broadcast"
+    }
+  ]
+}

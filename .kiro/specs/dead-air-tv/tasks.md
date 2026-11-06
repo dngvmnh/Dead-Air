@@ -59,8 +59,8 @@ Work in order. Each milestone ends in something runnable. Commit after each comp
   - [x] 13.2 Implement `decideEvent` with tests and property tests, including the YouTube rule and global gap.
   - [x] 13.3 Implement the event step runner, including captions-only degradation.
   - _Requirements: 9.1–9.7_
-- [ ] 14. Channels 04 and 07
-  - [ ] 14.1 Author scene rundowns and revisit variants, including moving set objects on 07.
+- [x] 14. Channels 04 and 07
+  - [x] 14.1 Author scene rundowns and revisit variants, including moving set objects on 07.
   - _Requirements: 8.3, 8.4_
 - [ ] 15. Channel 13 and the ending
   - [ ] 15.1 Build Dead Air programming, history read-back, and voice stem stitching.

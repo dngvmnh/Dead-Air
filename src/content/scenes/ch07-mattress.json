@@ -1,0 +1,12 @@
+{
+  "id": "ch07-mattress",
+  "durationMs": 12000,
+  "layers": [
+    { "id": "bg", "type": "rect", "x": 0, "y": 0, "w": 960, "h": 720, "colour": "#0d5c5c" },
+    { "id": "head", "type": "text", "text": "HOLLOW CREEK MATTRESS BARN", "x": 70, "y": 300, "size": 40, "colour": "#ffd24a" },
+    { "id": "sub", "type": "text", "text": "SLEEP LIKE YOU MEAN IT", "x": 180, "y": 380, "size": 30, "colour": "#ff3ea5" }
+  ],
+  "captions": [
+    { "atMs": 0, "endMs": 12000, "text": "Hollow Creek Mattress Barn. Sleep like you mean it." }
+  ]
+}

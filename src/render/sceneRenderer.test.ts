@@ -148,6 +148,24 @@ describe('renderScene', () => {
     expect(calls.some((c) => c.op === 'fillText' && c.args[0] === 'FADE')).toBe(false);
   });
 
+  it('changes a channel-07 set object on revisit (requirement 8.4)', async () => {
+    // The real ch07 scene: a shelf clock slot appears at minVisits:2.
+    const scene = (await import('../content/scenes/ch07-shopping-a.json', { with: { type: 'json' } }))
+      .default as unknown as SceneProgramInput;
+
+    const visit1 = fakeCtx();
+    renderScene(visit1.ctx, scene, 0, { visits: 1, act: 0 }, { drawCaptions: false });
+    const visit2 = fakeCtx();
+    renderScene(visit2.ctx, scene, 0, { visits: 2, act: 0 }, { drawCaptions: false });
+
+    const drewClock = (calls: Call[]): boolean =>
+      calls.some((c) => c.op === 'fillText' && c.args[0] === '12:00');
+    // The clock slot is hidden on visit 1 and shown on visit 2 — a set object
+    // changed relative to the previous visit.
+    expect(drewClock(visit1.calls)).toBe(false);
+    expect(drewClock(visit2.calls)).toBe(true);
+  });
+
   it('is time-addressable: same inputs produce the same call sequence', () => {
     const program: SceneProgramInput = {
       id: 's',

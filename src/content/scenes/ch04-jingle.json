@@ -1,0 +1,12 @@
+{
+  "id": "ch04-jingle",
+  "durationMs": 8000,
+  "layers": [
+    { "id": "bg", "type": "rect", "x": 0, "y": 0, "w": 960, "h": 720, "colour": "#3a1f5c" },
+    { "id": "mark", "type": "text", "text": "PUMPKIN HOUR", "x": 230, "y": 320, "size": 60, "colour": "#ff8a2a" },
+    { "id": "sub", "type": "text", "text": "KDA-TV 04", "x": 380, "y": 410, "size": 32, "colour": "#f3ead6" }
+  ],
+  "captions": [
+    { "atMs": 0, "endMs": 8000, "text": "The Pumpkin Hour will be right back." }
+  ]
+}

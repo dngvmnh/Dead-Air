@@ -1,0 +1,30 @@
+{
+  "id": 7,
+  "name": "Midnight Shopping Network",
+  "epochMs": 300000,
+  "stationCard": "img/ch07/station-card.png",
+  "rundown": [
+    {
+      "id": "ch07-shopping-1",
+      "title": "Ever-Lasting Night Light",
+      "kind": "programme",
+      "durationMs": 50000,
+      "rights": { "basis": "original", "note": "Placeholder scene art; original host Candy Marlowe and product." },
+      "placeholder": true,
+      "source": "scene",
+      "sceneId": "ch07-shopping-a",
+      "look": "broadcast"
+    },
+    {
+      "id": "ch07-mattress-1",
+      "title": "Mattress Barn Commercial",
+      "kind": "interstitial",
+      "durationMs": 12000,
+      "rights": { "basis": "original", "note": "Placeholder scene art; fictional local commercial." },
+      "placeholder": true,
+      "source": "scene",
+      "sceneId": "ch07-mattress",
+      "look": "broadcast"
+    }
+  ]
+}

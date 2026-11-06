@@ -496,3 +496,42 @@ done, how it was checked, and anything left unverified.
   integration rides with the channel work (14/15) and is proven end to end at the
   task 16 MVP checkpoint (sign-off reached via `/?demo=1`). Here each piece is
   proven in isolation.
+## Task 14 — Channels 04 (Pumpkin Hour) and 07 (Midnight Shopping)
+
+- Mode: direct implementation (the `spec-task-execution` subagent is still
+  absent from the registry).
+- Done:
+  - Channel 04 (`src/content/catalog/ch04.json`, epoch offset 120s so it does
+    not run in step with ch02): a bumper + the "Counting" programme + a late
+    bumper. Scenes `ch04-jingle` and `ch04-pumpkin-a`; the Pumpkin Hour scene
+    carries the revisit variant via `when` — Dot shown at `maxVisits:1`, a
+    turned Gourd and a whispered revisit line at `minVisits:2` (media-bible §5).
+  - Channel 07 (`src/content/catalog/ch07.json`, epoch offset 300s): the
+    Ever-Lasting Night Light programme + a Mattress Barn commercial. Scene
+    `ch07-shopping-a` implements the moving set objects (requirement 8.4): a
+    shelf clock slot at `minVisits:2`, a small CRT at `minVisits:3`, that CRT lit
+    at `minVisits:4`, a "host gone" note at `minVisits:5`, and a price card that
+    changes by act ($19.95 ≤ act1, $13.00 act2, YOU ALREADY PAID act3+).
+  - All six scenes are placeholder art (labelled blocks), rights `original`,
+    fictional Hollow Creek / KDA-TV. The catalogue loader picks them up via its
+    glob with no code change.
+- Checked: `npm test` 249 passed (new: a sceneRenderer test that loads the real
+  ch07 scene and proves the clock set-object is hidden at visit 1 and drawn at
+  visit 2 — requirement 8.4, deterministic). `npm run lint` clean.
+  `npm run build` clean (JS 114.17 KB gzip, within budget).
+  `npm run validate:catalog` passes (3 channels, 9 scenes). Browser: a new
+  committed `tests/e2e/channels0407.spec.ts` (Chromium, 2 tests) surfs to 04 and
+  07 under a fake clock and asserts each draws a lit, structured scene on the
+  tube via pixel readback. Full e2e 16/16 green on chromium. Chromium only.
+- Decisions made alone: (1) the ch07 clock slot shows a static "12:00"
+  placeholder rather than the `{localTime}` template — scene-layer text is not
+  template-filled (only event copy is, by the director), so a literal template
+  token would render verbatim; the set-change requirement (8.4) is met by the
+  slot appearing on revisit, and live local-time in a scene is a polish item.
+  (2) the revisit proof is a deterministic unit test over the real scene JSON
+  rather than a flaky pixel diff between two visits. (3) channel epochs are
+  staggered (0 / 120s / 300s) so the channels do not change in step (design §4).
+  All reversible.
+- Unverified: real scene art (placeholders only); the director still is not
+  wired to fire these channels' events (events.json is task 15.4); live
+  local-time in the ch07 clock. These land in task 15 / the MVP checkpoint.
