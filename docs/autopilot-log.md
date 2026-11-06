@@ -163,3 +163,20 @@ done, how it was checked, and anything left unverified.
 - Unverified: actual audibility/mix quality (no automated assertion possible —
   belongs to the manual checklist, task 22.2). The analog chain and voice stems
   are built but not yet driven by real sources (Milestone 4 / task 15).
+
+## Task 6 — Milestone 1 checkpoint
+
+- Mode: implemented directly in chat.
+- Done: Added `tests/e2e/milestone1-checkpoint.spec.ts`, the end-to-end proof
+  that the television, CRT renderer and audio work together: POWER on → boot →
+  default channel 02; the AudioContext reaches 'running' (sound is produced);
+  surf the full cycle 02→04→07→13→02, each hop showing static on the canvas
+  (verified via pixel readback, brightest-frame polling) with the chassis LED
+  tracking the channel; POWER off collapses the picture to black and the audio
+  context is no longer running.
+- Checked: `npm test` 98 passed (the checkpoint's explicit requirement).
+  `npm run lint` clean. `npm run build` clean (79.31 KB gzip, within budget).
+  Browser: `npx playwright test --project=chromium` 11 passed including the new
+  checkpoint. Chromium only; firefox/webkit not installed or run.
+- Decisions made alone: none beyond reusing the existing window test hooks.
+- Unverified: audible sound quality (manual checklist, task 22.2).

@@ -25,7 +25,7 @@ Work in order. Each milestone ends in something runnable. Commit after each comp
 - [x] 5. Procedural audio
   - [x] 5.1 Implement AudioEngine: gesture unlock, buses, limiter, static, tuning click, boot and power-off sounds.
   - _Requirements: 12.1, 12.3_
-- [ ] 6. Checkpoint: POWER on, surf through static across four empty channels with correct LED and sound, POWER off. `npm test` passes.
+- [x] 6. Checkpoint: POWER on, surf through static across four empty channels with correct LED and sound, POWER off. `npm test` passes.
 
 ## Milestone 2: Always-on broadcast (one complete channel)
 
