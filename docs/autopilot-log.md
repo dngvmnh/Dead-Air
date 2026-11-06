@@ -74,3 +74,49 @@ done, how it was checked, and anything left unverified.
 - Unverified: 60 fps at 960x720 on integrated graphics (task 22.1). Real owned
   source textures arrive in Milestone 2; shutdown/boot were exercised over a
   black source only.
+
+## Task 4.3 — flashLimiter, reduced effects, context restore, non-WebGL fallback
+
+- Mode: implemented directly in chat (the spec-task-execution subagent was tried
+  once and is still unavailable in the registry).
+- Done:
+  - `src/render/flashLimiter.ts` + tests: a pure rolling-window limiter capping
+    luminance flashes at 3 per second (requirement 13.1), with a `setSuppressed`
+    for reduced effects. Every flashing effect must call it; nothing can bypass.
+  - `CrtRenderer`: added `setReducedEffects` (zeroes roll/tear, suppresses the
+    limiter — req 13.2), `requestFlash`/`flashBudget` (the single flash gate),
+    and gated `setRoll`/`setTear` that no-op under reduced effects. Added
+    WebGL context-loss handling: `webglcontextlost` calls preventDefault and
+    pauses drawing; `webglcontextrestored` rebuilds program/VAO/texture/uniform
+    locations (requirement 5.5, no page reload). GL objects are no longer
+    readonly so they can be rebuilt.
+  - `src/render/Renderer.ts`: shared interface implemented by both renderers.
+  - `src/render/FallbackRenderer.ts`: 2D-canvas fallback used when WebGL2 is
+    unavailable (requirement 5.3). Draws the source/snow dimmed by the same pure
+    boot/shutdown envelopes, and adds a `crtFallback` CSS treatment class
+    (scanline gradient + inset vignette in global.css — a surface treatment on
+    the picture element, applied only on the owned-source fallback path, never
+    over a YouTube player). `Screen` now selects CrtRenderer, else FallbackRenderer,
+    and keeps reduced-effects in sync; `Chassis` passes the reducedEffects setting.
+- Checked: `npm test` 86 passed (8 new flashLimiter tests incl. a fast-check
+  property that NO rolling 1s window ever exceeds 3 grants). `npm run lint`
+  clean. `npm run build` clean, JS 77.91 KB gzip (within budget). Browser:
+  `npx playwright test --project=chromium` 8 passed (all specs), including a new
+  `crt-safety.spec.ts` that drives the live renderer via a test-only window hook:
+  flash limiter grants exactly 3/second and refills after the window; reduced
+  effects zeroes roll/tear and denies all flashes and ignores setRoll/setTear;
+  WEBGL_lose_context loses then restores the context and the canvas draws again
+  without reload; and forcing the fallback shows the crtFallback class, draws 2D
+  pixels, and the TV stays operable (surf still updates the LED). Chromium only;
+  firefox/webkit not installed or run.
+- Decisions made alone: (1) Added `src/render/Renderer.ts` interface and a
+  `window.__CRT_FORCE_FALLBACK__` test flag so the fallback path is exercisable
+  in-browser; production never sets the flag (reversible). (2) Fallback CSS
+  treatment is a global `.crtFallback` class (the renderer applies a literal
+  class name, which CSS Modules would otherwise hash); scoped to the fallback
+  canvas only. (3) Relaxed the safety e2e to wait for "powered and drawing"
+  rather than the brief TUNING phase, after seeing parallel-worker flakiness;
+  this does not weaken the assertions (the checks hold in TUNING or ON_AIR).
+- Unverified: real GPU driver context-loss (as opposed to the debug extension)
+  is not exercised; actual cross-browser fallback on a device genuinely lacking
+  WebGL2 (only simulated via the force flag); 60 fps budget (task 22.1).

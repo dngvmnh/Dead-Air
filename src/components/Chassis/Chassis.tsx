@@ -22,7 +22,11 @@ export function Chassis({ tv, powerRef }: ChassisProps) {
   return (
     <div className={styles.chassis}>
       <div className={styles.bezel}>
-        <Screen phase={tv.state.phase} channelLabel={label} />
+        <Screen
+          phase={tv.state.phase}
+          channelLabel={label}
+          reducedEffects={tv.settings.reducedEffects}
+        />
       </div>
       <p className={styles.brand}>KDA · DEAD AIR</p>
 

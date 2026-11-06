@@ -17,10 +17,10 @@ Work in order. Each milestone ends in something runnable. Commit after each comp
   - [x] 3.2 Add keyboard shortcuts and the first-run StartNotice.
   - [x] 3.3 Add the rear panel: Reduced Effects, Forget me.
   - _Requirements: 1.1, 1.2, 2.5, 2.6, 13.3–13.5, 15.2_
-- [ ] 4. CRT renderer
+- [x] 4. CRT renderer
   - [x] 4.1 Implement the WebGL2 pipeline, uniforms, look presets, and procedural static.
   - [x] 4.2 Implement boot and shutdown via `uPower`, plus tuning transitions.
-  - [ ] 4.3 Implement `flashLimiter` with tests, reduced-effects handling, context restore, and non-WebGL fallback.
+  - [x] 4.3 Implement `flashLimiter` with tests, reduced-effects handling, context restore, and non-WebGL fallback.
   - _Requirements: 5.1–5.5, 13.1, 13.2, 1.4_
 - [ ] 5. Procedural audio
   - [ ] 5.1 Implement AudioEngine: gesture unlock, buses, limiter, static, tuning click, boot and power-off sounds.

@@ -41,6 +41,7 @@ import {
   shutdownDrive,
   type EnvelopePhase,
 } from './envelope.ts';
+import { FlashLimiter } from './flashLimiter.ts';
 import { type Look } from '../core/types.ts';
 
 /** Options for {@link CrtRenderer.create}. */
@@ -79,10 +80,12 @@ type Transient = Omit<CrtUniforms, keyof ReturnType<typeof lookPreset> | 'resolu
 export class CrtRenderer {
   private readonly gl: WebGL2RenderingContext;
   private readonly canvas: HTMLCanvasElement;
-  private readonly program: WebGLProgram;
-  private readonly vao: WebGLVertexArrayObject;
-  private readonly texture: WebGLTexture;
-  private readonly locations: Map<string, WebGLUniformLocation | null> = new Map();
+  // GL objects are rebuilt on context restore (requirement 5.5), so they are
+  // not readonly.
+  private program: WebGLProgram;
+  private vao: WebGLVertexArrayObject;
+  private texture: WebGLTexture;
+  private locations: Map<string, WebGLUniformLocation | null> = new Map();
 
   private look: Look = DEFAULT_LOOK;
   private transient: Transient = { ...INERT_TRANSIENT };
@@ -91,6 +94,14 @@ export class CrtRenderer {
   private startTime = 0;
   private rafId: number | null = null;
   private running = false;
+
+  // --- Safety & robustness (task 4.3) ---------------------------------------
+  /** Gates every flashing effect to ≤3 per rolling second (requirement 13.1). */
+  private readonly flashLimiter = new FlashLimiter();
+  /** Reduced effects / reduced motion: zero roll, tear and flashes (req 13.2). */
+  private reducedEffects = false;
+  /** True between webglcontextlost and webglcontextrestored; skips drawing. */
+  private contextLost = false;
 
   // --- Transition envelopes (task 4.2) --------------------------------------
   // The active boot/shutdown transition and when it began, in the same clock as
@@ -111,7 +122,27 @@ export class CrtRenderer {
     this.vao = this.buildVao();
     this.texture = this.buildTexture();
     this.cacheLocations();
+    canvas.addEventListener('webglcontextlost', this.handleContextLost);
+    canvas.addEventListener('webglcontextrestored', this.handleContextRestored);
   }
+
+  /**
+   * On context loss, prevent the default (which would stop restoration) and
+   * pause drawing. The GL objects are invalid until restore (requirement 5.5).
+   */
+  private readonly handleContextLost = (event: Event): void => {
+    event.preventDefault();
+    this.contextLost = true;
+  };
+
+  /** On restore, rebuild the program, VAO, texture and uniform locations. */
+  private readonly handleContextRestored = (): void => {
+    this.program = this.buildProgram();
+    this.vao = this.buildVao();
+    this.texture = this.buildTexture();
+    this.cacheLocations();
+    this.contextLost = false;
+  };
 
   /**
    * Create a renderer on a canvas, or return null if WebGL2 is unavailable.
@@ -192,6 +223,57 @@ export class CrtRenderer {
    */
   setTuning(active: boolean): void {
     this.tuning = active;
+  }
+
+  /**
+   * Toggle reduced effects (Reduced Effects switch or prefers-reduced-motion).
+   * When on, roll, tear and flashes are disabled (requirement 13.2): any
+   * current roll/tear is zeroed and the flash limiter denies every request so
+   * no effect can flash. Collapse and power are left alone so boot and shutdown
+   * still read correctly.
+   */
+  setReducedEffects(reduced: boolean): void {
+    this.reducedEffects = reduced;
+    this.flashLimiter.setSuppressed(reduced);
+    if (reduced) {
+      this.transient.roll = 0;
+      this.transient.tear = 0;
+    }
+  }
+
+  get reducedEffectsEnabled(): boolean {
+    return this.reducedEffects;
+  }
+
+  /**
+   * Request a single luminance flash through the shared flash limiter
+   * (requirement 13.1). EVERY flashing effect must go through here — the
+   * renderer grants at most three flashes per rolling second and none at all
+   * when reduced effects is on. Returns true if the flash was permitted.
+   *
+   * On success the caller's `apply` runs so it can drive the flash (set a
+   * transient pulse, capture a frame, etc.); on denial nothing happens and the
+   * screen stays safe regardless of what the content asked for.
+   */
+  requestFlash(nowMs: number, apply?: () => void): boolean {
+    const granted = this.flashLimiter.tryFlash(nowMs);
+    if (granted) apply?.();
+    return granted;
+  }
+
+  /** Flashes allowed right now (0..3); 0 when reduced effects is on. */
+  flashBudget(nowMs: number): number {
+    return this.flashLimiter.remaining(nowMs);
+  }
+
+  /** Enable roll interference, but only when reduced effects is off (req 13.2). */
+  setRoll(amount: number): void {
+    this.transient.roll = this.reducedEffects ? 0 : clamp01(amount);
+  }
+
+  /** Enable horizontal tear/jitter, but only when reduced effects is off. */
+  setTear(amount: number): void {
+    this.transient.tear = this.reducedEffects ? 0 : clamp01(amount);
   }
 
   /** The transition currently playing, or 'idle'. Exposed for tests/UI. */
@@ -290,6 +372,10 @@ export class CrtRenderer {
   renderFrame(t: number = performanceNow()): void {
     const gl = this.gl;
 
+    // While the context is lost the GL objects are invalid; skip drawing until
+    // webglcontextrestored rebuilds them (requirement 5.5).
+    if (this.contextLost || gl.isContextLost()) return;
+
     // Advance any active boot/shutdown transition and tuning hold before we
     // read the transient uniforms for this frame.
     this.applyEnvelope(t);
@@ -323,6 +409,8 @@ export class CrtRenderer {
   /** Release GL resources. The caller drops the reference afterwards. */
   dispose(): void {
     this.stop();
+    this.canvas.removeEventListener('webglcontextlost', this.handleContextLost);
+    this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored);
     const gl = this.gl;
     gl.deleteTexture(this.texture);
     gl.deleteVertexArray(this.vao);
