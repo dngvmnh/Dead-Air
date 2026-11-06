@@ -31,6 +31,13 @@ export interface ScreenProps {
   channelLabel: string;
   /** Reduced Effects / prefers-reduced-motion: disable flashes, roll, jitter. */
   reducedEffects: boolean;
+  /**
+   * Hands the created renderer to the orchestrator so owned sources (scenes,
+   * files) can publish their picture via `renderer.setSource`. Called with the
+   * renderer on mount and `null` on unmount. The orchestrator owns playback;
+   * Screen still owns the renderer's lifecycle and phase-driven envelopes.
+   */
+  onRendererReady?: (renderer: Renderer | null) => void;
 }
 
 function statusWord(phase: TvPhase): string {
@@ -73,12 +80,19 @@ function steadyDrive(phase: TvPhase): { power: number; static: number } {
   }
 }
 
-export function Screen({ phase, channelLabel, reducedEffects }: ScreenProps) {
+export function Screen({ phase, channelLabel, reducedEffects, onRendererReady }: ScreenProps) {
   const off = phase === 'OFF';
   const word = statusWord(phase);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<Renderer | null>(null);
   const prevPhase = useRef<TvPhase | null>(null);
+
+  // Keep the latest callback without making it a dependency of the mount effect
+  // (the renderer is built exactly once).
+  const onRendererReadyRef = useRef(onRendererReady);
+  useEffect(() => {
+    onRendererReadyRef.current = onRendererReady;
+  }, [onRendererReady]);
 
   // Create the renderer once the canvas is mounted. Prefer the WebGL2 CRT
   // pipeline; if WebGL2 is unavailable (requirement 5.3), fall back to the 2D
@@ -102,7 +116,9 @@ export function Screen({ phase, channelLabel, reducedEffects }: ScreenProps) {
     if (window.__CRT_PRESERVE_DRAWING_BUFFER__ === true) {
       (window as unknown as { __crt?: Renderer }).__crt = renderer;
     }
+    onRendererReadyRef.current?.(renderer);
     return () => {
+      onRendererReadyRef.current?.(null);
       renderer.dispose();
       rendererRef.current = null;
     };

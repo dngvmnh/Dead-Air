@@ -330,3 +330,52 @@ done, how it was checked, and anything left unverified.
   showing on the tube) land in task 10 with the first committed Playwright pixel
   test; here the scene path is proven by fake-context and injected-clock unit
   tests only.
+## Task 10 — Channel 02 rundown + useTelevision wiring (first on-screen programme)
+
+- Mode: direct implementation (the `spec-task-execution` subagent is still
+  absent from the registry).
+- Done:
+  - Content (10.1): `src/content/catalog/ch02.json` (KDA Nightly News) with six
+    scene items — station ID, Bulletin A, council notice, forecast, stay-tuned
+    bumper, late station ID — every item `placeholder: true`, `rights.basis`
+    `original`, from `docs/media-bible.md` (fictional Hollow Creek / KDA-TV).
+    Five scene programmes under `src/content/scenes/` (bulletin uses a
+    `when`-gated anchor swap: neutral at `maxVisits:1`, staring at `minVisits:2`,
+    per the revisit variant). All art is labelled-placeholder (no real images
+    yet), captions carry the scripted lines. `src/content/catalog.ts` eagerly
+    imports + Zod-validates the JSON at load (throws on malformed content) and
+    exposes `getChannel`/`getScene`.
+  - Wiring (10.2): `useTelevision` now owns a `SceneAdapter` and a `SceneContext`
+    (scene lookup, visit/act vars, `setSource`/`setLook` to the renderer,
+    injected `now()`). `startTuning` resolves the clock to decide playable and
+    counts the visit; `startSource`/`reResolve` resolve `resolveBroadcast(now)`,
+    load+play the scene at its offset, and schedule `ITEM_ENDED` from the clock's
+    `remainingMs` so the programme advances with no user action (requirement
+    3.3). `stopAll`/`powerOff`/unmount stop playback and clear the timer.
+    `Screen` gained an `onRendererReady` seam (threaded through `Chassis`) so the
+    orchestrator can publish the scene canvas to the renderer; all screen effects
+    stay in the shader (the scene paints a flat picture that becomes the shader's
+    source texture — no DOM styling on the tube).
+- Checked: `npm test` 192 passed. `npm run lint` clean. `npm run build` clean
+  (JS 110.31 KB gzip — up from 79.31 because the catalogue loader pulls Zod into
+  the app bundle for load-time validation; well within the 300 KB budget).
+  `npm run validate:catalog` passes (1 channel, 5 scenes). Browser: a new
+  committed `tests/e2e/channel02.spec.ts` (Chromium only, 2 tests) reads the
+  tube canvas via WebGL2 pixel readback and asserts the scene actually drew
+  through the shader — lit (meanLum > 14, litFraction > 0.3), structured (> 4
+  luminance buckets, not flat), and carrying the navy palette's blue — and that
+  the programme advances past the 8s first item without input. Full e2e suite
+  13/13 green on chromium (no regression). Chromium only; firefox/webkit not run.
+- Decisions made alone: (1) item-end is driven by a clock-derived `setTimeout`
+  (not only the adapter's rAF `ended`) so continuity holds if a background tab
+  throttles rAF; the adapter's `ended` also dispatches, both token-guarded so a
+  stale session can't advance the current one. (2) Dispatch (`sendRef`) is kept
+  local to `runEffects`; `startResolvedSource` is dispatch-free and returns
+  `remainingMs`, which was required to satisfy the new `react-hooks/immutability`
+  lint rule (a `useCallback` reading `sendRef` plus the effect writing it
+  tripped it). (3) A minimal per-channel visit map stands in for viewer memory
+  until task 12; act is 0 until escalation (Milestone 3). All reversible.
+- Unverified: real scene art (placeholders only), audio mix, and the full
+  leave-and-return continuity assertion (that is task 11's mocked-clock e2e,
+  next). Non-scene (file/YouTube) items are treated as unplayable for now
+  (Milestone 4).

@@ -1,0 +1,12 @@
+{
+  "id": "ch02-council-notice",
+  "durationMs": 10000,
+  "layers": [
+    { "id": "bg", "type": "rect", "x": 0, "y": 0, "w": 960, "h": 720, "colour": "#111a26" },
+    { "id": "head", "type": "text", "text": "HOLLOW CREEK TOWN COUNCIL", "x": 60, "y": 120, "size": 40, "colour": "#f2f2ea" },
+    { "id": "body", "type": "text", "text": "A PUBLIC NOTICE", "x": 60, "y": 200, "size": 32, "colour": "#c9c9bf" }
+  ],
+  "captions": [
+    { "atMs": 0, "endMs": 10000, "text": "The council thanks residents for their cooperation." }
+  ]
+}

@@ -26,6 +26,7 @@ export function Chassis({ tv, powerRef }: ChassisProps) {
           phase={tv.state.phase}
           channelLabel={label}
           reducedEffects={tv.settings.reducedEffects}
+          onRendererReady={tv.registerRenderer}
         />
       </div>
       <p className={styles.brand}>KDA · DEAD AIR</p>

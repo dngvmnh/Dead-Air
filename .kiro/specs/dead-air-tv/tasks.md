@@ -41,9 +41,9 @@ Work in order. Each milestone ends in something runnable. Commit after each comp
   - [x] 9.2 Implement `LayerWhen` for visit and act variants, and captions.
   - [x] 9.3 Implement `PlaybackAdapter` and `SceneAdapter`.
   - _Requirements: 3.3, 8.3, 13.3_
-- [ ] 10. Channel 02 with placeholder art
-  - [ ] 10.1 Author the channel 02 rundown from `docs/media-bible.md` using scenes, marked `placeholder: true` where art is temporary.
-  - [ ] 10.2 Wire `useTelevision`: tune, resolve, play, re-resolve at item end.
+- [x] 10. Channel 02 with placeholder art
+  - [x] 10.1 Author the channel 02 rundown from `docs/media-bible.md` using scenes, marked `placeholder: true` where art is temporary.
+  - [x] 10.2 Wire `useTelevision`: tune, resolve, play, re-resolve at item end.
   - _Requirements: 3.1–3.3, 4.4_
 - [ ] 11. Checkpoint: leave channel 02, return 60 s later, and the programme has advanced about 60 s. Add this as an end-to-end test using a mocked clock.
 

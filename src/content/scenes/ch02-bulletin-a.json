@@ -1,0 +1,20 @@
+{
+  "id": "ch02-bulletin-a",
+  "durationMs": 40000,
+  "layers": [
+    { "id": "newsroom", "type": "image", "src": "img/ch02/newsroom.png" },
+    { "id": "anchor-neutral", "type": "image", "src": "img/ch02/anchor-neutral.png", "when": { "maxVisits": 1 } },
+    { "id": "anchor-staring", "type": "image", "src": "img/ch02/anchor-staring.png", "when": { "minVisits": 2 } },
+    { "id": "logo", "type": "text", "text": "KDA", "x": 820, "y": 40, "size": 42, "colour": "#d63a3a" },
+    { "id": "lower-third", "type": "rect", "x": 0, "y": 560, "w": 960, "h": 80, "colour": "#0b1f3a" },
+    { "id": "lower-text", "type": "text", "text": "KDA NIGHTLY NEWS", "x": 40, "y": 578, "size": 40, "colour": "#f2f2ea" },
+    { "id": "ticker", "type": "ticker", "text": "HOLLOW CREEK · TRICK-OR-TREAT ENDS 9PM · ALDER RD REPORTS", "speed": 90 }
+  ],
+  "captions": [
+    { "atMs": 0, "endMs": 5000, "text": "This is KDA Nightly News." },
+    { "atMs": 5000, "endMs": 15000, "text": "Good evening. Trick-or-treating will end at nine o'clock tonight." },
+    { "atMs": 15000, "endMs": 25000, "text": "Residents on Alder Road report their sets switching on overnight." },
+    { "atMs": 25000, "endMs": 35000, "text": "Engineers describe the fault as minor, and say there is no reason to check." },
+    { "atMs": 35000, "endMs": 40000, "text": "We'll have more after the weather." }
+  ]
+}

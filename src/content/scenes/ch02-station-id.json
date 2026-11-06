@@ -1,0 +1,12 @@
+{
+  "id": "ch02-station-id",
+  "durationMs": 8000,
+  "layers": [
+    { "id": "bg", "type": "rect", "x": 0, "y": 0, "w": 960, "h": 720, "colour": "#0b1f3a" },
+    { "id": "mark", "type": "text", "text": "KDA-TV 02", "x": 300, "y": 320, "size": 72, "colour": "#f2f2ea" },
+    { "id": "sub", "type": "text", "text": "HOLLOW CREEK", "x": 360, "y": 410, "size": 34, "colour": "#d63a3a" }
+  ],
+  "captions": [
+    { "atMs": 0, "endMs": 8000, "text": "You are watching KDA-TV, channel two." }
+  ]
+}

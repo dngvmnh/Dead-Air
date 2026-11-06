@@ -1,0 +1,13 @@
+{
+  "id": "ch02-weather",
+  "durationMs": 20000,
+  "layers": [
+    { "id": "backdrop", "type": "rect", "x": 0, "y": 0, "w": 960, "h": 720, "colour": "#09182e" },
+    { "id": "map", "type": "image", "src": "img/ch02/weather-map.png" },
+    { "id": "title", "type": "text", "text": "HOLLOW CREEK FORECAST", "x": 40, "y": 48, "size": 44, "colour": "#f2f2ea" }
+  ],
+  "captions": [
+    { "atMs": 0, "endMs": 10000, "text": "Clear. Clear. Clear." },
+    { "atMs": 10000, "endMs": 20000, "text": "Overcast by morning, for those who see it." }
+  ]
+}

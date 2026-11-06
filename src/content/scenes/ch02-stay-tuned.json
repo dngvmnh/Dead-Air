@@ -1,0 +1,11 @@
+{
+  "id": "ch02-stay-tuned",
+  "durationMs": 6000,
+  "layers": [
+    { "id": "bg", "type": "rect", "x": 0, "y": 0, "w": 960, "h": 720, "colour": "#0b1f3a" },
+    { "id": "msg", "type": "text", "text": "STAY TUNED", "x": 330, "y": 330, "size": 64, "colour": "#f2f2ea" }
+  ],
+  "captions": [
+    { "atMs": 0, "endMs": 6000, "text": "Stay tuned to KDA." }
+  ]
+}

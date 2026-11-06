@@ -6,10 +6,17 @@ import {
   type TvAction,
   type TvState,
 } from '../core/tvMachine.ts';
-import { type ChannelId } from '../core/types.ts';
+import { type ChannelId, type Look, type Resolved } from '../core/types.ts';
 import { channelInfo } from '../core/channels.ts';
 import { BOOT_MS, TUNE_MS } from './timing.ts';
 import { AudioEngine } from '../audio/AudioEngine.ts';
+import { resolveBroadcast } from '../core/clock.ts';
+import { getChannel, getScene } from '../content/catalog.ts';
+import { SceneAdapter } from '../playback/SceneAdapter.ts';
+import { type SceneContext } from '../playback/PlaybackAdapter.ts';
+import { type Renderer } from '../render/Renderer.ts';
+import { type CrtSource } from '../render/CrtRenderer.ts';
+import { type SceneVars } from '../core/scene.ts';
 
 /**
  * Milestone 1 orchestrator.
@@ -44,6 +51,8 @@ export interface TelevisionApi {
   toggleCaptions: () => void;
   toggleReducedEffects: () => void;
   forgetMe: () => void;
+  /** Screen hands its renderer here so owned sources can publish their picture. */
+  registerRenderer: (renderer: Renderer | null) => void;
 }
 
 const DEFAULT_SETTINGS: UiSettings = {
@@ -94,6 +103,100 @@ export function useTelevision(): TelevisionApi {
     return audioRef.current;
   }, []);
 
+  // --- Broadcast playback (Milestone 2) ----------------------------------
+  // The renderer Screen created (owned sources publish their canvas here).
+  const rendererRef = useRef<Renderer | null>(null);
+  // The current owned-source adapter (scenes now; file/YouTube in Milestone 4).
+  const sceneAdapterRef = useRef<SceneAdapter | null>(null);
+  // Unsubscribe for the current adapter's event listener.
+  const adapterOffRef = useRef<(() => void) | null>(null);
+  // Timer that fires ITEM_ENDED when the current item's remaining time elapses.
+  const itemEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Per-channel visit counts, so scene `when` variants work before viewer
+  // memory lands (task 12). Keyed by channel id; first tune is visit 1.
+  const visitsRef = useRef<Map<ChannelId, number>>(new Map());
+  // The act is 0 until escalation lands in Milestone 3.
+  const actRef = useRef(0);
+
+  const getSceneAdapter = useCallback((): SceneAdapter => {
+    if (!sceneAdapterRef.current) sceneAdapterRef.current = new SceneAdapter();
+    return sceneAdapterRef.current;
+  }, []);
+
+  const clearItemEndTimer = useCallback(() => {
+    if (itemEndTimer.current !== null) {
+      clearTimeout(itemEndTimer.current);
+      itemEndTimer.current = null;
+    }
+  }, []);
+
+  // A single SceneContext the adapter uses to look up scenes, read the current
+  // visit/act, and publish the picture to the renderer. Built once via a getter
+  // so it is never a hook-argument value (the refs it reads are mutated
+  // elsewhere); its closures read the latest ref values at call time.
+  const sceneCtxRef = useRef<SceneContext | null>(null);
+  const getSceneCtx = useCallback((): SceneContext => {
+    if (!sceneCtxRef.current) {
+      sceneCtxRef.current = {
+        getScene: (sceneId) => getScene(sceneId),
+        // Preloaded bitmaps arrive with real art (task 21); placeholder scenes
+        // draw labelled blocks until then, so no images to hand over yet.
+        getImages: () => undefined,
+        getVars: (): SceneVars => ({
+          visits: visitsRef.current.get((stateRef.current.channel ?? 2) as ChannelId) ?? 1,
+          act: actRef.current,
+        }),
+        setSource: (source) => rendererRef.current?.setSource(source as CrtSource | null),
+        setLook: (look: Look) => rendererRef.current?.setLook(look),
+        now: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
+      };
+    }
+    return sceneCtxRef.current;
+  }, []);
+
+  const registerRenderer = useCallback((renderer: Renderer | null) => {
+    rendererRef.current = renderer;
+  }, []);
+
+  /**
+   * Resolve the broadcast clock for `channel` now and start playing the
+   * resolved scene item from its offset. Returns the clock's `remainingMs` so
+   * the caller can schedule the item boundary, or null when nothing playable
+   * (the caller moves to stand-by). Dispatch stays with the caller so this
+   * callback never captures `send` (which would make the effect-synced
+   * `sendRef` a hook value).
+   *
+   * `onEnded` is wired to the adapter's `ended` event for this play session.
+   */
+  const startResolvedSource = useCallback(
+    (channel: ChannelId, onEnded: () => void): number | null => {
+      const ch = getChannel(channel);
+      if (!ch) return null;
+      const resolved: Resolved | null = resolveBroadcast(ch, Date.now(), () => true);
+      if (!resolved) return null;
+      // File/YouTube adapters arrive in Milestone 4; only scenes play for now.
+      if (resolved.item.source !== 'scene') return null;
+      const adapter = getSceneAdapter();
+      // Swap the event listener to this play session.
+      adapterOffRef.current?.();
+      adapterOffRef.current = adapter.on((e) => {
+        if (e.type === 'ended') onEnded();
+      });
+      void adapter.load(resolved.item, resolved.offsetMs, getSceneCtx()).then(() => {
+        void adapter.play();
+      });
+      return resolved.remainingMs;
+    },
+    [getSceneAdapter, getSceneCtx],
+  );
+
+  const stopPlayback = useCallback(() => {
+    clearItemEndTimer();
+    adapterOffRef.current?.();
+    adapterOffRef.current = null;
+    sceneAdapterRef.current?.stop();
+  }, [clearItemEndTimer]);
+
   // Latest settings, readable from async callbacks (e.g. audio unlock) without
   // recreating them on every settings change. Assigned in an effect (not during
   // render) and used to keep the audio engine's volume/mute in sync.
@@ -124,6 +227,25 @@ export function useTelevision(): TelevisionApi {
 
   const runEffects = useCallback(
     (effects: Effect[]) => {
+      // Resolve the clock and start the scene for `channel`, schedule the item
+      // boundary from the clock's remaining time (so continuity holds even if a
+      // background tab throttles rAF), and fall back to stand-by when nothing
+      // is playable. Defined here so dispatch stays local to runEffects, the
+      // one place that owns `sendRef`.
+      const playFromClock = (channel: ChannelId, token: number): void => {
+        const dispatchEnded = (): void => sendRef.current({ type: 'ITEM_ENDED', token });
+        const remainingMs = startResolvedSource(channel, dispatchEnded);
+        if (remainingMs === null) {
+          sendRef.current({ type: 'NOTHING_PLAYABLE', token });
+          return;
+        }
+        clearItemEndTimer();
+        itemEndTimer.current = setTimeout(() => {
+          itemEndTimer.current = null;
+          dispatchEnded();
+        }, remainingMs);
+      };
+
       for (const effect of effects) {
         switch (effect.type) {
           case 'unlockAudio': {
@@ -154,21 +276,29 @@ export function useTelevision(): TelevisionApi {
           }
           case 'startTuning': {
             if (tuneTimer.current !== null) clearTimeout(tuneTimer.current);
+            // Count this visit so scene `when` variants escalate on revisit
+            // (requirement 8.3). Real viewer memory supersedes this in task 12.
+            visitsRef.current.set(effect.channel, (visitsRef.current.get(effect.channel) ?? 0) + 1);
             // Tuning click + full static snow while acquiring the station.
             audioRef.current?.playTuningClick();
             audioRef.current?.setStatic(1);
             const token = effect.token;
+            const tuneChannel = effect.channel;
             tuneTimer.current = setTimeout(() => {
               tuneTimer.current = null;
-              // Milestone 1: nothing is unplayable yet; always resolve to air.
-              sendRef.current({ type: 'TUNE_RESOLVED', token, playable: true });
+              // Playable iff the clock resolves a (scene) item for this channel.
+              const ch = getChannel(tuneChannel);
+              const resolved = ch ? resolveBroadcast(ch, Date.now(), () => true) : null;
+              const playable = resolved !== null && resolved.item.source === 'scene';
+              sendRef.current({ type: 'TUNE_RESOLVED', token, playable });
             }, TUNE_MS);
             break;
           }
           case 'startSource': {
             // On air: drop the snow to a faint bed (real source audio arrives in
-            // Milestone 4).
+            // Milestone 4), then resolve the clock and play the current item.
             audioRef.current?.setStatic(0.08);
+            playFromClock(effect.channel, effect.token);
             break;
           }
           case 'standBy': {
@@ -183,6 +313,7 @@ export function useTelevision(): TelevisionApi {
           }
           case 'powerOff': {
             clearTimers();
+            stopPlayback();
             // Power-off cue, then suspend the context so nothing plays while off.
             audioRef.current?.playPowerOff();
             void audioRef.current?.suspend();
@@ -190,20 +321,28 @@ export function useTelevision(): TelevisionApi {
             break;
           }
           case 'stopAll': {
-            // Silence the snow bed between sources during a tune.
+            // Silence the snow bed between sources during a tune, and stop any
+            // owned source so the next tune starts clean.
             audioRef.current?.setStatic(0);
+            stopPlayback();
+            break;
+          }
+          case 'reResolve': {
+            // An item ended (or an event finished): re-resolve the clock and
+            // play the next item without user action (requirement 3.3).
+            audioRef.current?.setStatic(0.08);
+            playFromClock(effect.channel, effect.token);
             break;
           }
           case 'runEvent':
-          case 'reResolve':
           case 'signOffText':
           case 'setAfterHours':
-            // Handled by later-milestone systems (clock, director, adapters).
+            // Handled by later-milestone systems (director, sign-off).
             break;
         }
       }
     },
-    [clearTimers, getAudio],
+    [clearTimers, getAudio, startResolvedSource, stopPlayback, clearItemEndTimer],
   );
 
   /**
@@ -229,13 +368,14 @@ export function useTelevision(): TelevisionApi {
 
   useEffect(() => clearTimers, [clearTimers]);
 
-  // Release the audio context when the television unmounts.
+  // Release the audio context and stop playback when the television unmounts.
   useEffect(() => {
     return () => {
+      stopPlayback();
       void audioRef.current?.close();
       audioRef.current = null;
     };
-  }, []);
+  }, [stopPlayback]);
 
   const power = useCallback(() => send({ type: 'POWER' }), [send]);
   const channelUp = useCallback(() => send({ type: 'CHANNEL_UP' }), [send]);
@@ -286,6 +426,7 @@ export function useTelevision(): TelevisionApi {
       toggleCaptions,
       toggleReducedEffects,
       forgetMe,
+      registerRenderer,
     }),
     [
       state,
@@ -301,6 +442,7 @@ export function useTelevision(): TelevisionApi {
       toggleCaptions,
       toggleReducedEffects,
       forgetMe,
+      registerRenderer,
     ],
   );
 }
