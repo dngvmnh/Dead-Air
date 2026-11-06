@@ -191,6 +191,78 @@ export function release(sheet: TearSheet, id: number): void {
   sheet.grabbed.delete(id);
 }
 
+/** Squared distance from point p to segment ab, in grid units. */
+function distToSegSq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const vx = bx - ax;
+  const vy = by - ay;
+  const wx = px - ax;
+  const wy = py - ay;
+  const len2 = vx * vx + vy * vy;
+  let t = len2 > 0 ? (wx * vx + wy * vy) / len2 : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const cx = ax + vx * t;
+  const cy = ay + vy * t;
+  const dx = px - cx;
+  const dy = py - cy;
+  return dx * dx + dy * dy;
+}
+
+/**
+ * Break every constraint whose midpoint lies within `radius` grid cells of the
+ * pointer path segment `(ax,ay)→(bx,by)` (grid units). This is what makes the
+ * gash FOLLOW THE POINTER at any drag speed (requirement 1.x, task 5a.3): a
+ * grabbed node alone tears only a local patch and skips cells on a fast flick,
+ * whereas cutting along the swept segment opens a continuous slit under the
+ * path. Interior constraints only — a pinned-to-pinned edge (the frame) is
+ * never cut, so the sheet still hangs. Returns how many were newly broken.
+ */
+export function cutPath(sheet: TearSheet, ax: number, ay: number, bx: number, by: number, radius = 1): number {
+  const { xs, ys, constraints, broken, restLength, pinned } = sheet;
+  const count = restLength.length;
+  const r2 = radius * radius;
+  let cut = 0;
+  for (let k = 0; k < count; k += 1) {
+    if (broken[k] === 1) continue;
+    const a = constraints[k * 2]!;
+    const b = constraints[k * 2 + 1]!;
+    // Keep the outer frame intact so paper rips but does not fall away.
+    if (pinned[a] === 1 && pinned[b] === 1) continue;
+    const mx = (xs[a]! + xs[b]!) * 0.5;
+    const my = (ys[a]! + ys[b]!) * 0.5;
+    if (distToSegSq(mx, my, ax, ay, bx, by) <= r2) {
+      broken[k] = 1;
+      cut += 1;
+      // Peel the two freed sides apart so the hole OPENS and, with the frame
+      // still pinned, STAYS open after release (task 5a.3). Push each free end
+      // perpendicular to the cut direction, and lift it (z) so the flap catches
+      // the light. The shove goes into the previous position too, so Verlet
+      // keeps the momentum rather than snapping back.
+      const dirx = bx - ax;
+      const diry = by - ay;
+      const dlen = Math.hypot(dirx, diry) || 1;
+      // Perpendicular to the drag direction.
+      const nx = -diry / dlen;
+      const ny = dirx / dlen;
+      peel(sheet, a, nx, ny);
+      peel(sheet, b, -nx, -ny);
+    }
+  }
+  return cut;
+}
+
+/** Shove a free node outward from the cut and lift it, so a flap opens. */
+function peel(sheet: TearSheet, i: number, nx: number, ny: number): void {
+  if (sheet.pinned[i] === 1) return;
+  const SHOVE = 0.35; // grid units
+  const LIFT = 0.6;
+  sheet.xs[i] = sheet.xs[i]! + nx * SHOVE;
+  sheet.ys[i] = sheet.ys[i]! + ny * SHOVE;
+  // Bias the previous position so the shove persists as velocity.
+  sheet.px[i] = sheet.px[i]! - nx * SHOVE * 0.5;
+  sheet.py[i] = sheet.py[i]! - ny * SHOVE * 0.5;
+  sheet.zs[i] = Math.max(sheet.zs[i]!, LIFT);
+}
+
 /**
  * Advance the sheet by `dtMs`, split into fixed sub-steps so the simulation is
  * stable and frame-rate independent. Each sub-step integrates, pulls grabbed

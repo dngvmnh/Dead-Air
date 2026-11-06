@@ -5,6 +5,7 @@ import {
   grab,
   moveGrab,
   release,
+  cutPath,
   stepSheet,
   nodeIndex,
   countBroken,
@@ -143,7 +144,10 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
 
     // Active drags keyed by pointerId (mouse or touch), up to two. Each drag
     // holds the NODE index it grabbed (the tearSheet grab id is the node index).
-    const drags = new Map<number, { node: number; lastX: number; lastY: number; lastT: number; points: Array<[number, number]> }>();
+    const drags = new Map<
+      number,
+      { node: number; lastX: number; lastY: number; lastT: number; lastGx: number; lastGy: number; points: Array<[number, number]> }
+    >();
 
     const onDown = (e: PointerEvent): void => {
       if (!interactiveRef.current) return;
@@ -153,7 +157,15 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
       // An edge (pinned) node cannot be dragged; ignore so the gesture is a no-op.
       if (sheet.pinned[node] === 1) return;
       grab(sheet, node, gx, gy);
-      drags.set(e.pointerId, { node, lastX: e.clientX, lastY: e.clientY, lastT: e.timeStamp, points: [[gx / (WALL_COLS - 1), gy / (WALL_ROWS - 1)]] });
+      drags.set(e.pointerId, {
+        node,
+        lastX: e.clientX,
+        lastY: e.clientY,
+        lastT: e.timeStamp,
+        lastGx: gx,
+        lastGy: gy,
+        points: [[gx / (WALL_COLS - 1), gy / (WALL_ROWS - 1)]],
+      });
       strokeCount += 1;
       canvas.setPointerCapture?.(e.pointerId);
       // A pointer gesture may unlock audio if POWER hasn't (design §9).
@@ -174,6 +186,11 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
       }
       const { gx, gy } = toGrid(e.clientX, e.clientY);
       moveGrab(sheet, d.node, gx, gy);
+      // Cut the paper along the SWEPT segment since the last move, within one
+      // cell of the path. This makes the gash follow the pointer at any drag
+      // speed (task 5a.3) — a fast flick that jumps several cells still opens a
+      // continuous slit, which pulling one grabbed node alone cannot do.
+      cutPath(sheet, d.lastGx, d.lastGy, gx, gy, 1);
       // Rip sound scaled by drag speed.
       const dt = Math.max(1, e.timeStamp - d.lastT);
       const dist = Math.hypot(e.clientX - d.lastX, e.clientY - d.lastY);
@@ -189,6 +206,8 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
       d.lastX = e.clientX;
       d.lastY = e.clientY;
       d.lastT = e.timeStamp;
+      d.lastGx = gx;
+      d.lastGy = gy;
       e.preventDefault();
     };
 
@@ -266,10 +285,25 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
     const LIGHT_INTERVAL_MS = 200;
     let lastLightKey = '';
     // Apply the derived light; returns true if it changed meaningfully.
+    // The TV light pool is centred on the actual tube opening, not the middle
+    // of the wall (task 5a.2): read its box and convert to a 0..1 fraction.
+    const updateLightCenter = (): void => {
+      if (!gl) return;
+      const tube = document.querySelector('[data-testid="tube-opening"]');
+      if (!tube) {
+        gl.setLightCenter(0.5, 0.45);
+        return;
+      }
+      const r = tube.getBoundingClientRect();
+      const cx = (r.left + r.width / 2) / Math.max(1, window.innerWidth);
+      const cy = (r.top + r.height / 2) / Math.max(1, window.innerHeight);
+      gl.setLightCenter(cx, cy);
+    };
     const applyLight = (): boolean => {
       const d = new Date();
       const rs = getRoomStateRef.current(reducedRef.current, d.getHours(), d.getMinutes());
       gl?.setLight(rs.ambient, rs.tvLight);
+      updateLightCenter();
       const l = rs.tvLight;
       const key = `${rs.ambient.toFixed(2)}|${Math.round(l.r / 16)}|${Math.round(l.g / 16)}|${Math.round(l.b / 16)}|${l.amount.toFixed(2)}`;
       if (key === lastLightKey) return false;
@@ -354,23 +388,25 @@ function ripSeededPath(sheet: TearSheet): void {
   // Tear down the LEFT margin of the wall (columns ~8-18% in), which is the
   // part NOT covered by the centred chassis, so a keyboard user sees the gash
   // (requirement 8.2). A gentle arc keeps it from being a straight slit.
-  const c0 = Math.max(1, Math.floor(sheet.cols * 0.08));
-  const c1 = Math.max(c0 + 1, Math.floor(sheet.cols * 0.2));
-  const r0 = Math.floor(sheet.rows * 0.2);
-  const r1 = Math.floor(sheet.rows * 0.8);
-  for (let r = r0; r <= r1; r += 1) {
-    const t = (r - r0) / Math.max(1, r1 - r0);
-    const c = Math.min(sheet.cols - 2, Math.max(1, c0 + Math.round((c1 - c0) * Math.sin(t * Math.PI))));
-    const n = nodeIndex(sheet, c, r);
-    if (sheet.pinned[n] === 1) continue;
-    // The grab id is the node index (design §2); pull it sideways to tear.
-    grab(sheet, n, sheet.xs[n]! + sheet.cols, sheet.ys[n]!);
-    stepSheet(sheet, 16.67);
-    stepSheet(sheet, 16.67);
-    release(sheet, n);
+  const c0 = sheet.cols * 0.1;
+  const c1 = sheet.cols * 0.22;
+  const r0 = sheet.rows * 0.2;
+  const r1 = sheet.rows * 0.8;
+  // Cut a gentle arc down the exposed left band, segment by segment, so the
+  // same path-following tear a drag makes (task 5a.3) appears for the keyboard.
+  let prevX = c0 + (c1 - c0) * Math.sin(0);
+  let prevY = r0;
+  const STEPS = 16;
+  for (let s = 1; s <= STEPS; s += 1) {
+    const t = s / STEPS;
+    const x = c0 + (c1 - c0) * Math.sin(t * Math.PI);
+    const y = r0 + (r1 - r0) * t;
+    cutPath(sheet, prevX, prevY, x, y, 1);
+    prevX = x;
+    prevY = y;
   }
-  // Settle so the flap falls open.
-  for (let s = 0; s < 30; s += 1) stepSheet(sheet, 16.67);
+  // Settle so the flaps peel open.
+  for (let s = 0; s < 24; s += 1) stepSheet(sheet, 16.67);
 }
 
 /** 2D fallback: a static pre-torn room with the behind layer showing (req 8.5). */

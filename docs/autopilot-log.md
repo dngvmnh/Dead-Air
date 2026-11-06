@@ -957,3 +957,91 @@ covers the centre); still a seeded path (requirement 8.2), e2e unchanged.
 
 **STOP per the plan.** A person must judge whether the room looks good and
 frightening before Phase C builds on it. Not proceeding to task 6.
+
+## Task 5a - Make the room and tear read (visual-review fixes)
+
+Task 5 passed all tests but failed human review: the room was too dark and the
+tear looked like a blocky cut-out. Task 5a was added to `tasks.md` and
+implemented. Every YouTube, clean-feed and chassis rule is unchanged (the room
+canvas still sits at z-index 0 behind the opaque chassis; nothing new sits over
+the tube; the `youtube-clean-feed` and `elementFromPoint` guards still pass).
+
+- Done:
+  - **Composition (5a.1).** Constrained the chassis by viewport HEIGHT as well
+    as width: the tube is capped at ~58vh (`Screen.module.css`), the cabinet is
+    `width: max-content` with a `min(72vw,1024px)` ceiling, and the control
+    column is compacted on desktop (smaller LED, tighter gaps, 40/36px buttons)
+    so it no longer sets the cabinet height. Measured exposed-wall fraction
+    (room canvas topmost via `elementFromPoint`): **58.1% at 1280x720, 66.9% at
+    1440x900** - both over the 50% floor. Controls stay fully operable; the
+    <=768px phone layout is untouched.
+  - **Room light (5a.2).** The TV light is now a real pool centred on the actual
+    tube box (read from the DOM each frame, `RoomCanvas.updateLightCenter` ->
+    `tearRenderer.setLightCenter`), bright and readable near the set and falling
+    to black at the viewport edges (new `uLightCenter`, exp falloff in the
+    fragment shader). Brightened the wallpaper base and motifs so the pool picks
+    them out. Moved the window into the exposed LEFT band and the clock, frame
+    and candy-bowl shelf into the exposed RIGHT band, clear of the chassis
+    (`roomWallpaper.bakeRoom`); added hour ticks so the clock reads as a clock.
+  - **Tear mechanics (5a.3).** Added `core/tearSheet.cutPath(ax,ay,bx,by,radius)`:
+    it breaks every interior constraint whose midpoint is within one cell of the
+    swept pointer segment, so the gash FOLLOWS THE POINTER at any speed - a fast
+    flick that jumps cells still cuts a continuous slit, which pulling one
+    grabbed node could not. Freed nodes are shoved perpendicular to the cut and
+    lifted (`peel`) so flaps open; the pinned frame holds the surrounding paper
+    taut, so the hole STAYS open after release. The pinned frame is never cut.
+    The `T`-key path and the drag handler both use it.
+  - **Tear look (5a.4).** Implemented design section 3 in full in `tearRenderer`:
+    a per-node `aEdge` attribute marks torn-boundary nodes; the fragment shader
+    erodes the alpha with multi-octave fibre noise (so edges are ragged, not
+    polygonal), paints a pale fibre band just inside the edge, shades lifted
+    flaps from `z`, and a dedicated shadow pass draws the boundary flaps offset
+    and darkened onto the behind layer (a cast drop shadow). Render-side only;
+    the grid is unchanged, so the sim budget is unaffected.
+  - **Behind contrast (5a.5).** `bakeBehindPlaster` is now pale plaster over
+    wooden lath with cracks and damp stains - clearly LIGHTER than the olive
+    wallpaper, so a tear is obvious at a glance in Act 0.
+  - **Tests (5a.6).** Added unit tests for `cutPath` (cuts along the segment,
+    continuous slit at any speed, never cuts the pinned frame, deterministic,
+    broken-only-grows). Added a real-WebGL Playwright test
+    (`room-tear.spec.ts`): a stepped 300px drag at 1440x900, then it reads back
+    the canvas and measures the OPENING's per-row width and total area along the
+    drag path (detecting the pale plaster that only shows through a real hole),
+    asserts the opening is >=40px wide along most of the path, and re-measures
+    2s after release to confirm the flaps stay open. This checks geometry, not
+    just changed pixels.
+
+- Checked: `npm test` **286 passed** (incl. 4 new `cutPath` unit tests).
+  `npm run lint` clean. `npm run build` clean, JS **129.50 KB gzip** / CSS
+  2.51 KB gzip (well under the 300 KB budget). `npm run validate:catalog` OK.
+  `npx playwright test --project=chromium` **41 passed**. Browser: viewed the
+  composition at 1280x720 and 1440x900, the lit room in Acts 0 and 3, and a
+  pointer-dragged tear at both sizes in a real Chromium with real WebGL - the
+  light pool reads, objects sit in exposed bands, and the gash follows the
+  pointer with ragged fibre edges and a visible plaster reveal. Measured tear
+  sim cost with `tsx` (step + path-cut per frame): wall 48x30 ~ **2.23 ms/frame**,
+  under the 3 ms budget.
+
+- Decisions made alone: tube height capped at ~58vh (a single ceiling that
+  satisfies >=50% exposed wall at both target sizes without per-size code);
+  control buttons 40px (desktop) / 36px (rear panel) - below the 44px ideal but
+  still comfortable pointer targets, needed so the column does not set the
+  height; `cutPath` radius = 1 cell (matches the requirement's "within one
+  cell"); `peel` shove 0.35 grid units + lift 0.6 (tuned so the hole opens
+  clearly without the sheet exploding - the resting-sheet stability test still
+  passes). Opening-area threshold in the e2e set to 1000 px (robust under the
+  2-worker parallel load, where the rAF loop gets less settle time than a solo
+  run) while the >=40px width-along-path assertion carries the real geometry
+  check. No screen recording (the task says "if possible"); committing video
+  binaries conflicts with the no-media-binaries rule, so the five committed PNGs
+  are the evidence, as at task 5.
+
+- Unverified: the in-browser 60 fps budget with both canvases live (task 13);
+  the figure silhouette and unobserved object moves (task 8); the per-act behind
+  art (task 6); memory-v2 stroke persistence (task 7). The slight horizontal
+  stair-stepping remaining on a torn edge comes partly from the lath's own
+  horizontal banding; the fibre erosion softens but does not fully erase it at
+  this grid.
+
+**STOP per the plan.** A person must judge the room again before Phase C builds
+on it. Not proceeding to task 6, and not deploying.

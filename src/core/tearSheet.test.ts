@@ -5,6 +5,7 @@ import {
   grab,
   moveGrab,
   release,
+  cutPath,
   stepSheet,
   nodeIndex,
   countBroken,
@@ -105,6 +106,78 @@ describe('stepSheet', () => {
     release(s, node);
     // Let it settle: the broken count can only grow, never shrink.
     let prev = brokenAfterTear;
+    for (let i = 0; i < 120; i += 1) {
+      stepSheet(s, 16.67);
+      const now = countBroken(s);
+      expect(now).toBeGreaterThanOrEqual(prev);
+      prev = now;
+    }
+  });
+});
+
+describe('cutPath (gash follows the pointer, task 5a.3)', () => {
+  it('breaks interior constraints along the swept segment', () => {
+    const s = createSheet(48, 30, 1);
+    const before = countBroken(s);
+    // Cut a vertical segment down the middle, well inside the frame.
+    const cut = cutPath(s, 24, 6, 24, 24, 1);
+    expect(cut).toBeGreaterThan(0);
+    expect(countBroken(s)).toBe(before + cut);
+  });
+
+  it('follows the path at any speed: one long jump still cuts a continuous slit', () => {
+    // A fast flick jumps many cells in a single move. cutPath must still break
+    // constraints all along the segment, not just at the ends.
+    const s = createSheet(48, 30, 2);
+    cutPath(s, 20, 5, 20, 25, 1);
+    // Every interior row crossed by the segment must have a broken constraint
+    // near column 20 — i.e. the slit is continuous, not two end nicks.
+    let rowsWithBreak = 0;
+    for (let r = 6; r <= 24; r += 1) {
+      const target = nodeIndex(s, 20, r);
+      let near = false;
+      for (let k = 0; k < s.restLength.length; k += 1) {
+        if (s.broken[k] !== 1) continue;
+        if (s.constraints[k * 2] === target || s.constraints[k * 2 + 1] === target) {
+          near = true;
+          break;
+        }
+      }
+      if (near) rowsWithBreak += 1;
+    }
+    // Almost every row along the slit is cut (allow a little slack at the ends).
+    expect(rowsWithBreak).toBeGreaterThanOrEqual(16);
+  });
+
+  it('never cuts the pinned frame, so the sheet still hangs', () => {
+    const s = createSheet(16, 12, 3);
+    // Sweep right along the very top edge, which is all pinned-to-pinned.
+    cutPath(s, 1, 0, 14, 0, 1);
+    // No constraint whose BOTH ends are pinned may be broken.
+    for (let k = 0; k < s.restLength.length; k += 1) {
+      const a = s.constraints[k * 2]!;
+      const b = s.constraints[k * 2 + 1]!;
+      if (s.pinned[a] === 1 && s.pinned[b] === 1) expect(s.broken[k]).toBe(0);
+    }
+    // The sheet stays finite and no pinned node moved into NaN.
+    expect(allFinite(s)).toBe(true);
+  });
+
+  it('is deterministic and broken-only-grows after a cut and settle', () => {
+    const run = (): number[] => {
+      const s = createSheet(20, 16, 7);
+      cutPath(s, 10, 4, 10, 12, 1);
+      for (let i = 0; i < 60; i += 1) stepSheet(s, 16.67);
+      return Array.from(s.broken);
+    };
+    const a = run();
+    const b = run();
+    expect(a).toEqual(b);
+
+    // After the cut, stepping only ever adds breaks.
+    const s = createSheet(20, 16, 7);
+    cutPath(s, 10, 4, 10, 12, 1);
+    let prev = countBroken(s);
     for (let i = 0; i < 120; i += 1) {
       stepSheet(s, 16.67);
       const now = countBroken(s);

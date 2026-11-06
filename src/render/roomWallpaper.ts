@@ -73,19 +73,22 @@ function pumpkin(ctx: CanvasRenderingContext2D, x: number, y: number, s: number)
  */
 export function bakeWallpaper(w = 1024, h = 768): BakedTexture {
   const { canvas, ctx } = makeCanvas(w, h);
-  // Base paper: vertical olive/umber gradient with a faint grain.
+  // Base paper: a warmer, lighter olive/umber so the TV light pool has a
+  // mid-tone to pick out (task 5a.2). The renderer darkens the edges to black;
+  // the paper itself must read as paper where the light lands.
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, '#4a4326');
-  grad.addColorStop(0.5, '#3e3822');
-  grad.addColorStop(1, '#332d1b');
+  grad.addColorStop(0, '#8a7c46');
+  grad.addColorStop(0.5, '#786a3c');
+  grad.addColorStop(1, '#5f5330');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
 
   // Subtle vertical stripes, like old wallpaper.
-  ctx.fillStyle = 'rgba(0,0,0,0.06)';
+  ctx.fillStyle = 'rgba(0,0,0,0.10)';
   for (let x = 0; x < w; x += 48) ctx.fillRect(x, 0, 24, h);
 
-  // Repeating motif grid: alternating bats and pumpkins, faded into the paper.
+  // Repeating motif grid: alternating bats and pumpkins, with enough contrast
+  // to be clearly readable where the light lands (task 5a.2).
   const stepX = 96;
   const stepY = 110;
   let row = 0;
@@ -93,10 +96,10 @@ export function bakeWallpaper(w = 1024, h = 768): BakedTexture {
     const offset = row % 2 === 0 ? 0 : stepX / 2;
     for (let x = 40 + offset; x < w; x += stepX) {
       if ((x + y) % 3 === 0) {
-        ctx.fillStyle = 'rgba(255, 150, 40, 0.16)';
+        ctx.fillStyle = 'rgba(255, 140, 30, 0.42)';
         pumpkin(ctx, x, y, 1.1);
       } else {
-        ctx.fillStyle = 'rgba(20, 15, 10, 0.3)';
+        ctx.fillStyle = 'rgba(28, 18, 10, 0.55)';
         bat(ctx, x, y, 1);
       }
     }
@@ -139,23 +142,28 @@ export function bakeRoom(
   const ctx = base.canvas.getContext('2d');
   if (!ctx) return base;
 
-  // Window onto darkness (upper-left): a cold rectangle with a faint cross bar.
+  // Objects are placed in the EXPOSED side bands (task 5a.2): the chassis sits
+  // in the centre of the viewport, so the left band is roughly x 0..0.24 and the
+  // right band x 0.76..1. The wall texture maps 1:1 to the viewport, so these
+  // UV fractions are where the object lands on screen.
+
+  // Window onto darkness, high in the LEFT band.
   ctx.save();
   ctx.fillStyle = '#0a0d14';
-  ctx.fillRect(w * 0.06, h * 0.12, w * 0.2, h * 0.26);
+  ctx.fillRect(w * 0.03, h * 0.14, w * 0.17, h * 0.26);
   ctx.strokeStyle = '#2a2016';
   ctx.lineWidth = 6;
-  ctx.strokeRect(w * 0.06, h * 0.12, w * 0.2, h * 0.26);
+  ctx.strokeRect(w * 0.03, h * 0.14, w * 0.17, h * 0.26);
   ctx.beginPath();
-  ctx.moveTo(w * 0.16, h * 0.12);
-  ctx.lineTo(w * 0.16, h * 0.38);
-  ctx.moveTo(w * 0.06, h * 0.25);
-  ctx.lineTo(w * 0.26, h * 0.25);
+  ctx.moveTo(w * 0.115, h * 0.14);
+  ctx.lineTo(w * 0.115, h * 0.4);
+  ctx.moveTo(w * 0.03, h * 0.27);
+  ctx.lineTo(w * 0.2, h * 0.27);
   ctx.stroke();
   // A faint moon.
-  ctx.fillStyle = 'rgba(180, 180, 150, 0.22)';
+  ctx.fillStyle = 'rgba(190, 190, 160, 0.3)';
   ctx.beginPath();
-  ctx.arc(w * 0.2, h * 0.18, 14, 0, Math.PI * 2);
+  ctx.arc(w * 0.15, h * 0.2, 14, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
@@ -179,50 +187,62 @@ export function bakeRoom(
   }
   ctx.restore();
 
-  // Shelf (lower-right) with a candy bowl and a framed picture.
+  // Shelf in the RIGHT band, with a candy bowl and a framed picture.
   ctx.save();
-  const shelfY = h * 0.66;
+  const shelfY = h * 0.64;
+  const shelfX = w * 0.76;
   ctx.fillStyle = '#2a2018';
-  ctx.fillRect(w * 0.62, shelfY, w * 0.3, 10);
+  ctx.fillRect(shelfX, shelfY, w * 0.22, 10);
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.fillRect(w * 0.62, shelfY + 10, w * 0.3, 6);
+  ctx.fillRect(shelfX, shelfY + 10, w * 0.22, 6);
   // Candy bowl (empty at variant ≥ 2).
   ctx.fillStyle = '#3a2d22';
   ctx.beginPath();
-  ctx.ellipse(w * 0.7, shelfY - 6, 34, 16, 0, 0, Math.PI * 2);
+  ctx.ellipse(w * 0.82, shelfY - 6, 34, 16, 0, 0, Math.PI * 2);
   ctx.fill();
   if (objectVariant < 2) {
     for (let i = 0; i < 6; i += 1) {
       ctx.fillStyle = i % 2 === 0 ? '#c8318a' : '#ff7b00';
       ctx.beginPath();
-      ctx.arc(w * 0.7 - 20 + i * 8, shelfY - 12, 4, 0, Math.PI * 2);
+      ctx.arc(w * 0.82 - 20 + i * 8, shelfY - 12, 4, 0, Math.PI * 2);
       ctx.fill();
     }
   }
-  // Framed picture, tilted at variant ≥ 1.
-  ctx.translate(w * 0.84, shelfY - 40);
+  // Framed picture on the wall above the shelf, tilted at variant ≥ 1.
+  ctx.translate(w * 0.92, shelfY - 44);
   if (objectVariant >= 1) ctx.rotate(-0.12);
   ctx.fillStyle = '#1a1410';
   ctx.fillRect(-34, -40, 68, 52);
   ctx.strokeStyle = '#4a3a2a';
   ctx.lineWidth = 4;
   ctx.strokeRect(-34, -40, 68, 52);
-  ctx.fillStyle = 'rgba(120,110,90,0.4)';
+  ctx.fillStyle = 'rgba(140,128,104,0.5)';
   ctx.fillRect(-28, -34, 56, 40);
   ctx.restore();
 
-  // Wall clock showing the real local time (requirement 5.1).
+  // Wall clock showing the real local time (requirement 5.1), in the RIGHT band
+  // high up, clear of the chassis.
   ctx.save();
-  const cx = w * 0.46;
-  const cy = h * 0.2;
-  const rad = 44;
-  ctx.fillStyle = '#1c1610';
+  const cx = w * 0.86;
+  const cy = h * 0.24;
+  const rad = 46;
+  ctx.fillStyle = '#2a2318';
   ctx.beginPath();
   ctx.arc(cx, cy, rad, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#6a5a3a';
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#9a834a';
+  ctx.lineWidth = 5;
   ctx.stroke();
+  // Hour ticks so it reads as a clock.
+  ctx.strokeStyle = 'rgba(216, 207, 191, 0.7)';
+  ctx.lineWidth = 2;
+  for (let t = 0; t < 12; t += 1) {
+    const a = t * (Math.PI / 6);
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * rad * 0.82, cy + Math.sin(a) * rad * 0.82);
+    ctx.lineTo(cx + Math.cos(a) * rad * 0.94, cy + Math.sin(a) * rad * 0.94);
+    ctx.stroke();
+  }
   // Hands from the real local time.
   const hourAng = ((localHour % 12) + localMinute / 60) * (Math.PI / 6) - Math.PI / 2;
   const minAng = localMinute * (Math.PI / 30) - Math.PI / 2;
@@ -242,25 +262,54 @@ export function bakeRoom(
   return base;
 }
 
-/** Dark plaster/lath behind the paper, so a tear reveals a believable layer. */
+/**
+ * Plaster and lath behind the paper (task 5a.5). In Act 0 this reads as pale,
+ * dry plaster over wooden lath — clearly LIGHTER than the olive wallpaper, so a
+ * tear is obvious at a glance. The renderer's shadow pass and the behind layer
+ * per act (task 6) add dread later; here the job is contrast, not darkness.
+ */
 export function bakeBehindPlaster(w = 1024, h = 768): BakedTexture {
   const { canvas, ctx } = makeCanvas(w, h);
-  ctx.fillStyle = '#17120e';
+  // Pale, slightly grubby plaster base.
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, '#cdc3ad');
+  grad.addColorStop(1, '#b3a78d');
+  ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
-  // Horizontal lath lines in the gloom.
-  ctx.strokeStyle = 'rgba(60, 48, 36, 0.5)';
-  ctx.lineWidth = 2;
-  for (let y = 18; y < h; y += 26) {
+
+  // Exposed wooden lath strips showing through broken plaster.
+  ctx.fillStyle = 'rgba(92, 66, 38, 0.55)';
+  for (let y = 10; y < h; y += 30) ctx.fillRect(0, y, w, 12);
+  // Lath shadow gaps.
+  ctx.fillStyle = 'rgba(30, 20, 12, 0.4)';
+  for (let y = 24; y < h; y += 30) ctx.fillRect(0, y, w, 4);
+
+  // Cracks and stains in the plaster, so it is not a flat fill.
+  ctx.strokeStyle = 'rgba(40, 30, 22, 0.35)';
+  ctx.lineWidth = 1.5;
+  let seed = 0x1234567;
+  const rnd = (): number => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return (seed >>> 8) / 16777216;
+  };
+  for (let i = 0; i < 40; i += 1) {
+    const x = rnd() * w;
+    const y = rnd() * h;
     ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(w, y);
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + (rnd() - 0.5) * 120, y + (rnd() - 0.5) * 60);
     ctx.stroke();
   }
-  // A faint cold draught of darkness at the centre.
-  const g = ctx.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, w / 2);
-  g.addColorStop(0, 'rgba(0,0,0,0.7)');
-  g.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, h);
+  // Damp stains.
+  for (let i = 0; i < 10; i += 1) {
+    const x = rnd() * w;
+    const y = rnd() * h;
+    const r = 30 + rnd() * 70;
+    const g = ctx.createRadialGradient(x, y, 2, x, y, r);
+    g.addColorStop(0, 'rgba(70, 55, 38, 0.3)');
+    g.addColorStop(1, 'rgba(70, 55, 38, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
   return { canvas };
 }

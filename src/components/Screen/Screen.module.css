@@ -24,11 +24,14 @@
   display: block;
 }
 
-/* Keep the whole set on a laptop screen: 9rem is the room, chassis and bezel
-   padding above and below the tube. */
+/* Keep the whole set well within a laptop screen AND leave at least half the
+   viewport as exposed wall (task 5a.1). The tube height is capped at ~58% of
+   the viewport, so the 4:3 tube plus the compact control column occupy under
+   half the width at 1280×720 and 1440×900; the rest is lit wall. */
 @media (min-width: 769px) {
   .tube {
-    width: min(100%, calc((100dvh - 9rem) * 4 / 3));
+    width: min(58vh, 560px, calc((100dvh - 7rem) * 4 / 3));
+    max-width: 100%;
   }
 }
 

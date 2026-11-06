@@ -31,6 +31,15 @@ Tick a task only when the behaviour has been seen in a real browser, not because
   - _Requirements: 5.1–5.4, 5.7, 10.3_
 - [x] 5. **STOP: Visual checkpoint.** Commit screenshots of the room in Acts 0 and 3, and of a tear, plus a short screen recording if possible. Stop and report. A person must judge whether it looks good and frightening before more is built on it.
 
+- [x] 5a. **Make the room and tear read.** Task 5 passed tests but failed human review: the room is not good-looking or frightening. Keep every YouTube, clean-feed and chassis rule.
+  - [x] 5a.1 Composition: at 1280×720 and 1440×900, at least 50% of the viewport is exposed wall. Constrain the chassis by viewport height as well as width, and compact the control column so it does not set the height. Controls stay fully operable. Keep the phone layout working.
+  - [x] 5a.2 Room light: the TV casts a visible pool of light on the wall. Near the set, wallpaper, bats, pumpkins, garland and objects are clearly readable, falling to darkness at the viewport edges. Move the clock, frame, bowl and window into exposed bands so they are not hidden behind the chassis.
+  - [x] 5a.3 Tear mechanics: the gash follows the pointer. Break constraints along the pointer's path, within one cell of it, at normal and fast drag speeds — not only by pulling one grabbed node. Flaps peel open and stay open after release. On 1440×900, a 300 px drag leaves an opening at least 40 px wide along most of its length.
+  - [x] 5a.4 Tear look: implement design §3 in full — noise-eroded edges, a pale fibre band, flap lighting, and a drop shadow onto the behind layer. Edges must not look polygonal at the current grid. Keep the simulation under 3 ms, using render-side subdivision or a tear mask if needed.
+  - [x] 5a.5 Behind contrast: the behind layer contrasts clearly with the wallpaper — lighter plaster and lath in Act 0 make a tear obvious at a glance.
+  - [x] 5a.6 Tests: add a real-WebGL Playwright test using stepped pointer moves. It measures the opening's area and shape along the drag path, and confirms the opening is still there 2 s after release. A changed-pixels-only test is not enough.
+  - _Requirements: 1.1–1.9, 5.1–5.4, 5.7, 8.2, 10.2, 10.3_
+
 ## Phase C: Depth
 
 - [ ] 6. Behind layer per act, using real viewer values.

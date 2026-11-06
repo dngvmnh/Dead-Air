@@ -23,15 +23,20 @@ precision highp float;
 layout(location=0) in vec2 aPos;    // node position in grid units
 layout(location=1) in vec2 aUV;     // rest UV 0..1
 layout(location=3) in float aZ;     // curl/lift
+layout(location=4) in float aEdge;  // 1 at a node touching a torn edge, else 0
 uniform vec2 uGrid;                 // cols-1, rows-1 (for normalising pos)
-out vec2 vUV;
+out vec2 vUV;      // rest UV (for sampling the paper)
+out vec2 vScreen;  // on-screen 0..1 position (for the light pool)
 out float vZ;
+out float vEdge;
 void main() {
   vUV = aUV;
   vZ = aZ;
+  vEdge = aEdge;
   // Normalise grid position to clip space. Torn triangles are removed from the
   // index buffer, so no per-vertex collapse is needed here.
   vec2 n = aPos / uGrid;            // 0..1 (may exceed when torn/pulled)
+  vScreen = n;
   vec2 clip = vec2(n.x * 2.0 - 1.0, 1.0 - n.y * 2.0);
   gl_Position = vec4(clip, 0.0, 1.0);
 }`;
@@ -39,22 +44,74 @@ void main() {
 const FRAG = `#version 300 es
 precision highp float;
 in vec2 vUV;
+in vec2 vScreen;
 in float vZ;
+in float vEdge;
 uniform sampler2D uFront;
 uniform float uTime;
 uniform float uAmbient;      // base room light 0..1 (falls by act)
 uniform vec3 uLight;         // picture glow colour 0..1
 uniform float uLightAmount;  // picture glow strength 0..1
+uniform vec2 uLightCenter;   // where the set sits, in screen 0..1
 out vec4 frag;
+
+// Cheap value noise, so a torn edge erodes along fibre rather than a clean line.
+float hash(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  float a = hash(i);
+  float b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0));
+  float d = hash(i + vec2(1.0, 1.0));
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
 void main() {
   vec4 c = texture(uFront, vUV);
-  // Lift/curl shading so torn paper reads as 3D.
-  float shade = clamp(0.5 + vZ * 0.9, 0.2, 1.3);
+
+  // --- Noise-eroded torn edge (design §3) -----------------------------------
+  // vEdge rises toward a torn boundary; break it up with multi-octave fibre
+  // noise so the edge dissolves into ragged paper rather than the straight
+  // polygon it is built from. Several octaves (incl. a stretched vertical grain)
+  // erase the staircase of the triangle edges.
+  float fibre =
+      noise(vUV * 340.0) * 0.45 +
+      noise(vUV * 150.0) * 0.30 +
+      noise(vUV * vec2(70.0, 520.0)) * 0.25;   // vertical grain, like torn fibre
+  float edge = clamp(vEdge, 0.0, 1.0);
+  // Erode across a WIDE band so the noise, not the mesh, decides the outline.
+  float erodeField = edge - fibre * 1.25;
+  if (erodeField > 0.08) discard;               // ragged hole, not a flat line
+  // Pale fibre band of lifted paper threads just inside the torn edge.
+  float band = smoothstep(-0.30, 0.06, erodeField);
+
+  // --- Flap lighting from the lift (z) --------------------------------------
+  // A lifted flap catches the room light on its raised side and shadows its
+  // underside, so torn paper reads as 3D (design §3).
+  float shade = clamp(0.62 + vZ * 1.1, 0.25, 1.5);
   vec3 col = c.rgb * shade;
-  // The TV glow falls off from the centre of the wall (where the set sits).
-  float d = distance(vUV, vec2(0.5, 0.52));
-  float glow = uLightAmount * clamp(1.0 - d * 1.4, 0.0, 1.0);
-  col = col * uAmbient + col * uLight * glow;
+
+  // --- The TV light pool (task 5a.2) ----------------------------------------
+  // A real pool centred on the set: bright and readable near the tube, falling
+  // to darkness at the viewport edges. Aspect-correct the distance a little so
+  // the pool is roughly round on a wide screen.
+  vec2 dv = vScreen - uLightCenter;
+  dv.x *= 1.15;
+  float d = length(dv);
+  float pool = exp(-d * d * 7.0);                 // smooth round falloff
+  float lit = uAmbient * 0.35 + uLightAmount * pool * 1.35;
+  col = col * lit + c.rgb * uLight * (uLightAmount * pool * 0.9);
+
+  // Pale, slightly warm fibre colour painted into the band.
+  vec3 fibreCol = vec3(0.78, 0.74, 0.66) * (0.5 + 0.5 * fibre);
+  col = mix(col, fibreCol * max(lit, 0.25), band * 0.85);
+
   frag = vec4(col, 1.0);
 }`;
 
@@ -75,6 +132,38 @@ in vec2 vUV;
 uniform sampler2D uBehind;
 out vec4 frag;
 void main() { frag = texture(uBehind, vUV); }`;
+
+/**
+ * Drop-shadow pass (design §3): the flaps around a tear cast a soft shadow onto
+ * the behind layer. We draw the torn-edge triangles, pushed down and out by the
+ * flap lift, as a dark translucent fill on top of the behind texture — so the
+ * reveal has depth and the tear does not look like a flat cut-out.
+ */
+const SHADOW_VERT = `#version 300 es
+precision highp float;
+layout(location=0) in vec2 aPos;
+layout(location=3) in float aZ;
+uniform vec2 uGrid;
+out float vZ;
+void main() {
+  vZ = aZ;
+  vec2 n = aPos / uGrid;
+  // Offset the shadow down-right, scaled by the flap lift, so it falls away
+  // from the light and reads as a cast shadow rather than an outline.
+  n += vec2(0.006, 0.012) * (0.4 + abs(aZ) * 2.0);
+  vec2 clip = vec2(n.x * 2.0 - 1.0, 1.0 - n.y * 2.0);
+  gl_Position = vec4(clip, 0.0, 1.0);
+}`;
+
+const SHADOW_FRAG = `#version 300 es
+precision highp float;
+in float vZ;
+out vec4 frag;
+void main() {
+  // Soft, lift-scaled darkening. Premultiplied-alpha-safe: we blend over behind.
+  float a = clamp(0.28 + abs(vZ) * 0.5, 0.0, 0.6);
+  frag = vec4(0.0, 0.0, 0.0, a);
+}`;
 
 export interface TearGLOptions {
   preserveDrawingBuffer?: boolean;
@@ -98,25 +187,32 @@ export class TearGLRenderer {
   private readonly canvas: HTMLCanvasElement;
   private program: WebGLProgram;
   private behindProgram: WebGLProgram;
+  private shadowProgram: WebGLProgram;
   private emptyVao: WebGLVertexArrayObject;
   private vao: WebGLVertexArrayObject;
   private posBuf: WebGLBuffer;
   private uvBuf: WebGLBuffer;
   private zBuf: WebGLBuffer;
+  private edgeBuf: WebGLBuffer;
   private indexBuf: WebGLBuffer;
+  private shadowIndexBuf: WebGLBuffer;
   private frontTex: WebGLTexture;
   private behindTex: WebGLTexture;
 
   private sheet: TearSheet | null = null;
   private indexCount = 0;
+  private shadowIndexCount = 0;
   private posArray = new Float32Array(0);
   private zArray = new Float32Array(0);
+  private edgeArray = new Float32Array(0);
   private contextLost = false;
   private startMs = 0;
   // Lighting (set by the room each frame from deriveRoom).
   private ambient = 0.6;
   private light: [number, number, number] = [0, 0, 0];
   private lightAmount = 0;
+  /** Where the set sits, in screen 0..1 (the light pool centre). */
+  private lightCenter: [number, number] = [0.5, 0.5];
   /** All triangles as node-index triples (static), and their 3 edge-constraint ids. */
   private triangles: Int32Array = new Int32Array(0);
   private triEdges: Int32Array = new Int32Array(0);
@@ -128,12 +224,15 @@ export class TearGLRenderer {
     this.canvas = canvas;
     this.program = this.buildProgram();
     this.behindProgram = this.buildProgramFrom(BEHIND_VERT, BEHIND_FRAG);
+    this.shadowProgram = this.buildProgramFrom(SHADOW_VERT, SHADOW_FRAG);
     this.emptyVao = gl.createVertexArray();
     this.vao = gl.createVertexArray();
     this.posBuf = gl.createBuffer();
     this.uvBuf = gl.createBuffer();
     this.zBuf = gl.createBuffer();
+    this.edgeBuf = gl.createBuffer();
     this.indexBuf = gl.createBuffer();
+    this.shadowIndexBuf = gl.createBuffer();
     this.frontTex = this.makeTex();
     this.behindTex = this.makeTex();
     canvas.addEventListener('webglcontextlost', this.onLost);
@@ -160,12 +259,15 @@ export class TearGLRenderer {
   private readonly onRestored = (): void => {
     this.program = this.buildProgram();
     this.behindProgram = this.buildProgramFrom(BEHIND_VERT, BEHIND_FRAG);
+    this.shadowProgram = this.buildProgramFrom(SHADOW_VERT, SHADOW_FRAG);
     this.emptyVao = this.gl.createVertexArray();
     this.vao = this.gl.createVertexArray();
     this.posBuf = this.gl.createBuffer();
     this.uvBuf = this.gl.createBuffer();
     this.zBuf = this.gl.createBuffer();
+    this.edgeBuf = this.gl.createBuffer();
     this.indexBuf = this.gl.createBuffer();
+    this.shadowIndexBuf = this.gl.createBuffer();
     this.frontTex = this.makeTex();
     this.behindTex = this.makeTex();
     this.contextLost = false;
@@ -214,6 +316,7 @@ export class TearGLRenderer {
     const n = cols * rows;
     this.posArray = new Float32Array(n * 2);
     this.zArray = new Float32Array(n);
+    this.edgeArray = new Float32Array(n);
 
     // Rest UVs (static).
     const uv = new Float32Array(n * 2);
@@ -272,19 +375,45 @@ export class TearGLRenderer {
     gl.enableVertexAttribArray(3);
     gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 0, 0);
 
-    // The element buffer is rebuilt on break events (dynamic); start with all
-    // triangles present.
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.edgeBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, this.edgeArray, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(4);
+    gl.vertexAttribPointer(4, 1, gl.FLOAT, false, 0, 0);
+
+    // The element buffer and the torn-edge shadow buffer are rebuilt on break
+    // events (dynamic). rebuildIndex also fills the per-node edge field; force
+    // it on first render.
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuf);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(this.triangles), gl.DYNAMIC_DRAW);
     this.indexCount = this.triangles.length;
+    this.shadowIndexCount = 0;
 
     gl.bindVertexArray(null);
   }
 
-  /** Rebuild the element buffer, dropping any triangle with a broken edge. */
+  /**
+   * Rebuild the element buffer on a break event. A triangle with a broken edge
+   * is dropped from the live mesh (that opens the hole). Triangles that *kept*
+   * one or two broken-edge vertices form the torn boundary: their nodes get a
+   * per-node `edge` field (so the fragment shader can erode and paint a fibre
+   * band), and those triangles are collected into a shadow index for the cast
+   * shadow onto the behind layer.
+   */
   private rebuildIndex(sheet: TearSheet): void {
     const gl = this.gl;
     const live: number[] = [];
+    const shadow: number[] = [];
+    const n = sheet.cols * sheet.rows;
+    // Mark every node that touches a broken constraint as a torn-edge node.
+    const edge = this.edgeArray;
+    for (let i = 0; i < n; i += 1) edge[i] = 0;
+    const cc = sheet.restLength.length;
+    for (let k = 0; k < cc; k += 1) {
+      if (sheet.broken[k] !== 1) continue;
+      edge[sheet.constraints[k * 2]!] = 1;
+      edge[sheet.constraints[k * 2 + 1]!] = 1;
+    }
+
     const triCount = this.triangles.length / 3;
     for (let t = 0; t < triCount; t += 1) {
       const e0 = this.triEdges[t * 3]!;
@@ -294,14 +423,27 @@ export class TearGLRenderer {
         (e0 >= 0 && sheet.broken[e0] === 1) ||
         (e1 >= 0 && sheet.broken[e1] === 1) ||
         (e2 >= 0 && sheet.broken[e2] === 1);
-      if (brokenEdge) continue;
-      live.push(this.triangles[t * 3]!, this.triangles[t * 3 + 1]!, this.triangles[t * 3 + 2]!);
+      const a = this.triangles[t * 3]!;
+      const b = this.triangles[t * 3 + 1]!;
+      const c = this.triangles[t * 3 + 2]!;
+      if (brokenEdge) continue; // dropped from the mesh: this is the hole
+      live.push(a, b, c);
+      // A surviving triangle that still has a torn-edge vertex sits on the
+      // boundary: it is a flap, so it casts the drop shadow.
+      if (edge[a] === 1 || edge[b] === 1 || edge[c] === 1) shadow.push(a, b, c);
     }
+
     gl.bindVertexArray(this.vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.edgeBuf);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, edge);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuf);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(live), gl.DYNAMIC_DRAW);
     gl.bindVertexArray(null);
     this.indexCount = live.length;
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.shadowIndexBuf);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(shadow), gl.DYNAMIC_DRAW);
+    this.shadowIndexCount = shadow.length;
   }
 
   /** Upload a 2D canvas/image as the front (paper) texture. */
@@ -319,6 +461,11 @@ export class TearGLRenderer {
     this.ambient = ambient;
     this.light = [light.r / 255, light.g / 255, light.b / 255];
     this.lightAmount = light.amount;
+  }
+
+  /** Set where the set sits (the light-pool centre), in screen 0..1. */
+  setLightCenter(x: number, y: number): void {
+    this.lightCenter = [Math.max(0, Math.min(1, x)), Math.max(0, Math.min(1, y))];
   }
 
   private uploadTex(tex: WebGLTexture, src: TexImageSource): void {
@@ -366,6 +513,22 @@ export class TearGLRenderer {
     gl.uniform1i(gl.getUniformLocation(this.behindProgram, 'uBehind'), 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
+    // Shadow pass: the flaps around a tear darken the revealed behind layer, so
+    // the hole has depth (design §3). Blend over the behind, before the paper.
+    if (this.shadowIndexCount > 0) {
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.useProgram(this.shadowProgram);
+      gl.bindVertexArray(this.vao);
+      gl.uniform2f(gl.getUniformLocation(this.shadowProgram, 'uGrid'), cols - 1, rows - 1);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.shadowIndexBuf);
+      gl.drawElements(gl.TRIANGLES, this.shadowIndexCount, gl.UNSIGNED_INT, 0);
+      gl.disable(gl.BLEND);
+      // Restore the mesh's own index buffer for the paper pass.
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuf);
+      gl.bindVertexArray(null);
+    }
+
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
 
@@ -380,6 +543,7 @@ export class TearGLRenderer {
     gl.uniform1f(gl.getUniformLocation(this.program, 'uAmbient'), this.ambient);
     gl.uniform3f(gl.getUniformLocation(this.program, 'uLight'), this.light[0], this.light[1], this.light[2]);
     gl.uniform1f(gl.getUniformLocation(this.program, 'uLightAmount'), this.lightAmount);
+    gl.uniform2f(gl.getUniformLocation(this.program, 'uLightCenter'), this.lightCenter[0], this.lightCenter[1]);
 
     gl.drawElements(gl.TRIANGLES, this.indexCount, gl.UNSIGNED_INT, 0);
     gl.bindVertexArray(null);
@@ -417,12 +581,15 @@ export class TearGLRenderer {
     this.canvas.removeEventListener('webglcontextrestored', this.onRestored);
     gl.deleteProgram(this.program);
     gl.deleteProgram(this.behindProgram);
+    gl.deleteProgram(this.shadowProgram);
     gl.deleteVertexArray(this.vao);
     gl.deleteVertexArray(this.emptyVao);
     gl.deleteBuffer(this.posBuf);
     gl.deleteBuffer(this.uvBuf);
     gl.deleteBuffer(this.zBuf);
+    gl.deleteBuffer(this.edgeBuf);
     gl.deleteBuffer(this.indexBuf);
+    gl.deleteBuffer(this.shadowIndexBuf);
     gl.deleteTexture(this.frontTex);
     gl.deleteTexture(this.behindTex);
   }

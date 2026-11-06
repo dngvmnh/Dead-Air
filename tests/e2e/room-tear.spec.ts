@@ -242,6 +242,93 @@ test.describe('room wall tear (real WebGL)', () => {
     await expect(page.getByTestId('tube-opening')).toHaveAttribute('data-phase', /BOOTING|TUNING|ON_AIR|STAND_BY/);
   });
 
+  // Task 5a.6: measure the OPENING the drag makes — its area and its width
+  // along the drag path — on real WebGL, and confirm it is still open two
+  // seconds after release. This asserts the tear follows the pointer and stays
+  // open, which a changed-pixels-only check cannot prove.
+  test('a stepped drag opens a gash along its path that stays open 2 s later', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await ready(page);
+    await acknowledge(page);
+    await expect(page.getByTestId('room-canvas')).toBeVisible();
+    await expect.poll(async () => (await room(page)).broken, { timeout: 5000 }).toBe(0);
+
+    // A straight ~300 px vertical drag through the exposed left band, in small
+    // steps so the gash is cut all along the path (not just at the ends).
+    const sx = Math.round(1440 * 0.12);
+    const sy = Math.round(900 * 0.22);
+    const len = 300;
+    await page.mouse.move(sx, sy);
+    await page.mouse.down();
+    const steps = 24;
+    for (let i = 1; i <= steps; i += 1) {
+      await page.mouse.move(sx, sy + (len * i) / steps, { steps: 1 });
+      await page.waitForTimeout(16);
+    }
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+
+    // Measure the opening: along the drag path, scan each sampled row for a run
+    // of PLASTER pixels (the pale behind layer), which only shows where the
+    // paper is actually gone. Returns the per-row opening width in CSS px and
+    // the total opened area (as a pixel count).
+    const measure = () =>
+      page.evaluate(
+        ([cx, y0, y1]) => {
+          const canvas = document.querySelector<HTMLCanvasElement>('[data-testid="room-canvas"]');
+          const gl = canvas?.getContext('webgl2');
+          if (!canvas || !gl) return { widths: [] as number[], area: -1 };
+          const W = canvas.width;
+          const H = canvas.height;
+          const px = new Uint8Array(W * H * 4);
+          gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          const sxC = Math.round((cx / window.innerWidth) * W);
+          const yA = Math.round((y0 / window.innerHeight) * H);
+          const yB = Math.round((y1 / window.innerHeight) * H);
+          const isPlaster = (i: number): boolean => {
+            const r = px[i]!;
+            const g = px[i + 1]!;
+            const b = px[i + 2]!;
+            const bright = (r + g + b) / 3;
+            const neutral = Math.abs(r - g) < 40 && Math.abs(g - b) < 50;
+            return bright > 110 && neutral;
+          };
+          const widths: number[] = [];
+          let area = 0;
+          const rowStep = Math.max(1, Math.round(Math.abs(yB - yA) / 20));
+          for (let yy = Math.min(yA, yB); yy <= Math.max(yA, yB); yy += rowStep) {
+            const rowY = H - 1 - yy; // readPixels is bottom-up
+            let run = 0;
+            for (let xx = Math.max(0, sxC - 90); xx < Math.min(W, sxC + 90); xx += 1) {
+              if (isPlaster((rowY * W + xx) * 4)) {
+                run += 1;
+                area += 1;
+              }
+            }
+            widths.push(Math.round((run / W) * window.innerWidth));
+          }
+          return { widths, area };
+        },
+        [sx, sy, sy + len] as const,
+      );
+
+    const first = await measure();
+    // There is a real opening with meaningful area (the behind layer shows
+    // through a substantial hole, not a hairline).
+    expect(first.area).toBeGreaterThan(1000);
+    // The core geometry check: along most of the 300 px drag the opening is at
+    // least 40 px wide — the gash follows the pointer, not a local patch.
+    const wide = first.widths.filter((w) => w >= 40).length;
+    expect(wide).toBeGreaterThanOrEqual(Math.ceil(first.widths.length * 0.6));
+
+    // Two seconds after release, the opening is still there (flaps stay open).
+    await page.waitForTimeout(2000);
+    const later = await measure();
+    expect(later.area).toBeGreaterThan(first.area * 0.6);
+    const wideLater = later.widths.filter((w) => w >= 40).length;
+    expect(wideLater).toBeGreaterThanOrEqual(Math.ceil(later.widths.length * 0.5));
+  });
+
   test('the room canvas never covers the tube (clean-feed, elementFromPoint)', async ({ page }) => {
     await ready(page);
     await acknowledge(page);

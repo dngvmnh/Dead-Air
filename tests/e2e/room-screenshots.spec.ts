@@ -70,33 +70,64 @@ async function powerOn(page: Page): Promise<void> {
 }
 
 async function shoot(page: Page, file: string): Promise<void> {
-  if (UPDATE) await page.screenshot({ path: path.join(SHOTS_DIR, file) });
+  // animations:'disabled' avoids the font-wait hang while the tear's rAF loop
+  // is still settling; the room itself is a canvas, so no visual is lost.
+  if (UPDATE) await page.screenshot({ path: path.join(SHOTS_DIR, file), animations: 'disabled', timeout: 20000 });
 }
 
-test.describe('room visual checkpoint (task 5)', () => {
-  test('room in Act 0', async ({ page }) => {
+/** A big vertical gash down the exposed left band, in small stepped moves. */
+async function tearLeftBand(page: Page): Promise<void> {
+  const sx = Math.round(page.viewportSize()!.width * 0.12);
+  const sy = Math.round(page.viewportSize()!.height * 0.22);
+  const len = Math.round(page.viewportSize()!.height * 0.42);
+  await page.mouse.move(sx, sy);
+  await page.mouse.down();
+  for (let i = 1; i <= 22; i += 1) {
+    await page.mouse.move(sx, sy + (len * i) / 22, { steps: 1 });
+    await page.waitForTimeout(16);
+  }
+  await page.mouse.up();
+  await page.waitForTimeout(700);
+}
+
+test.describe('room visual checkpoint (task 5 / 5a)', () => {
+  test('room in Act 0 (1440x900)', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await seed(page, { act: 0 });
     await powerOn(page);
     await room(page); // asserts the room seam exists / rendered
     await shoot(page, 'room-act0.png');
   });
 
-  test('room in Act 3', async ({ page }) => {
+  test('room in Act 3 (1440x900)', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await seed(page, { act: 3, totalWatchMs: 15 * 60000, visits: { 2: 2, 4: 1, 7: 1, 13: 2 }, sessionCount: 2 });
     await powerOn(page);
     await room(page);
     await shoot(page, 'room-act3.png');
   });
 
-  test('a torn wall', async ({ page }) => {
-    await seed(page, { act: 1, visits: { 2: 1 } });
+  test('a large tear (1440x900)', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await seed(page, { act: 0, visits: { 2: 1 } });
     await powerOn(page);
-    // The T key rips a seeded path (deterministic; the same discovery keyboard
-    // users get). A couple of presses open a clear gash.
-    await page.keyboard.press('t');
-    await page.waitForTimeout(200);
-    await page.keyboard.press('t');
-    await page.waitForTimeout(400);
-    await shoot(page, 'room-tear.png');
+    await tearLeftBand(page);
+    await shoot(page, 'room-tear-1440x900.png');
+  });
+
+  test('room in Act 0 (1280x720)', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await seed(page, { act: 0 });
+    await powerOn(page);
+    await room(page);
+    await shoot(page, 'room-act0-1280x720.png');
+  });
+
+  test('a tear (1280x720)', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await seed(page, { act: 0, visits: { 2: 1 } });
+    await powerOn(page);
+    await tearLeftBand(page);
+    await shoot(page, 'room-tear-1280x720.png');
   });
 });

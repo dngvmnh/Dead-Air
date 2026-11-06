@@ -9,7 +9,12 @@
      thing over the tube, keeping the clean-feed rule by construction. */
   position: relative;
   z-index: 1;
-  width: min(92vw, 1024px);
+  /* Constrain by viewport HEIGHT as well as width (task 5a.1) so the set never
+     fills the screen: at 1280×720 and 1440×900 at least half the viewport must
+     stay exposed wall. The desktop grid below sizes the whole cabinet from the
+     tube, which is itself height-capped, so this is a safety ceiling. */
+  width: min(72vw, 1024px);
+  max-width: 100%;
   background: linear-gradient(
     160deg,
     var(--chassis-plastic-light),
@@ -47,7 +52,13 @@
 @media (min-width: 769px) {
   .chassis {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 220px;
+    /* The control column is compact (task 5a.1) so it never sets the cabinet
+       height; the tube — height-capped in Screen.module.css — drives the size.
+       `width: max-content` shrinks the cabinet to that content, so the exposed
+       wall around it grows as the viewport does. */
+    width: max-content;
+    max-width: min(72vw, 1024px);
+    grid-template-columns: minmax(0, auto) 180px;
     grid-template-rows: auto auto 1fr;
     align-items: start;
   }
