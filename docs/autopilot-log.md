@@ -180,3 +180,25 @@ done, how it was checked, and anything left unverified.
   checkpoint. Chromium only; firefox/webkit not installed or run.
 - Decisions made alone: none beyond reusing the existing window test hooks.
 - Unverified: audible sound quality (manual checklist, task 22.2).
+## Task 7.1 — Content schema and types (Zod, design §4 and §6)
+
+- Mode: direct implementation. The `spec-task-execution` subagent was tried
+  once and is not in the registry (`agent 'spec-task-execution' not found`);
+  per the resume instructions I proceeded directly with the same quality rules.
+  This work was already present uncommitted in `src/content/`; this entry
+  reconciles and verifies it.
+- Done: `src/content/schema.ts` defines the Zod schemas for the catalogue and
+  scene content (requirement 14, design §4/§6): channel id, look, rights basis,
+  strict `rightsSchema`, the discriminated `itemSchema` (scene/file/youtube) with
+  positive integer `durationMs`, `channelSchema`, and the scene layer union
+  (image/text/ticker/rect/noise) plus keyframes, captions, audio cues and
+  `LayerWhen` (visit/act bounds). Inferred `*Input` types are exported, plus the
+  `toChannel`/`toItem`/`toRights` bridges that normalise Zod's `T | undefined`
+  to the exact-optional core types in `src/core/types.ts`, so any schema/core
+  drift fails to compile at the bridge rather than at a call site. Zod lives in
+  `content`, keeping `core` dependency-free. `schema.test.ts` has 20 tests.
+- Checked: `npm test` 118 passed (incl. 20 schema tests). `npm run lint` clean.
+  `npm run build` clean, JS 79.31 KB gzip (within the 300 KB budget).
+- Decisions made alone: none (verification/reconciliation of pre-existing work).
+- Unverified: the validator that consumes these schemas and the depth/release
+  rules are task 7.2 (next).
