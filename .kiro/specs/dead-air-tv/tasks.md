@@ -33,8 +33,8 @@ Work in order. Each milestone ends in something runnable. Commit after each comp
   - [x] 7.1 Define Zod schemas and types from design sections 4 and 6.
   - [x] 7.2 Implement `scripts/validate-catalog.ts` with `--release`, and tests for each rule.
   - _Requirements: 14.1–14.5_
-- [ ] 8. Broadcast clock
-  - [ ] 8.1 Implement `resolveBroadcast` with fast-check properties.
+- [x] 8. Broadcast clock
+  - [x] 8.1 Implement `resolveBroadcast` with fast-check properties.
   - _Requirements: 3.1, 3.2, 3.4, 3.5_
 - [ ] 9. Scene system
   - [ ] 9.1 Implement pure `renderScene` and keyframes with image, text, ticker, rect, and noise layers.

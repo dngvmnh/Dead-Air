@@ -62,3 +62,14 @@ export interface Channel {
 }
 
 export type Seam = 'tune-in' | 'item-boundary' | 'mid-item';
+
+/** The broadcast clock's answer: what is on, where in it, and how long is left. */
+export interface Resolved {
+  item: Item;
+  /** Index into the *filtered* (playable) rundown. */
+  index: number;
+  /** Offset into the current item, `0 <= offsetMs < item.durationMs`. */
+  offsetMs: number;
+  /** Time until the current item ends, `0 < remainingMs <= item.durationMs`. */
+  remainingMs: number;
+}

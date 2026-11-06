@@ -254,3 +254,32 @@ done, how it was checked, and anything left unverified.
   scenes, events are authored in tasks 10/13/14/15); it is exercised only by
   fixtures and the temporary probe. End-to-end release gating over real content
   is proven when that content exists.
+## Task 8 — Broadcast clock (`resolveBroadcast`, design §5, requirement 3)
+
+- Mode: direct implementation (the `spec-task-execution` subagent is still
+  absent from the registry; also recovered mid-task from a lost backend
+  connection — clock.ts and the Resolved type had landed, the test had not,
+  so I verified the tree then wrote the test and ran the gate).
+- Done:
+  - `src/core/types.ts`: added the `Resolved` interface (item, filtered index,
+    `0 <= offsetMs < durationMs`, `remainingMs`).
+  - `src/core/clock.ts`: pure `resolveBroadcast(channel, nowMs, isPlayable)`.
+    Filters the rundown with `isPlayable` (dead-item drop, req 3.4); returns
+    null when nothing is playable; `position = floorMod(nowMs - epochMs, total)`
+    (floored modulo so pre-epoch times still land inside the loop); linear scan
+    over cumulative durations. No Date.now / Math.random — time is an argument
+    (tech.md core purity).
+- Checked: `npm test` 163 passed (15 new clock tests: 9 example-based incl.
+  boundary crossing, period wrap, pre-epoch, shifting epoch, dead-item drop with
+  filtered index; 6 fast-check properties — offset in [0,dur) with
+  remaining=dur-offset>0, one-for-one advance inside an item, boundary
+  continuity (next starts at 0 at now+remaining), periodicity resolve(now) ==
+  resolve(now+total), determinism/req 3.4, and null iff nothing playable).
+  `npm run lint` clean. `npm run build` clean (JS unchanged, 79.31 KB gzip —
+  core is already imported by the app graph; the clock is tree-shaken until
+  wired in task 10).
+- Decisions made alone: none of consequence; `index` is deliberately the index
+  into the FILTERED (playable) rundown, matching design §5's Resolved and the
+  dead-item semantics, and asserted as such in the tests.
+- Unverified: real continuity end-to-end (leave a channel, return 60s later)
+  is task 11's mocked-clock e2e; here the clock is proven in isolation.
