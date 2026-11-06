@@ -44,6 +44,8 @@ interface RoomSeam {
   strokes: () => number;
   broken: () => number;
   ripSeeded: () => void;
+  /** Paint everything behind the paper solid magenta, so a test can measure holes. */
+  showHoleMask: (on: boolean) => void;
 }
 
 const IDLE_CORNER_RADIUS = 0.12; // fraction of the sheet near the top-right corner
@@ -89,7 +91,16 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
       return; // no 2D context (e.g. jsdom): render nothing, never crash.
     }
 
-    const gl = forceFallback ? null : TearGLRenderer.create(canvas, { preserveDrawingBuffer: preserve });
+    // The room is decoration, so a driver that rejects its shaders must never take
+    // the television down with it.
+    let gl: TearGLRenderer | null = null;
+    if (!forceFallback) {
+      try {
+        gl = TearGLRenderer.create(canvas, { preserveDrawingBuffer: preserve });
+      } catch (err) {
+        console.warn('room renderer unavailable', err);
+      }
+    }
     const fallbackCtx = gl ? null : canvas.getContext('2d');
     if (!gl && !fallbackCtx) return; // no renderer available at all.
     let strokeCount = 0;
@@ -104,7 +115,7 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
     if (gl) {
       gl.setSheet(sheet);
       gl.setFrontTexture(front.canvas);
-      gl.setBehindTexture(behind.canvas);
+      gl.setBehindLayer({ albedo: behind.canvas, emissive: null, holeFloor: 0.12, motion: 0 });
     }
 
     const cap = { w: 1280, h: 800 };
@@ -167,7 +178,11 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
         points: [[gx / (WALL_COLS - 1), gy / (WALL_ROWS - 1)]],
       });
       strokeCount += 1;
-      canvas.setPointerCapture?.(e.pointerId);
+      try {
+        canvas.setPointerCapture?.(e.pointerId);
+      } catch {
+        // The pointer ended before the browser could capture it.
+      }
       // A pointer gesture may unlock audio if POWER hasn't (design §9).
       try {
         void getAudio().unlock();
@@ -185,12 +200,22 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
         return;
       }
       const { gx, gy } = toGrid(e.clientX, e.clientY);
-      moveGrab(sheet, d.node, gx, gy);
+      // Hold the paper at the pointer's tip, not at the node the drag began on:
+      // hauling one node across the wall stretched the triangles around it into
+      // long spikes over the hole.
+      const tip = nearestFreeNode(gx, gy);
+      if (tip !== d.node && sheet.pinned[tip] === 0) {
+        release(sheet, d.node);
+        grab(sheet, tip, gx, gy);
+        d.node = tip;
+      } else {
+        moveGrab(sheet, d.node, gx, gy);
+      }
       // Cut the paper along the SWEPT segment since the last move, within one
       // cell of the path. This makes the gash follow the pointer at any drag
       // speed (task 5a.3) — a fast flick that jumps several cells still opens a
       // continuous slit, which pulling one grabbed node alone cannot do.
-      cutPath(sheet, d.lastGx, d.lastGy, gx, gy, 1);
+      cutPath(sheet, d.lastGx, d.lastGy, gx, gy);
       // Rip sound scaled by drag speed.
       const dt = Math.max(1, e.timeStamp - d.lastT);
       const dist = Math.hypot(e.clientX - d.lastX, e.clientY - d.lastY);
@@ -216,7 +241,11 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
       if (!d) return;
       release(sheet, d.node);
       drags.delete(e.pointerId);
-      canvas.releasePointerCapture?.(e.pointerId);
+      try {
+        canvas.releasePointerCapture?.(e.pointerId);
+      } catch {
+        // Already released with the pointer.
+      }
     };
 
     const updateCursor = (clientX: number, clientY: number): void => {
@@ -342,6 +371,10 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
           ripSeededPath(sheet);
           strokeCount += 1;
         },
+        showHoleMask: (on) => {
+          gl?.setHoleMask(on);
+          gl?.render(performance.now());
+        },
       };
     }
 
@@ -401,7 +434,7 @@ function ripSeededPath(sheet: TearSheet): void {
     const t = s / STEPS;
     const x = c0 + (c1 - c0) * Math.sin(t * Math.PI);
     const y = r0 + (r1 - r0) * t;
-    cutPath(sheet, prevX, prevY, x, y, 1);
+    cutPath(sheet, prevX, prevY, x, y);
     prevX = x;
     prevY = y;
   }
@@ -419,6 +452,9 @@ function drawFallback(
   const w = canvas.width;
   const h = canvas.height;
   ctx.drawImage(behind, 0, 0, w, h);
+  // The room is dark, so what is behind the paper must be too.
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+  ctx.fillRect(0, 0, w, h);
   // Paper with a fixed diagonal gash removed, so the behind shows through.
   ctx.save();
   ctx.beginPath();

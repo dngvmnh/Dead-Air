@@ -79,7 +79,10 @@
   cursor: pointer;
 }
 
-.button:hover:not(:disabled) {
+/* :where keeps this at the specificity of .button, so it cannot override the
+   background of a lit control while its dark label stays. Lit controls set their
+   own hover below. */
+.button:where(:hover:not(:disabled)) {
   background: var(--chassis-plastic);
 }
 
@@ -97,14 +100,26 @@
   color: var(--led-amber);
 }
 
+.power:hover:not(:disabled) {
+  background: #4c241b;
+}
+
 .power[data-on='true'] {
   background: var(--led-on);
   color: #1a0603;
 }
 
+.power[data-on='true']:hover:not(:disabled) {
+  background: #ff7458;
+}
+
 .toggle[aria-pressed='true'] {
   background: var(--led-amber);
   color: #1a0603;
+}
+
+.toggle[aria-pressed='true']:hover:not(:disabled) {
+  background: #ffc266;
 }
 
 .label {
@@ -121,9 +136,9 @@
 }
 
 @media (min-width: 769px) {
-  /* Compact control column (task 5a.1): it must not set the cabinet height, so
-     the whole stack stays within the tube's height. Smaller LED, tighter gaps,
-     a 2-up CH row, and 40px buttons (still a comfortable pointer target). */
+  /* Compact control column: it must not set the cabinet height, so the stack
+     stays within the tube's height. Smaller LED, tighter gaps, a 2-up CH row, and
+     40px buttons. Phones keep the full 44px targets. */
   .remote {
     flex-direction: column;
     align-items: stretch;

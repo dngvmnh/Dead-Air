@@ -242,20 +242,17 @@ test.describe('room wall tear (real WebGL)', () => {
     await expect(page.getByTestId('tube-opening')).toHaveAttribute('data-phase', /BOOTING|TUNING|ON_AIR|STAND_BY/);
   });
 
-  // Task 5a.6: measure the OPENING the drag makes — its area and its width
-  // along the drag path — on real WebGL, and confirm it is still open two
-  // seconds after release. This asserts the tear follows the pointer and stays
-  // open, which a changed-pixels-only check cannot prove.
-  test('a stepped drag opens a gash along its path that stays open 2 s later', async ({ page }) => {
+  // Measure the OPENING itself: the behind layer is painted a flat test colour,
+  // so this reads the real hole however dark the room makes it.
+  test('a 300 px drag opens a rip of the right size that stays open 2 s later', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await ready(page);
     await acknowledge(page);
     await expect(page.getByTestId('room-canvas')).toBeVisible();
     await expect.poll(async () => (await room(page)).broken, { timeout: 5000 }).toBe(0);
 
-    // A straight ~300 px vertical drag through the exposed left band, in small
-    // steps so the gash is cut all along the path (not just at the ends).
-    const sx = Math.round(1440 * 0.12);
+    const chassis = await page.locator('[class*="chassis"]').first().boundingBox();
+    const sx = Math.round((chassis?.x ?? 200) / 2);
     const sy = Math.round(900 * 0.22);
     const len = 300;
     await page.mouse.move(sx, sy);
@@ -268,65 +265,172 @@ test.describe('room wall tear (real WebGL)', () => {
     await page.mouse.up();
     await page.waitForTimeout(400);
 
-    // Measure the opening: along the drag path, scan each sampled row for a run
-    // of PLASTER pixels (the pale behind layer), which only shows where the
-    // paper is actually gone. Returns the per-row opening width in CSS px and
-    // the total opened area (as a pixel count).
     const measure = () =>
       page.evaluate(
         ([cx, y0, y1]) => {
           const canvas = document.querySelector<HTMLCanvasElement>('[data-testid="room-canvas"]');
           const gl = canvas?.getContext('webgl2');
-          if (!canvas || !gl) return { widths: [] as number[], area: -1 };
+          const seam = (window as unknown as { __room?: { showHoleMask: (on: boolean) => void } }).__room;
+          if (!canvas || !gl || !seam) return { widths: [] as number[], area: -1 };
+          seam.showHoleMask(true);
           const W = canvas.width;
           const H = canvas.height;
           const px = new Uint8Array(W * H * 4);
           gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
-          const sxC = Math.round((cx / window.innerWidth) * W);
-          const yA = Math.round((y0 / window.innerHeight) * H);
-          const yB = Math.round((y1 / window.innerHeight) * H);
-          const isPlaster = (i: number): boolean => {
-            const r = px[i]!;
-            const g = px[i + 1]!;
-            const b = px[i + 2]!;
-            const bright = (r + g + b) / 3;
-            const neutral = Math.abs(r - g) < 40 && Math.abs(g - b) < 50;
-            return bright > 110 && neutral;
-          };
+          seam.showHoleMask(false);
+          const toX = W / window.innerWidth;
+          const toY = H / window.innerHeight;
+          const xC = Math.round(cx * toX);
+          const yA = Math.round(y0 * toY);
+          const yB = Math.round(y1 * toY);
           const widths: number[] = [];
           let area = 0;
-          const rowStep = Math.max(1, Math.round(Math.abs(yB - yA) / 20));
-          for (let yy = Math.min(yA, yB); yy <= Math.max(yA, yB); yy += rowStep) {
-            const rowY = H - 1 - yy; // readPixels is bottom-up
+          // Stay away from both ends, where a rip tapers.
+          for (let yy = yA + 20; yy <= yB - 20; yy += 1) {
+            const rowY = H - 1 - yy;
             let run = 0;
-            for (let xx = Math.max(0, sxC - 90); xx < Math.min(W, sxC + 90); xx += 1) {
-              if (isPlaster((rowY * W + xx) * 4)) {
-                run += 1;
-                area += 1;
-              }
+            for (let xx = Math.max(0, xC - 110); xx < Math.min(W, xC + 110); xx += 1) {
+              const i = (rowY * W + xx) * 4;
+              if (px[i]! > 200 && px[i + 1]! < 60 && px[i + 2]! > 200) run += 1;
             }
-            widths.push(Math.round((run / W) * window.innerWidth));
+            area += run;
+            widths.push(Math.round(run / toX));
           }
           return { widths, area };
         },
         [sx, sy, sy + len] as const,
       );
 
-    const first = await measure();
-    // There is a real opening with meaningful area (the behind layer shows
-    // through a substantial hole, not a hairline).
-    expect(first.area).toBeGreaterThan(1000);
-    // The core geometry check: along most of the 300 px drag the opening is at
-    // least 40 px wide — the gash follows the pointer, not a local patch.
-    const wide = first.widths.filter((w) => w >= 40).length;
-    expect(wide).toBeGreaterThanOrEqual(Math.ceil(first.widths.length * 0.6));
+    const median = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0;
 
-    // Two seconds after release, the opening is still there (flaps stay open).
+    const first = await measure();
+    // A real opening of real area: at least 40 px wide for most of 260 px of
+    // drag, counted in canvas pixels (the canvas is capped at 1280x800).
+    expect(first.area).toBeGreaterThan(6000);
+    expect(median(first.widths)).toBeGreaterThanOrEqual(40);
+    expect(median(first.widths)).toBeLessThanOrEqual(80);
+    expect(Math.max(...first.widths)).toBeLessThan(110);
+    // It follows the pointer: every row along the drag has an opening.
+    expect(first.widths.filter((w) => w < 15).length).toBeLessThanOrEqual(first.widths.length * 0.05);
+
     await page.waitForTimeout(2000);
     const later = await measure();
-    expect(later.area).toBeGreaterThan(first.area * 0.6);
-    const wideLater = later.widths.filter((w) => w >= 40).length;
-    expect(wideLater).toBeGreaterThanOrEqual(Math.ceil(later.widths.length * 0.5));
+    expect(later.area).toBeGreaterThan(first.area * 0.8);
+    expect(median(later.widths)).toBeGreaterThanOrEqual(40);
+    expect(Math.max(...later.widths)).toBeLessThan(110);
+  });
+
+  test('an opening is dark in its middle and never brighter than the picture', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await ready(page);
+    await acknowledge(page);
+    await page.getByRole('button', { name: /^power$/i }).click();
+    await page.waitForTimeout(3000);
+    const chassis = await page.locator('[class*="chassis"]').first().boundingBox();
+    const sx = Math.round((chassis?.x ?? 200) / 2);
+    await page.mouse.move(sx, 200);
+    await page.mouse.down();
+    for (let i = 1; i <= 24; i += 1) {
+      await page.mouse.move(sx, 200 + i * 12.5);
+      await page.waitForTimeout(16);
+    }
+    await page.mouse.up();
+    await page.waitForTimeout(600);
+
+    const lum = await page.evaluate(() => {
+      const canvas = document.querySelector<HTMLCanvasElement>('[data-testid="room-canvas"]');
+      const gl = canvas?.getContext('webgl2');
+      const seam = (window as unknown as { __room?: { showHoleMask: (on: boolean) => void } }).__room;
+      if (!canvas || !gl || !seam) return null;
+      const W = canvas.width;
+      const H = canvas.height;
+      const read = (): Uint8Array => {
+        const px = new Uint8Array(W * H * 4);
+        gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        return px;
+      };
+      seam.showHoleMask(true);
+      const mask = read();
+      seam.showHoleMask(false);
+      const px = read();
+      let sum = 0;
+      let n = 0;
+      let peak = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        if (mask[i]! > 200 && mask[i + 1]! < 60 && mask[i + 2]! > 200) {
+          const l = (px[i]! + px[i + 1]! + px[i + 2]!) / 3;
+          sum += l;
+          n += 1;
+          if (l > peak) peak = l;
+        }
+      }
+      return { mean: n ? sum / n : -1, peak, n };
+    });
+    expect(lum).not.toBeNull();
+    expect(lum!.n).toBeGreaterThan(1000);
+    // The shader caps what is behind the wall at 0.42 (107 of 255).
+    expect(lum!.peak).toBeLessThanOrEqual(110);
+    expect(lum!.mean).toBeLessThan(45);
+  });
+
+  test('at least half the viewport is wall, and no plastic sits under the tube', async ({ page }) => {
+    for (const [width, height] of [[1440, 900], [1280, 720]] as const) {
+      await page.setViewportSize({ width, height });
+      await ready(page);
+      await acknowledge(page);
+      const box = await page.evaluate(() => {
+        const c = document.querySelector('[class*="chassis"]')!.getBoundingClientRect();
+        const t = document.querySelector('[data-testid="tube-opening"]')!.getBoundingClientRect();
+        return { cw: c.width, ch: c.height, cb: c.bottom, tb: t.bottom, tw: t.width };
+      });
+      expect((box.cw * box.ch) / (width * height)).toBeLessThanOrEqual(0.5);
+      expect(box.cb - box.tb).toBeLessThanOrEqual(60);
+      expect(box.tw).toBeGreaterThan(width === 1440 ? 700 : 560);
+    }
+  });
+
+  test('Power and CC stay readable when hovered, focused and on', async ({ page }) => {
+    await ready(page);
+    await acknowledge(page);
+    const power = page.getByRole('button', { name: /^power$/i });
+    const cc = page.getByRole('button', { name: /captions|^cc$/i });
+    await power.click();
+    await page.waitForTimeout(400);
+
+    const contrast = (name: string) =>
+      page.evaluate((label) => {
+        const el = [...document.querySelectorAll('button')].find(
+          (b) => b.textContent?.trim().toLowerCase() === label,
+        )!;
+        const s = getComputedStyle(el);
+        const rgb = (c: string): number[] => (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+        const l = (c: number[]): number => {
+          const [r, g, b] = c.map((v) => {
+            const x = v / 255;
+            return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+          });
+          return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+        };
+        const a = l(rgb(s.color));
+        const b = l(rgb(s.backgroundColor));
+        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      }, name);
+
+    // Pointer still on Power straight after the click, the state that hid it.
+    await power.hover();
+    await page.waitForTimeout(100);
+    expect(await contrast('power')).toBeGreaterThanOrEqual(4.5);
+    await power.focus();
+    expect(await contrast('power')).toBeGreaterThanOrEqual(4.5);
+    await cc.hover();
+    await page.waitForTimeout(100);
+    expect(await contrast('cc')).toBeGreaterThanOrEqual(4.5);
+    await cc.click();
+    await page.waitForTimeout(100);
+    expect(await contrast('cc')).toBeGreaterThanOrEqual(4.5);
+    await cc.click();
+    await page.waitForTimeout(100);
+    expect(await contrast('cc')).toBeGreaterThanOrEqual(4.5);
   });
 
   test('the room canvas never covers the tube (clean-feed, elementFromPoint)', async ({ page }) => {

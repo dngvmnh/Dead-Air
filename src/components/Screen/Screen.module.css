@@ -24,13 +24,12 @@
   display: block;
 }
 
-/* Keep the whole set well within a laptop screen AND leave at least half the
-   viewport as exposed wall (task 5a.1). The tube height is capped at ~58% of
-   the viewport, so the 4:3 tube plus the compact control column occupy under
-   half the width at 1280×720 and 1440×900; the rest is lit wall. */
+/* Keep the set within a laptop screen and leave at least half the viewport as
+   exposed wall. 81vh is the largest tube that does this at both 1280x720 and
+   1440x900; the width term stops it crowding the controls on a narrow window. */
 @media (min-width: 769px) {
   .tube {
-    width: min(58vh, 560px, calc((100dvh - 7rem) * 4 / 3));
+    width: min(81vh, 100vw - 320px, calc((100dvh - 8rem) * 4 / 3));
     max-width: 100%;
   }
 }

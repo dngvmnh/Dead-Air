@@ -1045,3 +1045,25 @@ the tube; the `youtube-clean-feed` and `elementFromPoint` guards still pass).
 
 **STOP per the plan.** A person must judge the room again before Phase C builds
 on it. Not proceeding to task 6, and not deploying.
+
+## Task 5b: Make the tear dark and proportionate
+
+Human review of 5a: the tear mechanics were right, but holes were panel-sized and
+the unlit plaster was the brightest thing on screen.
+
+- Rips: `CUT_RADIUS` is 0.5 cells. Peel applies once per node, with no velocity. A
+  drag now holds the paper at the pointer's tip instead of hauling one node, and a
+  triangle stretched past 1.55x is dropped. Those two caused the spikes.
+- Rendering: `tearRenderer` now draws a blurred mask of the surviving paper (320x200)
+  and uses it three ways: fibre-noise erosion of the outline, a pale fibre band, and
+  a hole that is darkest in its middle with a soft shadow from the paper above. This
+  replaced per-node edge erosion, which ate a whole extra grid cell each side. The
+  behind layer uses the same light model as the paper, capped at 0.42.
+- Fixed a bug while rewriting: a restored WebGL context now re-uploads its textures.
+- A shader the driver rejects no longer takes the television down with it.
+- Layout: tube `min(81vh, ...)`: 50% or more exposed wall at 1440x900 and 1280x720,
+  with the tube at about 729 px and 583 px wide.
+- Controls: `.button:hover` no longer overrides a lit control's background.
+- Tests: `showHoleMask` paints behind the paper a flat colour, so the opening test
+  reads the real hole. Median width 40 to 80, peak under 110, area over 6000 canvas
+  px (the 5a floor was 1000).

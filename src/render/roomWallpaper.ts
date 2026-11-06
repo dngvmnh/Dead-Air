@@ -142,28 +142,27 @@ export function bakeRoom(
   const ctx = base.canvas.getContext('2d');
   if (!ctx) return base;
 
-  // Objects are placed in the EXPOSED side bands (task 5a.2): the chassis sits
-  // in the centre of the viewport, so the left band is roughly x 0..0.24 and the
-  // right band x 0.76..1. The wall texture maps 1:1 to the viewport, so these
-  // UV fractions are where the object lands on screen.
+  // Objects stay in the EXPOSED side bands: the set covers roughly x 0.15..0.85
+  // at both 1440x900 and 1280x720. The wall texture maps 1:1 to the viewport, so
+  // these fractions are where each object lands on screen.
 
   // Window onto darkness, high in the LEFT band.
   ctx.save();
   ctx.fillStyle = '#0a0d14';
-  ctx.fillRect(w * 0.03, h * 0.14, w * 0.17, h * 0.26);
+  ctx.fillRect(w * 0.015, h * 0.16, w * 0.12, h * 0.26);
   ctx.strokeStyle = '#2a2016';
   ctx.lineWidth = 6;
-  ctx.strokeRect(w * 0.03, h * 0.14, w * 0.17, h * 0.26);
+  ctx.strokeRect(w * 0.015, h * 0.16, w * 0.12, h * 0.26);
   ctx.beginPath();
-  ctx.moveTo(w * 0.115, h * 0.14);
-  ctx.lineTo(w * 0.115, h * 0.4);
-  ctx.moveTo(w * 0.03, h * 0.27);
-  ctx.lineTo(w * 0.2, h * 0.27);
+  ctx.moveTo(w * 0.075, h * 0.16);
+  ctx.lineTo(w * 0.075, h * 0.42);
+  ctx.moveTo(w * 0.015, h * 0.29);
+  ctx.lineTo(w * 0.135, h * 0.29);
   ctx.stroke();
   // A faint moon.
   ctx.fillStyle = 'rgba(190, 190, 160, 0.3)';
   ctx.beginPath();
-  ctx.arc(w * 0.15, h * 0.2, 14, 0, Math.PI * 2);
+  ctx.arc(w * 0.105, h * 0.22, 12, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
@@ -190,42 +189,42 @@ export function bakeRoom(
   // Shelf in the RIGHT band, with a candy bowl and a framed picture.
   ctx.save();
   const shelfY = h * 0.64;
-  const shelfX = w * 0.76;
+  const shelfX = w * 0.865;
   ctx.fillStyle = '#2a2018';
-  ctx.fillRect(shelfX, shelfY, w * 0.22, 10);
+  ctx.fillRect(shelfX, shelfY, w * 0.125, 10);
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.fillRect(shelfX, shelfY + 10, w * 0.22, 6);
+  ctx.fillRect(shelfX, shelfY + 10, w * 0.125, 6);
   // Candy bowl (empty at variant ≥ 2).
   ctx.fillStyle = '#3a2d22';
   ctx.beginPath();
-  ctx.ellipse(w * 0.82, shelfY - 6, 34, 16, 0, 0, Math.PI * 2);
+  ctx.ellipse(w * 0.9, shelfY - 6, 26, 13, 0, 0, Math.PI * 2);
   ctx.fill();
   if (objectVariant < 2) {
     for (let i = 0; i < 6; i += 1) {
       ctx.fillStyle = i % 2 === 0 ? '#c8318a' : '#ff7b00';
       ctx.beginPath();
-      ctx.arc(w * 0.82 - 20 + i * 8, shelfY - 12, 4, 0, Math.PI * 2);
+      ctx.arc(w * 0.9 - 16 + i * 6.5, shelfY - 11, 3.4, 0, Math.PI * 2);
       ctx.fill();
     }
   }
   // Framed picture on the wall above the shelf, tilted at variant ≥ 1.
-  ctx.translate(w * 0.92, shelfY - 44);
+  ctx.translate(w * 0.945, shelfY - 56);
   if (objectVariant >= 1) ctx.rotate(-0.12);
   ctx.fillStyle = '#1a1410';
-  ctx.fillRect(-34, -40, 68, 52);
+  ctx.fillRect(-28, -36, 56, 46);
   ctx.strokeStyle = '#4a3a2a';
   ctx.lineWidth = 4;
-  ctx.strokeRect(-34, -40, 68, 52);
+  ctx.strokeRect(-28, -36, 56, 46);
   ctx.fillStyle = 'rgba(140,128,104,0.5)';
-  ctx.fillRect(-28, -34, 56, 40);
+  ctx.fillRect(-23, -31, 46, 36);
   ctx.restore();
 
   // Wall clock showing the real local time (requirement 5.1), in the RIGHT band
   // high up, clear of the chassis.
   ctx.save();
-  const cx = w * 0.86;
-  const cy = h * 0.24;
-  const rad = 46;
+  const cx = w * 0.925;
+  const cy = h * 0.27;
+  const rad = 38;
   ctx.fillStyle = '#2a2318';
   ctx.beginPath();
   ctx.arc(cx, cy, rad, 0, Math.PI * 2);
@@ -263,51 +262,78 @@ export function bakeRoom(
 }
 
 /**
- * Plaster and lath behind the paper (task 5a.5). In Act 0 this reads as pale,
- * dry plaster over wooden lath — clearly LIGHTER than the olive wallpaper, so a
- * tear is obvious at a glance. The renderer's shadow pass and the behind layer
- * per act (task 6) add dread later; here the job is contrast, not darkness.
+ * Plaster and lath behind the paper. Narrow, uneven strips with dark gaps and
+ * patches of broken plaster still keyed onto them, so it reads as the inside of
+ * an old wall. The colours are mid-tones because the renderer lights this with
+ * the room, as it does the paper.
  */
 export function bakeBehindPlaster(w = 1024, h = 768): BakedTexture {
   const { canvas, ctx } = makeCanvas(w, h);
-  // Pale, slightly grubby plaster base.
-  const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, '#cdc3ad');
-  grad.addColorStop(1, '#b3a78d');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, h);
-
-  // Exposed wooden lath strips showing through broken plaster.
-  ctx.fillStyle = 'rgba(92, 66, 38, 0.55)';
-  for (let y = 10; y < h; y += 30) ctx.fillRect(0, y, w, 12);
-  // Lath shadow gaps.
-  ctx.fillStyle = 'rgba(30, 20, 12, 0.4)';
-  for (let y = 24; y < h; y += 30) ctx.fillRect(0, y, w, 4);
-
-  // Cracks and stains in the plaster, so it is not a flat fill.
-  ctx.strokeStyle = 'rgba(40, 30, 22, 0.35)';
-  ctx.lineWidth = 1.5;
   let seed = 0x1234567;
   const rnd = (): number => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return (seed >>> 8) / 16777216;
   };
-  for (let i = 0; i < 40; i += 1) {
-    const x = rnd() * w;
-    const y = rnd() * h;
+
+  // The cavity behind the wall shows through every gap.
+  ctx.fillStyle = '#0d0a08';
+  ctx.fillRect(0, 0, w, h);
+
+  // Lath: uneven strips, broken into boards of different lengths and tones.
+  for (let y = 2; y < h; ) {
+    const stripH = 5 + rnd() * 6;
+    for (let x = -rnd() * 80; x < w; ) {
+      const boardW = 70 + rnd() * 170;
+      const tone = 62 + rnd() * 46;
+      ctx.fillStyle = `rgb(${tone + 18}, ${tone}, ${tone - 22})`;
+      ctx.fillRect(x, y + (rnd() - 0.5) * 2, boardW - 1 - rnd() * 3, stripH);
+      x += boardW;
+    }
+    y += stripH + 2 + rnd() * 4;
+  }
+
+  // Patches of plaster that stayed on the lath, with crumbling outlines.
+  for (let i = 0; i < 70; i += 1) {
+    const cx = rnd() * w;
+    const cy = rnd() * h;
+    const r = 18 + rnd() * 62;
+    const tone = 112 + rnd() * 42;
+    ctx.fillStyle = `rgb(${tone}, ${tone - 6}, ${tone - 22})`;
+    ctx.beginPath();
+    for (let a = 0; a < 18; a += 1) {
+      const t = (a / 18) * Math.PI * 2;
+      const rr = r * (0.62 + rnd() * 0.5);
+      const px = cx + Math.cos(t) * rr * 1.3;
+      const py = cy + Math.sin(t) * rr * 0.8;
+      if (a === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Cracks and damp, so the plaster is not flat.
+  ctx.strokeStyle = 'rgba(16, 12, 8, 0.55)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 60; i += 1) {
+    let x = rnd() * w;
+    let y = rnd() * h;
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.lineTo(x + (rnd() - 0.5) * 120, y + (rnd() - 0.5) * 60);
+    for (let s = 0; s < 4; s += 1) {
+      x += (rnd() - 0.5) * 46;
+      y += (rnd() - 0.5) * 30;
+      ctx.lineTo(x, y);
+    }
     ctx.stroke();
   }
-  // Damp stains.
-  for (let i = 0; i < 10; i += 1) {
+  for (let i = 0; i < 14; i += 1) {
     const x = rnd() * w;
     const y = rnd() * h;
     const r = 30 + rnd() * 70;
     const g = ctx.createRadialGradient(x, y, 2, x, y, r);
-    g.addColorStop(0, 'rgba(70, 55, 38, 0.3)');
-    g.addColorStop(1, 'rgba(70, 55, 38, 0)');
+    g.addColorStop(0, 'rgba(24, 18, 10, 0.5)');
+    g.addColorStop(1, 'rgba(24, 18, 10, 0)');
     ctx.fillStyle = g;
     ctx.fillRect(x - r, y - r, r * 2, r * 2);
   }

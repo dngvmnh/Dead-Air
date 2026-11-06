@@ -35,6 +35,8 @@ export interface TearSheet {
   tearLimit: Float32Array;
   /** Node id -> target position for an active grab (sparse). */
   grabbed: Map<number, { x: number; y: number }>;
+  /** 1 once a node has been shoved open by a cut, so repeated cuts cannot widen it. */
+  peeled: Uint8Array;
 }
 
 /**
@@ -70,6 +72,12 @@ const SOLVER_ITERATIONS = 3;
  */
 const TEAR_LIMIT_MIN = 1.35;
 const TEAR_LIMIT_RANGE = 0.5;
+/**
+ * How close to the pointer's path a constraint must be to be cut, in grid cells.
+ * The hole is every triangle with a cut edge, so this sets the rip's width: at
+ * 0.5 a 300 px drag on 1440x900 opens about 40 to 80 px, a rip and not a panel.
+ */
+export const CUT_RADIUS = 0.5;
 
 /** A small deterministic PRNG (mulberry32); seeded, so no Math.random. */
 function mulberry32(seed: number): () => number {
@@ -163,6 +171,7 @@ export function createSheet(cols: number, rows: number, seed: number): TearSheet
     broken,
     tearLimit,
     grabbed: new Map(),
+    peeled: new Uint8Array(n),
   };
 }
 
@@ -216,7 +225,7 @@ function distToSegSq(px: number, py: number, ax: number, ay: number, bx: number,
  * path. Interior constraints only — a pinned-to-pinned edge (the frame) is
  * never cut, so the sheet still hangs. Returns how many were newly broken.
  */
-export function cutPath(sheet: TearSheet, ax: number, ay: number, bx: number, by: number, radius = 1): number {
+export function cutPath(sheet: TearSheet, ax: number, ay: number, bx: number, by: number, radius = CUT_RADIUS): number {
   const { xs, ys, constraints, broken, restLength, pinned } = sheet;
   const count = restLength.length;
   const r2 = radius * radius;
@@ -232,11 +241,9 @@ export function cutPath(sheet: TearSheet, ax: number, ay: number, bx: number, by
     if (distToSegSq(mx, my, ax, ay, bx, by) <= r2) {
       broken[k] = 1;
       cut += 1;
-      // Peel the two freed sides apart so the hole OPENS and, with the frame
-      // still pinned, STAYS open after release (task 5a.3). Push each free end
-      // perpendicular to the cut direction, and lift it (z) so the flap catches
-      // the light. The shove goes into the previous position too, so Verlet
-      // keeps the momentum rather than snapping back.
+      // Lift the two freed sides so the flaps catch the light. The hole itself
+      // comes from dropping triangles with a cut edge, so it stays open however
+      // the sheet settles (task 5a.3).
       const dirx = bx - ax;
       const diry = by - ay;
       const dlen = Math.hypot(dirx, diry) || 1;
@@ -250,16 +257,22 @@ export function cutPath(sheet: TearSheet, ax: number, ay: number, bx: number, by
   return cut;
 }
 
-/** Shove a free node outward from the cut and lift it, so a flap opens. */
+/**
+ * Lift a freed node and nudge it off the cut, once only. A node touches many
+ * cut constraints, so an unguarded shove accumulates into the stretched spikes
+ * and panel-sized holes this replaces. No velocity is added, so it stays put.
+ */
 function peel(sheet: TearSheet, i: number, nx: number, ny: number): void {
-  if (sheet.pinned[i] === 1) return;
-  const SHOVE = 0.35; // grid units
-  const LIFT = 0.6;
-  sheet.xs[i] = sheet.xs[i]! + nx * SHOVE;
-  sheet.ys[i] = sheet.ys[i]! + ny * SHOVE;
-  // Bias the previous position so the shove persists as velocity.
-  sheet.px[i] = sheet.px[i]! - nx * SHOVE * 0.5;
-  sheet.py[i] = sheet.py[i]! - ny * SHOVE * 0.5;
+  if (sheet.pinned[i] === 1 || sheet.peeled[i] === 1) return;
+  sheet.peeled[i] = 1;
+  const SHOVE = 0.16; // grid units
+  const LIFT = 0.5;
+  const dx = nx * SHOVE;
+  const dy = ny * SHOVE;
+  sheet.xs[i] = sheet.xs[i]! + dx;
+  sheet.ys[i] = sheet.ys[i]! + dy;
+  sheet.px[i] = sheet.px[i]! + dx;
+  sheet.py[i] = sheet.py[i]! + dy;
   sheet.zs[i] = Math.max(sheet.zs[i]!, LIFT);
 }
 

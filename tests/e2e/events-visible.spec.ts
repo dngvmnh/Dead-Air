@@ -221,6 +221,9 @@ test.describe('event output is visible on real WebGL', () => {
 
     await expect.poll(async () => (await tv(page)).fired, { timeout: 8000 }).toContain('E10');
     await expect.poll(async () => (await tv(page)).phase, { timeout: 8000 }).toBe('SIGN_OFF');
+    // The installed clock also follows real time, so under load the 8s window can
+    // end during the checks below. Hold it still and advance it only by hand.
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 50);
 
     // The EXACT wording from media-bible §9 was drawn — no extra label.
     const text = await lastEventText(page);
@@ -232,7 +235,7 @@ test.describe('event output is visible on real WebGL', () => {
     // static 0.05 or less), so the text is legible the whole time — not buried
     // under dead-air snow.
     expect(await staticLevel(page)).toBeLessThanOrEqual(0.05);
-    await page.clock.runFor(6000); // still inside the 8s window
+    await page.clock.runFor(3000); // still inside the 8s window
     expect((await tv(page)).phase).toBe('SIGN_OFF');
     expect(await staticLevel(page)).toBeLessThanOrEqual(0.05);
   });

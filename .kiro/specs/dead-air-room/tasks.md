@@ -40,6 +40,16 @@ Tick a task only when the behaviour has been seen in a real browser, not because
   - [x] 5a.6 Tests: add a real-WebGL Playwright test using stepped pointer moves. It measures the opening's area and shape along the drag path, and confirms the opening is still there 2 s after release. A changed-pixels-only test is not enough.
   - _Requirements: 1.1–1.9, 5.1–5.4, 5.7, 8.2, 10.2, 10.3_
 
+- [x] 5b. **Make the tear dark and proportionate.** Task 5a got the mechanics right, but holes were panel-sized and brighter than the room.
+  - [x] 5b.1 Opening size: a 300 px drag at normal speed leaves about 40 to 80 px on 1440×900, widest part under 110 px. Flaps stay open.
+  - [x] 5b.2 The behind layer uses the same ambient, TV pool and falloff as the wall, is never brighter than the picture, and is darkest in the middle of a hole.
+  - [x] 5b.3 Lath is narrow, irregular strips with dark gaps; plaster is patchy.
+  - [x] 5b.4 No spikes in openings. The cause was one node being hauled across the wall and shoves accumulating on freed nodes; both are fixed in the geometry.
+  - [x] 5b.5 Tube as large as 50% exposed wall allows at 1440×900 and 1280×720, with no empty plastic below it.
+  - [x] 5b.6 Power and CC stay readable on hover, on focus and when pressed.
+  - [x] 5b.7 Opening test measures the real hole with both width limits and a tighter area floor.
+  - _Requirements: 1.1–1.3, 3.3, 5.2, 5.4, 10.2_
+
 ## Phase C: Depth
 
 - [ ] 6. Behind layer per act, using real viewer values.

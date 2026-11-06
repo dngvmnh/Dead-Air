@@ -6,7 +6,7 @@ import { type UiSettings } from '../../app/useTelevision.ts';
 /**
  * The physical controls on the chassis: POWER, channel up/down, volume, mute,
  * and closed captions, plus the LED display (requirements 1.1, 2.1, 2.2, 2.5,
- * 12.3, 13.3, 13.4). Every control has an accessible name and a 44px target.
+ * 12.3, 13.3, 13.4). Every control has an accessible name, and a 44px target on phones (40px on desktop).
  */
 export interface RemoteProps {
   state: TvState;
