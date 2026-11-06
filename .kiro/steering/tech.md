@@ -36,15 +36,11 @@ inclusion: always
 
 ## Environment
 
-- Work in WSL at `~/projects/Kiroween`. Never run the project from `/mnt/c`: it is much slower and has caused test runs to stall.
-- Use the Node version in `.nvmrc`, through nvm. Non-interactive shells do not load nvm and fall back to `/usr/bin/node` (v12), so start every command like this:
-
-```bash
-source ~/.nvm/nvm.sh && nvm use --silent && npm test
-```
-
-- If a command fails strangely, check `node -v` and `command -v npm` first. `npm` must come from `~/.nvm`, not `/mnt/c`.
-
+- Work in `C:\Data\Singapore\SMU\Kiroween 2026`, in the native Windows folder. Kiro is a Windows app, so its file tools and terminal must stay on Windows.
+- Never run this project through WSL, `/mnt/c`, or `\\wsl.localhost`. Crossing that boundary has made file tools resolve the wrong paths and terminal commands return no output.
+- The terminal is Windows PowerShell 5.1, set in `.vscode/settings.json`. It has no `&&`, so run commands one at a time and check each result. Don't use `2>&1` on `npm` or `npx`; PowerShell can report failure even when they succeed.
+- Use Windows Node on `PATH`. `node_modules` must be installed from Windows; if native binaries are missing, run `npm ci`.
+- For real-browser checks, use Playwright with Chromium.
 ## Commands
 
 ```bash
