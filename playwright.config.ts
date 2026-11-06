@@ -6,7 +6,9 @@ export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 1,
+  // Local retries are 0: a flake must be fixed at its cause, not hidden by a
+  // retry. CI keeps a small retry budget for infrastructure hiccups.
+  retries: process.env.CI ? 2 : 0,
   // These tests drive real WebGL pixel readback and Web Audio. Too many browser
   // contexts against the single dev server starve backgrounded tabs' rAF loops,
   // which stalls canvas rendering and makes pixel samples flaky. Cap workers so

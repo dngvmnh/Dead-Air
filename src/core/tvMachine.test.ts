@@ -44,7 +44,7 @@ function onAir(channel: ChannelId = 2): TvState {
 function signingOff(): TvState {
   let s = onAir(13);
   s = tvReducer(s, { type: 'EVENT_START', token: s.tuneToken, seam: 'item-boundary' }).state;
-  return tvReducer(s, { type: 'SIGN_OFF_START', token: s.tuneToken }).state;
+  return tvReducer(s, { type: 'SIGN_OFF_START', token: s.tuneToken, eventId: 'E10' }).state;
 }
 
 describe('initial state', () => {
@@ -251,14 +251,18 @@ describe('sign-off and after hours', () => {
     let s = onAir(13);
     s = tvReducer(s, { type: 'EVENT_START', token: s.tuneToken, seam: 'item-boundary' }).state;
     expect(s.phase).toBe('EVENT');
-    const r = tvReducer(s, { type: 'SIGN_OFF_START', token: s.tuneToken });
+    const r = tvReducer(s, { type: 'SIGN_OFF_START', token: s.tuneToken, eventId: 'E10' });
     expect(r.state.phase).toBe('SIGN_OFF');
     expect(effectTypes(r.effects)).toEqual(['signOffText']);
+    // The sign-off effect carries the event id so the orchestrator records E10
+    // as fired only now, on reaching SIGN_OFF (design §7).
+    const signOff = r.effects.find((e) => e.type === 'signOffText');
+    expect(signOff && 'eventId' in signOff ? signOff.eventId : null).toBe('E10');
   });
 
   it('ignores SIGN_OFF_START outside an event', () => {
     const s = onAir(13);
-    const r = tvReducer(s, { type: 'SIGN_OFF_START', token: s.tuneToken });
+    const r = tvReducer(s, { type: 'SIGN_OFF_START', token: s.tuneToken, eventId: 'E10' });
     expect(r.state.phase).toBe('ON_AIR');
     expect(r.effects).toHaveLength(0);
   });

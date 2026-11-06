@@ -63,7 +63,10 @@ export function createMemory(nowMs: number): ViewerMemory {
     firedEvents: {},
     act: 0,
     noticeSeen: false,
-    settings: { volume: 0.7, muted: false, captions: false, reducedEffects: false },
+    // Captions default ON until real recorded voice exists (task 21): event
+    // voice lines have no audio yet, so their caption is their only output
+    // (requirement 13.3). The viewer can turn CC off.
+    settings: { volume: 0.7, muted: false, captions: true, reducedEffects: false },
   };
 }
 
@@ -218,4 +221,28 @@ export function beginSession(mem: ViewerMemory, nowMs: number, demo: boolean): V
  */
 export function demoActive(search: string): boolean {
   return new URLSearchParams(search).get('demo') === '1';
+}
+
+/**
+ * The previous DIFFERENT channel the viewer came from, derived from
+ * `visitOrder` (design §9 template variables, requirement 10.1). Distinct from
+ * `mem.lastChannel`, which is the channel most recently tuned (and the one to
+ * boot on, requirement 1.3). The last entry in `visitOrder` is the current
+ * channel; we scan back for the first entry that differs from it. Returns null
+ * when the viewer has only ever been on one channel.
+ *
+ * Example: visiting 04 then 02 leaves `lastChannel = 02` (boot there) but
+ * `previousDifferentChannel = 04` ("you came from channel 04"). Rapid surfing
+ * that lands on 02 records one visit for 02, so "came from" is the channel
+ * before that landing.
+ */
+export function previousDifferentChannel(mem: ViewerMemory): ChannelId | null {
+  const order = mem.visitOrder;
+  if (order.length === 0) return null;
+  const current = order[order.length - 1];
+  for (let i = order.length - 2; i >= 0; i -= 1) {
+    const ch = order[i];
+    if (ch !== undefined && ch !== current) return ch;
+  }
+  return null;
 }

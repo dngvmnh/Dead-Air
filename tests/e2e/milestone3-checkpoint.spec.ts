@@ -121,12 +121,39 @@ test.describe('MVP checkpoint (task 16)', () => {
       await tuneTo(page, 2);
       await dwell(page, 18_000); // clear the inter-event gap
       await tuneTo(page, 13);
-      await dwell(page, 6000); // let the E10 steps run
+      // Advance in SMALL steps so we STOP the instant SIGN_OFF is reached and do
+      // not consume the 8s text window before we assert on it.
+      for (let i = 0; i < 30 && (await tvState(page)).phase !== 'SIGN_OFF'; i += 1) {
+        if ((await tvState(page)).phase === 'OFF') break; // already finished
+        await page.clock.runFor(300);
+      }
     }
     expect((await tvState(page)).fired).toContain('E10');
 
-    // The fixed sign-off text shows for 8s, then powers off into Act 4.
-    await page.clock.runFor(9000);
+    // The sign-off cut shows the EXACT fixed text (media-bible §9), drawn onto
+    // the picture, for the FULL 8 seconds before power-off. We arrived at the
+    // start of the window above, so now: it is drawn now, still drawn ~7s in
+    // (under 8s), and powered off into Act 4 past 8s.
+    const readText = () =>
+      page.evaluate(() => (window as unknown as { __tv?: { lastEventText: () => string } }).__tv?.lastEventText() ?? '');
+    const signOffShowing = async () => {
+      const t = await readText();
+      return (
+        t.includes('NO SIGNAL') &&
+        t.includes('THANK YOU FOR WATCHING.') &&
+        t.includes('BROADCAST TERMINATED · 00:00:13')
+      );
+    };
+    expect((await tvState(page)).phase).toBe('SIGN_OFF');
+    expect(await signOffShowing()).toBe(true);
+
+    // Still showing at ~6s (comfortably under the 8s window).
+    await page.clock.runFor(6000);
+    expect(await signOffShowing()).toBe(true);
+    expect((await tvState(page)).phase).toBe('SIGN_OFF');
+
+    // Past 8s total: powered off into Act 4.
+    await page.clock.runFor(2000);
     await expect.poll(async () => (await tvState(page)).act, { timeout: 10000 }).toBe(4);
     const end = await tvState(page);
     expect(end.phase).toBe('OFF'); // powered off after the sign-off text

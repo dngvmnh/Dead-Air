@@ -183,7 +183,12 @@ export class SceneAdapter implements PlaybackAdapter {
     // A scene shorter than the item loops within the item (design §6).
     const tMs = scene.durationMs > 0 ? posMs % scene.durationMs : 0;
     const images = this.ctxApp.getImages(this.sceneId);
-    renderScene(this.ctx, scene, tMs, this.ctxApp.getVars(), images ? { images } : {});
+    const resolveText = this.ctxApp.resolveText?.bind(this.ctxApp);
+    renderScene(this.ctx, scene, tMs, this.ctxApp.getVars(), {
+      ...(images ? { images } : {}),
+      ...(this.ctxApp.drawCaptions ? { drawCaptions: this.ctxApp.drawCaptions() } : {}),
+      ...(resolveText ? { resolveText } : {}),
+    });
     this.ctxApp.setSource(this.sourceCanvas as never);
   }
 

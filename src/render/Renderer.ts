@@ -25,6 +25,20 @@ export interface Renderer {
   startShutdown(durationMs: number, onDone?: () => void): void;
   /** Set the source texture, or clear it with null. */
   setSource(source: CrtSource | null): void;
+  /**
+   * Capture the current source frame into a small 320×240 buffer for a later
+   * `flashPrevious` (design §10). Owned sources only; never call for a YouTube
+   * item (its iframe cannot be sampled). A no-op when there is no source.
+   */
+  captureFrame(): void;
+  /**
+   * Flash a previously captured frame for `ms`, gated by the flash limiter
+   * (requirement 10.2, 13.1). When no frame was captured — or the previous
+   * source was YouTube — pass `stationCardLabel` so a station card is
+   * synthesised on canvas and flashed instead (requirement 10.3); the renderer
+   * never reads from a YouTube player. Returns true if the flash was permitted.
+   */
+  flashPrevious(ms: number, nowMs: number, stationCardLabel?: string): boolean;
   /** Start the per-frame loop. */
   start(now?: number): void;
   /** Stop the per-frame loop. */

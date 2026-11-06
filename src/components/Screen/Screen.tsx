@@ -40,24 +40,6 @@ export interface ScreenProps {
   onRendererReady?: (renderer: Renderer | null) => void;
 }
 
-function statusWord(phase: TvPhase): string {
-  switch (phase) {
-    case 'OFF':
-      return '';
-    case 'BOOTING':
-      return 'Warming up';
-    case 'TUNING':
-      return 'Tuning';
-    case 'STAND_BY':
-      return 'Please stand by';
-    case 'SIGN_OFF':
-      return 'No signal';
-    case 'ON_AIR':
-    case 'EVENT':
-      return 'On air';
-  }
-}
-
 /**
  * Resting drive for phases that are neither booting, shutting down nor tuning.
  * Boot/shutdown animate uPower/uCollapse via the renderer's envelopes; tuning
@@ -82,7 +64,7 @@ function steadyDrive(phase: TvPhase): { power: number; static: number } {
 
 export function Screen({ phase, channelLabel, reducedEffects, onRendererReady }: ScreenProps) {
   const off = phase === 'OFF';
-  const word = statusWord(phase);
+  void channelLabel; // the LED on the chassis is the channel indicator, not the tube
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<Renderer | null>(null);
   const prevPhase = useRef<TvPhase | null>(null);
@@ -178,13 +160,11 @@ export function Screen({ phase, channelLabel, reducedEffects, onRendererReady }:
       data-phase={phase}
       data-testid="tube-opening"
     >
+      {/* Only the canvas lives in the tube. Every status word — including
+          PLEASE STAND BY and NO SIGNAL — is drawn ON the canvas so it passes
+          through the shader; no DOM text or styling may sit over the tube
+          (design §3). The channel number is the chassis LED, not the tube. */}
       <canvas ref={canvasRef} className={styles.canvas} aria-hidden="true" />
-      {!off && word ? (
-        <div className={styles.placeholder}>
-          {word}
-          {phase === 'ON_AIR' || phase === 'EVENT' ? ` · CH ${channelLabel}` : ''}
-        </div>
-      ) : null}
     </div>
   );
 }

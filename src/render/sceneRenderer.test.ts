@@ -149,21 +149,49 @@ describe('renderScene', () => {
   });
 
   it('changes a channel-07 set object on revisit (requirement 8.4)', async () => {
-    // The real ch07 scene: a shelf clock slot appears at minVisits:2.
+    // The real ch07 scene: a shelf clock slot appears at minVisits:2 and shows
+    // the viewer's local time via the {localTime} template.
     const scene = (await import('../content/scenes/ch07-shopping-a.json', { with: { type: 'json' } }))
       .default as unknown as SceneProgramInput;
+    const resolveText = (raw: string): string => raw.replace('{localTime}', '23:07');
 
     const visit1 = fakeCtx();
-    renderScene(visit1.ctx, scene, 0, { visits: 1, act: 0 }, { drawCaptions: false });
+    renderScene(visit1.ctx, scene, 0, { visits: 1, act: 0 }, { drawCaptions: false, resolveText });
     const visit2 = fakeCtx();
-    renderScene(visit2.ctx, scene, 0, { visits: 2, act: 0 }, { drawCaptions: false });
+    renderScene(visit2.ctx, scene, 0, { visits: 2, act: 0 }, { drawCaptions: false, resolveText });
 
     const drewClock = (calls: Call[]): boolean =>
-      calls.some((c) => c.op === 'fillText' && c.args[0] === '12:00');
+      calls.some((c) => c.op === 'fillText' && c.args[0] === '23:07');
     // The clock slot is hidden on visit 1 and shown on visit 2 — a set object
-    // changed relative to the previous visit.
+    // changed relative to the previous visit — and shows the filled local time.
     expect(drewClock(visit1.calls)).toBe(false);
     expect(drewClock(visit2.calls)).toBe(true);
+  });
+
+  it('fills a template in a text layer from resolveText (requirement 9.5/10.1)', () => {
+    const { ctx, calls } = fakeCtx();
+    const program: SceneProgramInput = {
+      id: 's',
+      durationMs: 1000,
+      layers: [{ id: 'h', type: 'text', text: 'LAST SEEN: CHANNEL {lastChannel}', x: 0, y: 0 }],
+    };
+    renderScene(ctx, program, 0, vars, {
+      drawCaptions: false,
+      resolveText: (raw) => raw.replace('{lastChannel}', '04'),
+    });
+    expect(calls.some((c) => c.op === 'fillText' && c.args[0] === 'LAST SEEN: CHANNEL 04')).toBe(true);
+  });
+
+  it('hides a text layer whose template value is missing (resolveText → null)', () => {
+    const { ctx, calls } = fakeCtx();
+    const program: SceneProgramInput = {
+      id: 's',
+      durationMs: 1000,
+      layers: [{ id: 'h', type: 'text', text: 'LAST SEEN: CHANNEL {lastChannel}', x: 0, y: 0 }],
+    };
+    renderScene(ctx, program, 0, vars, { drawCaptions: false, resolveText: () => null });
+    // Nothing drawn for the layer, and never the raw placeholder.
+    expect(calls.some((c) => c.op === 'fillText')).toBe(false);
   });
 
   it('is time-addressable: same inputs produce the same call sequence', () => {

@@ -28,6 +28,15 @@ export interface RenderSceneOptions {
   /** Canvas size; defaults to the internal 960×720 cap. */
   width?: number;
   height?: number;
+  /**
+   * Fill template variables ({lastChannel}, {localTime}, …) in text and ticker
+   * layers from real viewer memory (requirement 9.5, 10.1). Returns the filled
+   * string, or null when a referenced value is missing and no fallback exists —
+   * in which case the layer is HIDDEN (e.g. channel 13's history read-back is
+   * not shown until the viewer has visited another channel). Absent means text
+   * is drawn literally (back-compat for layers with no templates).
+   */
+  resolveText?: (raw: string) => string | null;
 }
 
 /**
@@ -56,8 +65,19 @@ export function renderScene(
     const kf = sampleKeyframes(layer.keyframes, tMs);
     const opacity = kf.opacity ?? 1;
     if (opacity <= 0) continue;
+    // Fill templates in text/ticker layers from real memory (requirement 9.5,
+    // 10.1). A null result means a referenced value is missing with no
+    // fallback, so the layer is hidden rather than drawing a raw {placeholder}.
+    let resolved = layer;
+    if (options.resolveText && (layer.type === 'text' || layer.type === 'ticker')) {
+      const raw = kf.text ?? layer.text;
+      const filled = options.resolveText(raw);
+      if (filled === null) continue;
+      resolved = { ...layer, text: filled };
+      kf.text = filled;
+    }
     ctx.globalAlpha = clamp01(opacity);
-    drawLayer(ctx, layer, kf, tMs, W, H, images);
+    drawLayer(ctx, resolved, kf, tMs, W, H, images);
   }
 
   ctx.globalAlpha = 1;

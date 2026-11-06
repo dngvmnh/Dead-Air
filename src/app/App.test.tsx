@@ -66,7 +66,11 @@ describe('App chassis and controls', () => {
     render(<App />);
     await user.click(screen.getByRole('button', { name: /i understand/i }));
 
+    // Captions default ON until real recorded voice exists (task 21): event
+    // voice lines have no audio, so their caption is their only output.
     const cc = screen.getByRole('button', { name: /closed captions/i });
+    expect(cc).toHaveAttribute('aria-pressed', 'true');
+    await user.click(cc);
     expect(cc).toHaveAttribute('aria-pressed', 'false');
     await user.click(cc);
     expect(cc).toHaveAttribute('aria-pressed', 'true');

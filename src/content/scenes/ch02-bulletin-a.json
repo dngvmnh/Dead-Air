@@ -3,12 +3,14 @@
   "durationMs": 40000,
   "layers": [
     { "id": "newsroom", "type": "image", "src": "img/ch02/newsroom.png" },
-    { "id": "anchor-neutral", "type": "image", "src": "img/ch02/anchor-neutral.png", "when": { "maxVisits": 1 } },
-    { "id": "anchor-staring", "type": "image", "src": "img/ch02/anchor-staring.png", "when": { "minVisits": 2 } },
+    { "id": "anchor-neutral", "type": "image", "src": "img/ch02/anchor-neutral.png", "when": { "maxVisits": 1, "maxAct": 3 } },
+    { "id": "anchor-staring", "type": "image", "src": "img/ch02/anchor-staring.png", "when": { "minVisits": 2, "maxAct": 3 } },
+    { "id": "empty-desk", "type": "text", "text": "The desk is empty.", "x": 320, "y": 300, "size": 34, "colour": "#9fb4d0", "when": { "minAct": 4 } },
     { "id": "logo", "type": "text", "text": "KDA", "x": 820, "y": 40, "size": 42, "colour": "#d63a3a" },
     { "id": "lower-third", "type": "rect", "x": 0, "y": 560, "w": 960, "h": 80, "colour": "#0b1f3a" },
     { "id": "lower-text", "type": "text", "text": "KDA NIGHTLY NEWS", "x": 40, "y": 578, "size": 40, "colour": "#f2f2ea" },
-    { "id": "ticker", "type": "ticker", "text": "HOLLOW CREEK · TRICK-OR-TREAT ENDS 9PM · ALDER RD REPORTS", "speed": 90 }
+    { "id": "ticker", "type": "ticker", "text": "HOLLOW CREEK · TRICK-OR-TREAT ENDS 9PM · ALDER RD REPORTS", "speed": 90, "when": { "maxAct": 3 } },
+    { "id": "ticker-welcome", "type": "ticker", "text": "WELCOME BACK · WELCOME BACK · WELCOME BACK", "speed": 90, "when": { "minAct": 4 } }
   ],
   "captions": [
     { "atMs": 0, "endMs": 5000, "text": "This is KDA Nightly News." },

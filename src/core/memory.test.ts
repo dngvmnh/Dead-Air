@@ -8,6 +8,7 @@ import {
   memoryReducer,
   naturalAct,
   NEW_SESSION_GAP_MS,
+  previousDifferentChannel,
   VISIT_ORDER_LIMIT,
   type ViewerMemory,
 } from './memory.ts';
@@ -33,6 +34,39 @@ describe('createMemory', () => {
     expect(m.totalWatchMs).toBe(0);
     expect(m.visitOrder).toEqual([]);
     expect(m.channels[2].visits).toBe(0);
+  });
+});
+
+describe('previousDifferentChannel (requirement 7/9/10)', () => {
+  function visitSeq(...chs: ChannelId[]): ViewerMemory {
+    let m = createMemory(0);
+    chs.forEach((ch, i) => {
+      m = memoryReducer(m, { type: 'visit', channel: ch, atMs: i + 1 }, false);
+    });
+    return m;
+  }
+
+  it('is null when only one channel has ever been visited', () => {
+    expect(previousDifferentChannel(visitSeq(2))).toBeNull();
+    expect(previousDifferentChannel(createMemory(0))).toBeNull();
+  });
+
+  it('is the channel the viewer came from, not the current one', () => {
+    // On 02 after coming from 04: lastChannel is 02 (boot there), but the
+    // previous different channel is 04.
+    const m = visitSeq(4, 2);
+    expect(m.lastChannel).toBe(2);
+    expect(previousDifferentChannel(m)).toBe(4);
+  });
+
+  it('skips repeated visits to the current channel', () => {
+    // Surfing 07 -> 13 -> 13 -> 13 lands on 13; came from 07.
+    expect(previousDifferentChannel(visitSeq(7, 13, 13, 13))).toBe(7);
+  });
+
+  it('tracks the most recent different channel across a longer path', () => {
+    expect(previousDifferentChannel(visitSeq(2, 4, 7, 13))).toBe(7);
+    expect(previousDifferentChannel(visitSeq(2, 4, 2))).toBe(4);
   });
 });
 

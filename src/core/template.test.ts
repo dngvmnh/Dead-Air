@@ -22,10 +22,21 @@ describe('fillTemplate (requirement 9.5)', () => {
       ctx,
     );
     expect(r.missing).toEqual([]);
-    expect(r.text).toContain('KDA Nightly News'); // lastChannel is 2
+    // {lastChannel*} is the channel the viewer CAME FROM (the previous different
+    // channel), not the current one: here they came from 04 onto 02.
+    expect(r.text).toContain('Pumpkin Hour');
     expect(r.text).toContain('02, 04'); // visited list (cycle order)
     expect(r.text).toContain('3m');
     expect(r.text).toContain('23:07');
+  });
+
+  it('{lastChannel} is the previous different channel, not the current one', () => {
+    // Came from 07 onto 13: naming "channel you came from" is 07.
+    let m = visit(createMemory(0), 7, 1);
+    m = visit(m, 13, 1);
+    const r = fillTemplate('LAST TUNED: CHANNEL {lastChannel}', m, ctx);
+    expect(r.missing).toEqual([]);
+    expect(r.text).toBe('LAST TUNED: CHANNEL 07');
   });
 
   it('reports missing variables and leaves the placeholder', () => {

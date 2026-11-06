@@ -6,6 +6,8 @@
     { "id": "l1", "type": "text", "text": "KDA-TV", "x": 360, "y": 250, "size": 56, "colour": "#e8e8e0" },
     { "id": "l2", "type": "text", "text": "TECHNICAL DIFFICULTIES", "x": 230, "y": 340, "size": 40, "colour": "#e8b84a" },
     { "id": "l3", "type": "text", "text": "PLEASE STAND BY", "x": 300, "y": 410, "size": 36, "colour": "#e8e8e0" },
+    { "id": "history", "type": "text", "text": "LAST SEEN: CHANNEL {lastChannel}", "x": 200, "y": 500, "size": 28, "colour": "#8a8a84" },
+    { "id": "afterhours", "type": "text", "text": "YOU CAME BACK.", "x": 320, "y": 560, "size": 32, "colour": "#e8b84a", "when": { "minAct": 4 } },
     { "id": "grain", "type": "noise", "intensity": 0.25 }
   ],
   "captions": [

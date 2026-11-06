@@ -42,6 +42,7 @@ import {
   type EnvelopePhase,
 } from './envelope.ts';
 import { FlashLimiter } from './flashLimiter.ts';
+import { drawStationCard } from './overlayRenderer.ts';
 import { type Look } from '../core/types.ts';
 
 /** Options for {@link CrtRenderer.create}. */
@@ -90,6 +91,14 @@ export class CrtRenderer {
   private look: Look = DEFAULT_LOOK;
   private transient: Transient = { ...INERT_TRANSIENT };
   private source: CrtSource | null = null;
+
+  // --- flashPrevious (design §10) -------------------------------------------
+  /** The last captured source frame at 320×240, or null if none captured. */
+  private capturedFrame: HTMLCanvasElement | null = null;
+  /** While > 0 the captured frame is shown in place of the live source. */
+  private flashUntilMs = 0;
+  /** The source to restore when the flash ends. */
+  private flashRestore: CrtSource | null = null;
 
   private startTime = 0;
   private rafId: number | null = null;
@@ -192,7 +201,61 @@ export class CrtRenderer {
    * The source is re-uploaded every frame while running (video frames change).
    */
   setSource(source: CrtSource | null): void {
-    this.source = source;
+    if (this.flashUntilMs > 0) {
+      // A flash is showing the captured frame; a new source set now must become
+      // what the flash restores TO, not be clobbered when the flash ends.
+      this.flashRestore = source;
+    } else {
+      this.source = source;
+    }
+  }
+
+  /**
+   * Capture the current source into a 320×240 canvas for a later
+   * `flashPrevious` (design §10). Owned sources only — never called for a
+   * YouTube item, whose iframe cannot be sampled. A no-op when there is no
+   * source or it is not yet drawable.
+   */
+  captureFrame(): void {
+    const src = this.source;
+    if (!src || !this.isSourceReady(src)) return;
+    if (!this.capturedFrame) {
+      const c = document.createElement('canvas');
+      c.width = 320;
+      c.height = 240;
+      this.capturedFrame = c;
+    }
+    const ctx = this.capturedFrame.getContext('2d');
+    if (!ctx) return;
+    try {
+      ctx.drawImage(src, 0, 0, 320, 240);
+    } catch {
+      // A source that briefly refuses to draw: keep whatever was captured.
+    }
+  }
+
+  /**
+   * Flash the captured frame (or a synthesised station card) for `ms`, gated by
+   * the flash limiter (requirement 10.2/10.3/13.1). Returns true if permitted.
+   * Never reads from a YouTube player: when there is no captured frame the
+   * caller supplies `stationCardLabel` and a card is drawn on canvas instead.
+   */
+  flashPrevious(ms: number, nowMs: number, stationCardLabel?: string): boolean {
+    const frame = this.resolveFlashFrame(stationCardLabel);
+    if (!frame) return false;
+    const granted = this.flashLimiter.tryFlash(nowMs);
+    if (!granted) return false;
+    this.flashRestore = this.source;
+    this.source = frame;
+    this.flashUntilMs = performanceNow() + Math.max(0, ms);
+    return true;
+  }
+
+  /** The frame to flash: the captured one, else a station card if a label was given. */
+  private resolveFlashFrame(stationCardLabel?: string): CrtSource | null {
+    if (this.capturedFrame) return this.capturedFrame;
+    if (stationCardLabel !== undefined) return makeStationCard(stationCardLabel);
+    return null;
   }
 
   // --- Transitions (task 4.2) ----------------------------------------------
@@ -380,6 +443,13 @@ export class CrtRenderer {
     // read the transient uniforms for this frame.
     this.applyEnvelope(t);
 
+    // End a flashPrevious once its window elapses: restore the live source.
+    if (this.flashUntilMs > 0 && performanceNow() >= this.flashUntilMs) {
+      this.source = this.flashRestore;
+      this.flashRestore = null;
+      this.flashUntilMs = 0;
+    }
+
     // Keep the buffer at the capped resolution for the canvas's CSS box.
     this.resize(this.canvas.clientWidth || this.canvas.width, this.canvas.clientHeight || this.canvas.height);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -538,4 +608,14 @@ function clamp01(x: number): number {
 
 function performanceNow(): number {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+/** A 320×240 station card drawn from a channel name, for the flashPrevious fallback. */
+function makeStationCard(label: string): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = 320;
+  c.height = 240;
+  const ctx = c.getContext('2d');
+  if (ctx) drawStationCard(ctx, label, { width: 320, height: 240 });
+  return c;
 }

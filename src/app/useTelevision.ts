@@ -15,13 +15,15 @@ import { getChannel, getEvents, getScene } from '../content/catalog.ts';
 import { SceneAdapter } from '../playback/SceneAdapter.ts';
 import { type SceneContext } from '../playback/PlaybackAdapter.ts';
 import { decideEvent } from '../core/director.ts';
-import { renderLine } from '../core/template.ts';
+import { renderLine, fillTemplate } from '../core/template.ts';
 import { runEventSteps, type EventOps, type ResolvedStep } from '../playback/eventRunner.ts';
 import type { HorrorEventInput } from '../content/schema.ts';
 import type { Seam } from '../core/types.ts';
 import { type Renderer } from '../render/Renderer.ts';
 import { type CrtSource } from '../render/CrtRenderer.ts';
 import { type SceneVars } from '../core/scene.ts';
+import { EventPresenter } from '../playback/EventPresenter.ts';
+import { channelInfo as channelInfoLookup } from '../core/channels.ts';
 import {
   beginSession,
   createMemory,
@@ -71,10 +73,21 @@ export interface TelevisionApi {
 
 const DEFAULT_SETTINGS: UiSettings = {
   volume: 0.7,
+  // Captions default ON until real recorded voice exists (task 21): voice event
+  // lines have no audio yet, so their caption is their only output and must show
+  // (requirement 13.3, Fix 11). The viewer can still turn CC off.
+  captions: true,
   muted: false,
-  captions: false,
   reducedEffects: false,
 };
+
+/** The faint resting snow level on air, restored after every event step (Fix 1). */
+const RESTING_STATIC = 0.08;
+
+/** The mid-item seam is checked this often while an owned source is on air (design §9). */
+const MID_ITEM_CHECK_MS = 10_000;
+/** Fixed low probability per mid-item check (design §9 "a fixed low probability per check"). */
+const MID_ITEM_PROBABILITY = 0.25;
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || !window.matchMedia) return false;
@@ -195,6 +208,16 @@ export function useTelevision(): TelevisionApi {
   const lastEventAtRef = useRef<number | null>(null);
   const pendingEventRef = useRef<HorrorEventInput | null>(null);
   const eventCancelRef = useRef(false);
+  // The offscreen presenter that paints event output (slates, captions, the
+  // sign-off text, played scenes) onto a canvas and publishes it to the shader
+  // (Fix 1). Created lazily once a renderer is registered.
+  const presenterRef = useRef<EventPresenter | null>(null);
+  // The sign-off text timer, cleared when it is no longer needed (Fix 4).
+  const signOffTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Mid-item seam ticker: checks for a mid-item event every 10s on owned
+  // sources (design §9, Fix 10). Injected random keeps it deterministic in test.
+  const midItemTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const midItemRandomRef = useRef<() => number>(Math.random);
 
   /**
    * Ask the director whether an event fires at `seam` on the current channel.
@@ -223,51 +246,87 @@ export function useTelevision(): TelevisionApi {
     [demo],
   );
 
-  // Build the injected effect operations an event's steps run against. Pure
-  // wiring over the renderer, audio and scene adapter; `onSignOff` is called
-  // when a signOff step runs so the caller can drive the state machine.
+  // Lazily build the event presenter once a renderer is available. It owns the
+  // offscreen canvas that event output is painted onto and published through.
+  const getPresenter = useCallback((): EventPresenter => {
+    if (!presenterRef.current) {
+      presenterRef.current = new EventPresenter({
+        publish: (source) => rendererRef.current?.setSource(source),
+        setStatic: (n) => {
+          rendererRef.current?.setStatic(n);
+          audioRef.current?.setStatic(n);
+        },
+        now: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
+      });
+    }
+    return presenterRef.current;
+  }, []);
+
+  // Build the injected effect operations an event's steps run against. Every
+  // visible step paints onto the presenter's canvas and publishes it to the
+  // shader (Fix 1) AND sets the ARIA announcement; static is restored to the
+  // resting level after each step. `onSignOff` is called when a signOff step
+  // runs so the caller can drive the state machine.
   const makeEventOps = useCallback(
-    (onSignOff: () => void): EventOps => {
+    (onSignOff: () => void, channel: ChannelId): EventOps => {
       const wait = (ms: number): Promise<void> =>
         new Promise((r) => setTimeout(r, Math.max(0, ms)));
+      const restingStatic = (): void => {
+        rendererRef.current?.setStatic(RESTING_STATIC);
+        audioRef.current?.setStatic(RESTING_STATIC);
+      };
+      const presenter = getPresenter();
       return {
         showStatic: async (ms) => {
+          // Pure snow: clear any published picture so the shader shows static.
+          presenter.clear();
           rendererRef.current?.setStatic(1);
           audioRef.current?.setStatic(1);
           await wait(ms);
-          rendererRef.current?.setStatic(0.08);
-          audioRef.current?.setStatic(0.08);
+          restingStatic();
         },
         showSlate: async (text, ms) => {
-          // A slate is a scene-free caption over a dim field; reuse static bed.
-          rendererRef.current?.setStatic(0.3);
+          // The slate text is drawn onto the canvas (Fix 1), not a DOM overlay,
+          // and also announced for assistive tech.
+          restingStatic();
+          presenter.showSlate(text);
           setAnnouncement(text);
           await wait(ms);
         },
         playScene: async (sceneId) => {
-          if (!getScene(sceneId)) throw new Error(`missing scene ${sceneId}`);
-          // Scenes inside events are brief; the adapter already renders scenes.
-          await wait(50);
+          const scene = getScene(sceneId);
+          if (!scene) throw new Error(`missing scene ${sceneId}`);
+          // Actually play the scene for its full duration (Fix 1), honouring CC.
+          restingStatic();
+          const vars: SceneVars = {
+            visits: Math.max(1, memoryRef.current.channels[channel]?.visits ?? 0),
+            act: memoryRef.current.act,
+          };
+          await presenter.playScene(
+            scene,
+            vars,
+            scene.durationMs,
+            memoryRef.current.settings.captions,
+            () => eventCancelRef.current,
+          );
         },
         speak: async (o) => {
-          // No recorded VO yet (task 21); captions-only is the honest path, so a
-          // voice step with no url/stems "succeeds" by showing its caption.
+          // No recorded VO yet (task 21); a voice line's caption is its only
+          // output, so it is drawn onto the picture and always shown (Fix 11),
+          // regardless of the url/stems that will carry audio later.
+          restingStatic();
+          presenter.showCaption(o.caption);
           setAnnouncement(o.caption);
           await wait(1800);
         },
         flashPrevious: async (ms) => {
-          // Gated by the flash limiter (requirement 13.1). For the MVP we flash
-          // the station card (the safe path and the YouTube fallback, req 10.3);
-          // a true last-frame GL capture is a later polish item.
-          const r = rendererRef.current;
-          if (r && 'requestFlash' in r) {
-            (r as unknown as { requestFlash: (n: number, a?: () => void) => boolean }).requestFlash(
-              Date.now(),
-              () => r.setStatic(1),
-            );
-          }
+          // Flash the captured last frame of the previous owned source, or a
+          // station card when there is none / the previous source was YouTube
+          // (requirement 10.2/10.3), gated by the flash limiter (13.1).
+          const label = channelInfoLookup(channel).name;
+          rendererRef.current?.flashPrevious(ms, Date.now(), label);
           await wait(ms);
-          rendererRef.current?.setStatic(0.08);
+          restingStatic();
         },
         shaderPulse: async (effect, ms) => {
           const r = rendererRef.current as unknown as {
@@ -285,25 +344,30 @@ export function useTelevision(): TelevisionApi {
           await wait(ms);
           r?.setRoll?.(0);
           r?.setTear?.(0);
+          restingStatic();
         },
         silence: async (ms) => {
           audioRef.current?.setStatic(0);
           await wait(ms);
+          restingStatic();
         },
         signOff: async () => {
           onSignOff();
           await wait(10);
         },
         captionsOverStatic: async (caption, ms) => {
+          // Degraded path (requirement 9.6): caption drawn over a static field.
           rendererRef.current?.setStatic(0.5);
+          audioRef.current?.setStatic(0.5);
+          presenter.showCaption(caption);
           setAnnouncement(caption);
           await wait(ms);
-          rendererRef.current?.setStatic(0.08);
+          restingStatic();
         },
         cancelled: () => eventCancelRef.current,
       };
     },
-    [],
+    [getPresenter],
   );
 
   // Resolve an event's step templates against real memory (requirement 9.5),
@@ -351,6 +415,23 @@ export function useTelevision(): TelevisionApi {
           const visits = memoryRef.current.channels[ch]?.visits ?? 0;
           return { visits: Math.max(1, visits), act: memoryRef.current.act };
         },
+        // Draw scene captions per the CC setting (requirement 13.3, Fix 11).
+        // Read from memory, which the settings effect keeps in sync with the UI.
+        drawCaptions: () => memoryRef.current.settings.captions,
+        // Fill scene-layer templates from real memory (Fix 12). A missing value
+        // with no fallback hides the layer (null) — so channel 13's history
+        // read-back only appears once the viewer came from another channel
+        // (requirement 10.1).
+        resolveText: (raw: string): string | null => {
+          const ch = (stateRef.current.channel ?? 2) as ChannelId;
+          const d = new Date();
+          const { text, missing } = fillTemplate(raw, memoryRef.current, {
+            channel: ch,
+            localHour: d.getHours(),
+            localMinute: d.getMinutes(),
+          });
+          return missing.length > 0 ? null : text;
+        },
         setSource: (source) => rendererRef.current?.setSource(source as CrtSource | null),
         setLook: (look: Look) => rendererRef.current?.setLook(look),
         now: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
@@ -383,6 +464,9 @@ export function useTelevision(): TelevisionApi {
           act: () => number;
           phase: () => string;
           firedEvents: () => string[];
+          lastEventText: () => string;
+          forceMidItem: () => void;
+          visitTotal: () => number;
         };
       }
     ).__tv = {
@@ -400,6 +484,23 @@ export function useTelevision(): TelevisionApi {
       },
       phase: () => stateRef.current.phase,
       firedEvents: () => Object.keys(memoryRef.current.firedEvents),
+      // The last text the event presenter painted onto the picture, so a test
+      // can prove event output reaches the canvas (Fix 1) and that the exact
+      // sign-off wording was drawn (Fix 2).
+      lastEventText: () => presenterRef.current?.lastText() ?? '',
+      // Force the next mid-item check to roll a hit (Fix 10 test seam), so a
+      // test can deterministically trigger a mid-item event (E03) without
+      // waiting on probability.
+      forceMidItem: () => {
+        midItemRandomRef.current = () => 0;
+      },
+      // Total recorded visits across channels, read from live memory (not
+      // localStorage, which is throttled), so a test can assert tune-complete
+      // visit accounting without racing the persistence throttle.
+      visitTotal: () => {
+        const ch = memoryRef.current.channels;
+        return ch[2].visits + ch[4].visits + ch[7].visits + ch[13].visits;
+      },
     };
   }, [flushWatch]);
 
@@ -437,6 +538,14 @@ export function useTelevision(): TelevisionApi {
 
   const stopPlayback = useCallback(() => {
     clearItemEndTimer();
+    if (midItemTimerRef.current !== null) {
+      clearInterval(midItemTimerRef.current);
+      midItemTimerRef.current = null;
+    }
+    // Capture the last owned-source frame before the source goes away, so
+    // channel 13's flashPrevious can show it (design §10, requirement 10.2).
+    // Owned sources only — a scene/file canvas; YouTube is never captured.
+    if (playingRef.current) rendererRef.current?.captureFrame();
     playingRef.current = false;
     watchSinceRef.current = null;
     adapterOffRef.current?.();
@@ -513,6 +622,17 @@ export function useTelevision(): TelevisionApi {
           itemEndTimer.current = null;
           dispatchEnded();
         }, remainingMs);
+        // Mid-item seam (design §9, Fix 10): while this owned source is on air,
+        // every 10s roll the injected random; on a hit ask the director for a
+        // mid-item event and fire it from ON_AIR. Never runs on YouTube (only
+        // owned sources start here). Cleared when playback stops.
+        if (midItemTimerRef.current !== null) clearInterval(midItemTimerRef.current);
+        midItemTimerRef.current = setInterval(() => {
+          if (stateRef.current.phase !== 'ON_AIR' || !playingRef.current) return;
+          if (midItemRandomRef.current() >= MID_ITEM_PROBABILITY) return;
+          const midEvent = decideSeamEvent(channel, 'mid-item');
+          if (midEvent) sendRef.current({ type: 'EVENT_START', token, seam: 'mid-item' });
+        }, MID_ITEM_CHECK_MS);
       };
 
       for (const effect of effects) {
@@ -545,10 +665,6 @@ export function useTelevision(): TelevisionApi {
           }
           case 'startTuning': {
             if (tuneTimer.current !== null) clearTimeout(tuneTimer.current);
-            // Record the visit (visit count, last channel, visit order) so
-            // scene `when` variants escalate on revisit and the act advances
-            // (requirements 7.1, 8.1, 8.3).
-            dispatchMemory({ type: 'visit', channel: effect.channel, atMs: Date.now() });
             // Tuning click + full static snow while acquiring the station.
             audioRef.current?.playTuningClick();
             audioRef.current?.setStatic(1);
@@ -556,6 +672,11 @@ export function useTelevision(): TelevisionApi {
             const tuneChannel = effect.channel;
             tuneTimer.current = setTimeout(() => {
               tuneTimer.current = null;
+              // Record the visit only when the tune COMPLETES (requirement 7.1,
+              // Fix 6): rapid surfing restarts this timer, so only the final
+              // channel's tune reaches here and records one visit. The director
+              // then sees the up-to-date visit count and visit order.
+              dispatchMemory({ type: 'visit', channel: tuneChannel, atMs: Date.now() });
               // A tune-in seam: ask the director first (requirement 9.1). If an
               // event fires, enter the EVENT phase; otherwise resolve to air.
               const tuneEvent = decideSeamEvent(tuneChannel, 'tune-in');
@@ -579,7 +700,12 @@ export function useTelevision(): TelevisionApi {
             break;
           }
           case 'standBy': {
-            // Dead-air hiss over the stand-by slate.
+            // Draw the PLEASE STAND BY slate ONTO the canvas so it passes
+            // through the shader (Fix 3) — no DOM text over the tube — with
+            // dead-air hiss behind it.
+            getPresenter().showSlate('PLEASE STAND BY');
+            setAnnouncement('Please stand by');
+            rendererRef.current?.setStatic(0.4);
             audioRef.current?.setStatic(0.4);
             break;
           }
@@ -589,8 +715,16 @@ export function useTelevision(): TelevisionApi {
             break;
           }
           case 'powerOff': {
+            // Cancel any running event so a stale step cannot run after power
+            // off (Fix 4), and clear the sign-off timer.
+            eventCancelRef.current = true;
+            if (signOffTimerRef.current !== null) {
+              clearTimeout(signOffTimerRef.current);
+              signOffTimerRef.current = null;
+            }
             clearTimers();
             stopPlayback();
+            presenterRef.current?.clear();
             // Power-off cue, then suspend the context so nothing plays while off.
             audioRef.current?.playPowerOff();
             void audioRef.current?.suspend();
@@ -598,6 +732,11 @@ export function useTelevision(): TelevisionApi {
             break;
           }
           case 'stopAll': {
+            // Cancel any running event: leaving a channel (CH+/-) during an
+            // event must stop its steps so none runs against the new channel
+            // (Fix 4). A sign-off event that has NOT yet reached SIGN_OFF is
+            // thereby abandoned, so E10 fires again on the next visit to 13.
+            eventCancelRef.current = true;
             // Silence the snow bed between sources during a tune, and stop any
             // owned source so the next tune starts clean.
             audioRef.current?.setStatic(0);
@@ -612,9 +751,9 @@ export function useTelevision(): TelevisionApi {
             break;
           }
           case 'runEvent': {
-            // Run the event the director chose for this seam. Record the firing
-            // in memory and this session, then drive the state machine to the
-            // sign-off cut (if a signOff step ran) or back to ON_AIR.
+            // Run the event the director chose for this seam, then drive the
+            // state machine to the sign-off cut (if a signOff step ran) or back
+            // to ON_AIR.
             const event = pendingEventRef.current;
             const token = effect.token;
             const channel = stateRef.current.channel ?? 2;
@@ -627,33 +766,61 @@ export function useTelevision(): TelevisionApi {
             eventCancelRef.current = false;
             lastEventAtRef.current = Date.now();
             sessionFiredRef.current[event.id] = (sessionFiredRef.current[event.id] ?? 0) + 1;
-            dispatchMemory({ type: 'eventFired', eventId: event.id, atMs: Date.now() });
+            // A sign-off event counts as fired only when it REACHES the sign-off
+            // (design §7, Fix 4): recording it here would consume the once-per-
+            // viewer sign-off even if the viewer left during the voice. Any
+            // other event is recorded now, as it runs.
+            const isSignOff = event.steps.some((s) => s.do === 'signOff');
+            if (!isSignOff) {
+              dispatchMemory({ type: 'eventFired', eventId: event.id, atMs: Date.now() });
+            }
             let signedOff = false;
             const ops = makeEventOps(() => {
               signedOff = true;
-            });
+            }, channel);
             const steps = resolveSteps(event, channel);
             void runEventSteps(steps, ops).then(() => {
               pendingEventRef.current = null;
-              if (signedOff) sendRef.current({ type: 'SIGN_OFF_START', token });
+              // If the viewer left or powered off during the event, the machine
+              // has already moved on; the token guard below drops this result.
+              if (signedOff) sendRef.current({ type: 'SIGN_OFF_START', token, eventId: event.id });
               else sendRef.current({ type: 'EVENT_DONE', token });
             });
             break;
           }
           case 'signOffText': {
-            // The sign-off cut: show the exact fixed text (design/media-bible §9),
-            // then power off into Act 4 after 8 seconds (requirement 11.2).
+            // The sign-off cut has been reached (SIGN_OFF phase). NOW record
+            // E10 as fired — design §7 counts it only on reaching SIGN_OFF, so a
+            // viewer who left during the voice meets it again (Fix 4). Flush the
+            // record immediately so a reload during the text cannot lose it.
+            dispatchMemory({ type: 'eventFired', eventId: effect.eventId, atMs: Date.now() });
+            getStore().flush(memoryRef.current);
+            // Show the exact fixed text (media-bible §9) on a clean picture, no
+            // snow, drawn onto the canvas (Fix 1/2) — not a DOM overlay.
             stopPlayback();
+            getPresenter().showSignOff();
             rendererRef.current?.setStatic(0);
+            audioRef.current?.setStatic(0);
             rendererRef.current?.setPower(1);
             setAnnouncement('NO SIGNAL. THANK YOU FOR WATCHING. BROADCAST TERMINATED.');
-            setTimeout(() => sendRef.current({ type: 'SIGN_OFF_COMPLETE' }), 8000);
+            if (signOffTimerRef.current !== null) clearTimeout(signOffTimerRef.current);
+            signOffTimerRef.current = setTimeout(() => {
+              signOffTimerRef.current = null;
+              sendRef.current({ type: 'SIGN_OFF_COMPLETE' });
+            }, 8000);
             break;
           }
           case 'setAfterHours': {
             // Sign-off completed: record Act 4 so after-hours variants unlock
-            // (requirement 11.2/11.3).
+            // (requirement 11.2/11.3), and flush immediately so a reload cannot
+            // strand the viewer below Act 4 (Fix 4). Clear the sign-off timer.
+            if (signOffTimerRef.current !== null) {
+              clearTimeout(signOffTimerRef.current);
+              signOffTimerRef.current = null;
+            }
+            getPresenter().clear();
             dispatchMemory({ type: 'signOffComplete' });
+            getStore().flush(memoryRef.current);
             break;
           }
         }
@@ -662,6 +829,8 @@ export function useTelevision(): TelevisionApi {
     [
       clearTimers,
       getAudio,
+      getStore,
+      getPresenter,
       startResolvedSource,
       stopPlayback,
       clearItemEndTimer,
@@ -700,6 +869,10 @@ export function useTelevision(): TelevisionApi {
   useEffect(() => {
     return () => {
       stopPlayback();
+      if (signOffTimerRef.current !== null) {
+        clearTimeout(signOffTimerRef.current);
+        signOffTimerRef.current = null;
+      }
       void audioRef.current?.close();
       audioRef.current = null;
     };
@@ -715,7 +888,13 @@ export function useTelevision(): TelevisionApi {
     if (typeof window !== 'undefined' && resetRequested(window.location.search)) {
       store.erase();
     }
-    const loaded = beginSession(store.load(), Date.now(), demo);
+    let loaded = beginSession(store.load(), Date.now(), demo);
+    // Reload recovery (Fix 4): if the sign-off (E10) has fired but the act is
+    // below 4, a reload happened during the 8s sign-off text — complete the
+    // transition so the viewer is never stranded in Act 3. Flush immediately.
+    if ((loaded.firedEvents['E10']?.count ?? 0) > 0 && loaded.act < 4) {
+      loaded = memoryReducer(loaded, { type: 'signOffComplete' }, demo);
+    }
     memoryRef.current = loaded;
     store.save(loaded);
     // Restore persisted settings, but keep reduced-effects honouring the OS
@@ -725,8 +904,25 @@ export function useTelevision(): TelevisionApi {
       ...loaded.settings,
       reducedEffects: loaded.settings.reducedEffects || prefersReducedMotion(),
     }));
-    if (loaded.noticeSeen) setState((st) => ({ ...st, noticeSeen: true }));
-    stateRef.current = { ...stateRef.current, noticeSeen: loaded.noticeSeen };
+    // Restore the TV shell from memory: POWER tunes to the last channel watched
+    // (requirement 1.3, Fix 8), and after-hours (Act 4) is restored so Act-4
+    // variants/events are available on power-on (requirement 11.3).
+    const restoredChannel = loaded.lastChannel;
+    const afterHours = loaded.act === 4;
+    if (loaded.noticeSeen || restoredChannel !== null || afterHours) {
+      setState((st) => ({
+        ...st,
+        noticeSeen: loaded.noticeSeen,
+        channel: restoredChannel ?? st.channel,
+        afterHours,
+      }));
+    }
+    stateRef.current = {
+      ...stateRef.current,
+      noticeSeen: loaded.noticeSeen,
+      channel: restoredChannel ?? stateRef.current.channel,
+      afterHours,
+    };
     memoryReadyRef.current = true;
 
     // Watch-time: timestamp-delta accounting (design §8 "from

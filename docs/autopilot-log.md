@@ -653,3 +653,99 @@ fixes below pass the full gate (`npm test`, `npm run lint`, `npm run build`,
 `npm run validate:catalog`, `npx playwright test --project=chromium`). Task 15.4
 (all events present in `events.json`) stays ticked; its content is corrected in
 place by the fixes below.
+
+## Repair — events now visible, the ending cannot be lost (re-tick 15.1–15.3, 16)
+
+Fixed the two review findings and ten related defects, test-first (each failing
+test written and confirmed red before the fix). Full gate green: `npm test` 266,
+`npm run lint` clean, `npm run build` 119.45 KB gzip (budget 300 KB),
+`npm run validate:catalog` OK (4 channels, 11 scenes, 12 events), and
+`npx playwright test --project=chromium` 28/28 with **local retries set to 0**.
+
+**Fix 1 — event output is visible.** New `src/render/overlayRenderer.ts` (pure
+`drawSlate`/`drawCaptionsOverStatic`/`drawSignOff`/`drawStationCard`) and
+`src/playback/EventPresenter.ts` (owns an offscreen canvas, paints each event
+step onto it and publishes via `setSource` so it flows through the shader, and
+records the drawn text for a test seam). `useTelevision`'s event ops now draw
+slates, voice captions, captions-over-static and the sign-off onto the canvas
+(ARIA announcement kept); the `scene` step actually plays its scene for its
+duration; static is restored to the resting 0.08 after every step. No DOM text
+over the tube.
+
+**Fix 2 — exact sign-off wording.** `SIGN_OFF_LINES` is verbatim media-bible §9
+(`NO SIGNAL` / `THANK YOU FOR WATCHING.` / `BROADCAST TERMINATED · 00:00:13`),
+laid out with the blank lines, on a clean opaque picture, no extra label, for
+the full 8 s. Proven by `events-visible.spec.ts` and the extended milestone-3
+checkpoint (asserts the text drawn at t=0 and still drawn ~6 s in, then OFF+Act4
+past 8 s). Committed screenshot `docs/screenshots/signoff-e10.png`.
+
+**Fix 3 — no status word on the tube.** Removed the `Screen.module.css
+.placeholder` DOM overlay and the `statusWord` helper; PLEASE STAND BY is drawn
+on the canvas via the presenter. The chassis LED remains the channel indicator.
+
+**Fix 4 — the ending cannot be lost.** `eventCancelRef` is now set true on
+channel change (`stopAll`) and power-off (`powerOff`), cancelling a running
+event so no stale step runs. E10 is recorded as fired only when it reaches
+`SIGN_OFF` (the `signOffText` effect carries the event id), so leaving or
+powering off during the voice lets it fire again on the next visit to 13. On
+load, if E10 has fired and act < 4 the TV completes into Act 4 (reload during
+the text cannot strand the viewer). Memory is flushed immediately when E10 is
+recorded and when Act 4 is set; the sign-off timer is cleared on completion,
+power-off and unmount.
+
+**Fix 5 — E10 bypasses the global gap.** Marked `chain: true`; a tune to 13 in
+Act 3 right after another event starts the sign-off (covered by the sign-off and
+leave-during-voice e2e, which fire E10 immediately after prior events).
+
+**Fix 6 — visit on tune COMPLETE.** The `visit` dispatch moved from the start of
+`startTuning` to the tune-timer callback, so rapid surfing records one visit for
+the final channel only (proven via a `visitTotal` seam, not throttled storage).
+
+**Fix 7 — `{lastChannel}` / `lastChannelIs` mean the previous DIFFERENT
+channel.** New pure `previousDifferentChannel(memory)` derives it from
+`visitOrder`; `template.ts` and `conditions.ts` use it, while `memory.lastChannel`
+stays the channel to boot on. E05/E07 now name the channel the viewer came from,
+and E09 ("last channel was 13") can fire. (Two template/condition unit tests that
+had encoded the old—buggy—semantics were corrected, not weakened.)
+
+**Fix 8 — restore on load.** The load effect restores `lastChannel` (POWER tunes
+there, requirement 1.3) and the after-hours (Act 4) state.
+
+**Fix 9 — `flashPrevious` per design §10.** Both renderers capture the last
+source frame into a 320×240 canvas before the source changes and flash it through
+the flash limiter; with no capture (or a YouTube previous source) a station card
+is synthesised on canvas from the channel name. A real bug was found and fixed:
+`setSource` during an active flash now updates the restore target, so a slate
+published mid-flash (E05) is no longer clobbered when the flash ends.
+
+**Fix 10 — mid-item seam.** A 10 s ticker on owned sources rolls an injected
+random at a fixed low probability and asks the director for a mid-item event;
+never on YouTube. E03 firing is proven in-browser via a `forceMidItem` seam.
+
+**Fix 11 — captions.** The CC setting is threaded into `renderScene`
+(`drawCaptions`) through the SceneContext; captions default ON until real voice
+exists (task 21) because event voice lines are caption-only — decision logged
+here. Voice event lines always show their caption.
+
+**Fix 12 — scene-layer templates.** `renderScene` takes a `resolveText` resolver
+(filled from real memory, hides the layer when a value is missing with no
+fallback). Channel 07's clock shows `{localTime}`; channel 13 shows a
+`{lastChannel}` history read-back that appears only once another channel has been
+visited (requirement 10.1).
+
+**Fix 13 — Act-4 layers + E11.** Each channel scene gained a minAct-4 layer
+(ch02 empty desk + WELCOME BACK ticker; ch04/07/13 after-hours lines); E11 now
+shows a WELCOME BACK slate aligned with the media bible.
+
+**Decisions made alone:** (1) captions default ON until task 21 (above).
+(2) `setSource`-during-flash restore-target fix (a correctness fix, reversible).
+(3) The new real-WebGL specs seed `deadair.memory.v1` and boot straight to
+channel 13 so events fire without minutes of watch-time banking; this exercises
+the real director/clock/presenter path, only the entry conditions are seeded.
+(4) `EventPresenter` + `overlayRenderer` as new modules rather than growing
+`sceneRenderer`, keeping drawing pure and testable.
+
+**Still unverified:** real recorded voice/art (placeholders + captions only,
+task 21); 60 fps budget and the manual cross-browser/soak checklist (task 22);
+firefox/webkit (Chromium only, as configured). Milestone 4 (file/YouTube
+adapters, tasks 17+) is intentionally not started.

@@ -19,6 +19,7 @@ import { type CrtSource } from './CrtRenderer.ts';
 import { type Renderer } from './Renderer.ts';
 import { bootDrive, isComplete, shutdownDrive, type EnvelopePhase } from './envelope.ts';
 import { cappedResolution } from './looks.ts';
+import { drawStationCard } from './overlayRenderer.ts';
 
 /** CSS class applied to the canvas so the fallback gets a scanline/vignette look. */
 export const FALLBACK_TREATMENT_CLASS = 'crtFallback';
@@ -32,6 +33,11 @@ export class FallbackRenderer implements Renderer {
   private tuning = false;
   private reducedEffects = false;
   private source: CrtSource | null = null;
+
+  // flashPrevious (design §10): a captured 320×240 frame and the flash window.
+  private capturedFrame: HTMLCanvasElement | null = null;
+  private flashUntilMs = 0;
+  private flashRestore: CrtSource | null = null;
 
   private envelopePhase: EnvelopePhase = 'idle';
   private envelopeStartMs = 0;
@@ -77,7 +83,45 @@ export class FallbackRenderer implements Renderer {
   }
 
   setSource(source: CrtSource | null): void {
-    this.source = source;
+    if (this.flashUntilMs > 0) {
+      // A flash is showing; a new source becomes what the flash restores to.
+      this.flashRestore = source;
+    } else {
+      this.source = source;
+    }
+  }
+
+  captureFrame(): void {
+    const src = this.source;
+    if (!src || !isSourceReady(src)) return;
+    if (!this.capturedFrame) {
+      const c = document.createElement('canvas');
+      c.width = 320;
+      c.height = 240;
+      this.capturedFrame = c;
+    }
+    const ctx = this.capturedFrame.getContext('2d');
+    if (!ctx) return;
+    try {
+      ctx.drawImage(src, 0, 0, 320, 240);
+    } catch {
+      // Keep whatever was captured if the source refuses to draw.
+    }
+  }
+
+  flashPrevious(ms: number, _nowMs: number, stationCardLabel?: string): boolean {
+    void _nowMs;
+    // No shader pulse here, but under reduced effects we suppress the flash to
+    // honour requirement 13.2, consistent with the WebGL path.
+    if (this.reducedEffects) return false;
+    const frame =
+      this.capturedFrame ?? (stationCardLabel !== undefined ? makeStationCard(stationCardLabel) : null);
+    if (!frame) return false;
+    this.flashRestore = this.source;
+    this.source = frame;
+    // The flash window is measured on the renderer's own clock (render loop).
+    this.flashUntilMs = nowMs() + Math.max(0, ms);
+    return true;
   }
 
   startBoot(durationMs: number, onDone?: () => void): void {
@@ -116,6 +160,12 @@ export class FallbackRenderer implements Renderer {
   /** Draw one frame: source or snow, dimmed by the power envelope. */
   renderFrame(t: number = nowMs()): void {
     this.applyEnvelope(t);
+    // End a flashPrevious once its window elapses.
+    if (this.flashUntilMs > 0 && nowMs() >= this.flashUntilMs) {
+      this.source = this.flashRestore;
+      this.flashRestore = null;
+      this.flashUntilMs = 0;
+    }
     this.resize();
 
     const { ctx, canvas } = this;
@@ -219,4 +269,13 @@ function isSourceReady(source: CrtSource): boolean {
 
 function nowMs(): number {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+function makeStationCard(label: string): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = 320;
+  c.height = 240;
+  const ctx = c.getContext('2d');
+  if (ctx) drawStationCard(ctx, label, { width: 320, height: 240 });
+  return c;
 }

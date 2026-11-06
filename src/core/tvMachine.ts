@@ -49,7 +49,7 @@ export type TvAction =
   /** A re-resolve while on air found no playable item. */
   | { type: 'NOTHING_PLAYABLE'; token: number }
   /** The running event reached its signOff step: cut to the fixed text. */
-  | { type: 'SIGN_OFF_START'; token: number }
+  | { type: 'SIGN_OFF_START'; token: number; eventId: string }
   /** The sign-off fixed text has been shown long enough. */
   | { type: 'SIGN_OFF_COMPLETE' };
 
@@ -63,7 +63,7 @@ export type Effect =
   | { type: 'reResolve'; channel: ChannelId; token: number }
   | { type: 'stopAll' }
   | { type: 'powerOff' }
-  | { type: 'signOffText' }
+  | { type: 'signOffText'; eventId: string }
   | { type: 'setAfterHours' }
   | { type: 'announceChannel'; channel: ChannelId };
 
@@ -203,7 +203,7 @@ export function tvReducer(state: TvState, action: TvAction): TvResult {
       if (action.token !== state.tuneToken || state.phase !== 'EVENT') return noChange(state);
       return {
         state: { ...state, phase: 'SIGN_OFF' },
-        effects: [{ type: 'signOffText' }],
+        effects: [{ type: 'signOffText', eventId: action.eventId }],
       };
     }
 

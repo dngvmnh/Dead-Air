@@ -128,6 +128,7 @@
       "when": { "distinctChannelsGte": 0 },
       "limit": { "perViewer": 1 },
       "priority": 100,
+      "chain": true,
       "steps": [
         { "do": "voice", "caption": "This concludes tonight's broadcast. Thank you for your attention. We have enjoyed yours." },
         { "do": "shaderPulse", "effect": "collapse", "ms": 1200 },
@@ -144,7 +145,7 @@
       "priority": 3,
       "steps": [
         { "do": "static", "ms": 600 },
-        { "do": "voice", "caption": "Welcome back." }
+        { "do": "slate", "text": "WELCOME BACK", "ms": 2000 }
       ]
     },
     {

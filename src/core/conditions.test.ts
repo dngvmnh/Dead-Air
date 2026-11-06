@@ -37,11 +37,14 @@ describe('evaluateCondition', () => {
 
   it('watchMsGte, lastChannelIs, eventFired, sessionCountGte', () => {
     let m = mem((x) => ({ ...x, totalWatchMs: 5000, sessionCount: 2 }));
+    // lastChannelIs means the channel the viewer CAME FROM (previous different
+    // channel). Coming from 7 onto 4 makes lastChannelIs:7 true, 4 false.
     m = visit(m, 7);
+    m = visit(m, 4);
     m = memoryReducer(m, { type: 'eventFired', eventId: 'E05', atMs: 1 }, false);
     expect(evaluateCondition({ watchMsGte: 5000 }, m, ctx)).toBe(true);
     expect(evaluateCondition({ lastChannelIs: 7 }, m, ctx)).toBe(true);
-    expect(evaluateCondition({ lastChannelIs: 2 }, m, ctx)).toBe(false);
+    expect(evaluateCondition({ lastChannelIs: 4 }, m, ctx)).toBe(false);
     expect(evaluateCondition({ eventFired: 'E05' }, m, ctx)).toBe(true);
     expect(evaluateCondition({ eventFired: 'E99' }, m, ctx)).toBe(false);
     expect(evaluateCondition({ sessionCountGte: 2 }, m, ctx)).toBe(true);
@@ -58,12 +61,14 @@ describe('evaluateCondition', () => {
   });
 
   it('all / any / not compose', () => {
-    let m = visit(createMemory(0), 2, 2);
+    // Come from 4 onto 2 (current=2, visited twice), so lastChannelIs:4 holds.
+    let m = visit(createMemory(0), 4, 1);
+    m = visit(m, 2, 2);
     m = mem(() => ({ ...m, totalWatchMs: 10_000 }));
     const cond: ConditionInput = {
       all: [{ visitsGte: { channel: 'current', n: 2 } }, { not: { watchMsGte: 999_999 } }],
     };
     expect(evaluateCondition(cond, m, ctx)).toBe(true);
-    expect(evaluateCondition({ any: [{ watchMsGte: 999_999 }, { lastChannelIs: 2 }] }, m, ctx)).toBe(true);
+    expect(evaluateCondition({ any: [{ watchMsGte: 999_999 }, { lastChannelIs: 4 }] }, m, ctx)).toBe(true);
   });
 });

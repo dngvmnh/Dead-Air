@@ -10,7 +10,7 @@
  */
 
 import { CHANNEL_INFO } from './channels.ts';
-import type { ViewerMemory } from './memory.ts';
+import { previousDifferentChannel, type ViewerMemory } from './memory.ts';
 import { CHANNEL_CYCLE, type ChannelId } from './types.ts';
 
 export interface TemplateContext {
@@ -46,11 +46,16 @@ function mostWatched(mem: ViewerMemory): ChannelId | null {
  * from an empty string so "no value" is unambiguous.
  */
 function resolveVar(name: string, mem: ViewerMemory, ctx: TemplateContext): string | null {
+  // {lastChannel} means the previous DIFFERENT channel the viewer came from
+  // (design §9, requirement 10.1), derived from visitOrder — not
+  // mem.lastChannel, which is the channel most recently tuned (the boot
+  // channel, requirement 1.3).
+  const cameFrom = previousDifferentChannel(mem);
   switch (name) {
     case 'lastChannel':
-      return mem.lastChannel === null ? null : label(mem.lastChannel);
+      return cameFrom === null ? null : label(cameFrom);
     case 'lastChannelName':
-      return mem.lastChannel === null ? null : CHANNEL_INFO[mem.lastChannel].name;
+      return cameFrom === null ? null : CHANNEL_INFO[cameFrom].name;
     case 'visitedList': {
       const visited = CHANNEL_CYCLE.filter((id) => (mem.channels[id]?.visits ?? 0) > 0);
       return visited.length === 0 ? null : visited.map(label).join(', ');

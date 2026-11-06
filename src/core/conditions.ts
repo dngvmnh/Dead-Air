@@ -5,7 +5,7 @@
  */
 
 import type { ConditionInput } from '../content/schema.ts';
-import type { ViewerMemory } from './memory.ts';
+import { previousDifferentChannel, type ViewerMemory } from './memory.ts';
 import type { ChannelId } from './types.ts';
 
 export interface ConditionContext {
@@ -43,7 +43,11 @@ export function evaluateCondition(
   }
   if ('distinctChannelsGte' in cond) return distinctChannels(mem) >= cond.distinctChannelsGte;
   if ('watchMsGte' in cond) return mem.totalWatchMs >= cond.watchMsGte;
-  if ('lastChannelIs' in cond) return mem.lastChannel === cond.lastChannelIs;
+  // "last channel" means the previous DIFFERENT channel the viewer came from
+  // (requirement 7.1/9/10): visits are recorded on tune-complete, so on channel
+  // 04 after 13 the current entry is 04 and the one before it is 13. Using
+  // mem.lastChannel (the current channel) would never let E09 fire.
+  if ('lastChannelIs' in cond) return previousDifferentChannel(mem) === cond.lastChannelIs;
   if ('eventFired' in cond) return (mem.firedEvents[cond.eventFired]?.count ?? 0) > 0;
   if ('sessionCountGte' in cond) return mem.sessionCount >= cond.sessionCountGte;
   if ('localHourBetween' in cond) {

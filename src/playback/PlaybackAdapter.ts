@@ -33,6 +33,14 @@ export interface SceneContext {
   setSource(source: CrtSource | null): void;
   /** Apply a look preset for the item being played. */
   setLook?(look: Look): void;
+  /** Whether to draw scene captions now (the CC setting; requirement 13.3). */
+  drawCaptions?(): boolean;
+  /**
+   * Fill scene-layer template variables ({lastChannel}, {localTime}, …) from
+   * real viewer memory (requirement 9.5, 10.1). Returns the filled string, or
+   * null to hide the layer when a value is missing with no fallback.
+   */
+  resolveText?(raw: string): string | null;
   /** Monotonic clock in ms, injected so adapters stay testable (no Date.now). */
   now(): number;
 }
