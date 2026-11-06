@@ -35,7 +35,26 @@ import {
   cappedResolution,
   lookPreset,
 } from './looks.ts';
+import {
+  bootDrive,
+  isComplete,
+  shutdownDrive,
+  type EnvelopePhase,
+} from './envelope.ts';
 import { type Look } from '../core/types.ts';
+
+/** Options for {@link CrtRenderer.create}. */
+export interface CrtRendererOptions {
+  /**
+   * Keep the drawing buffer after compositing so the canvas can be read back
+   * with `gl.readPixels` on a later frame. Off in production: this renderer
+   * draws every frame, and preserving the buffer can cost performance, which
+   * matters for the unmeasured 60 fps budget (tech.md). Tests enable it so the
+   * pixel-readback proof is reliable; app code leaves it false and reads pixels
+   * in the same frame as the draw instead.
+   */
+  preserveDrawingBuffer?: boolean;
+}
 
 /** Anything the shader can sample as a 2D texture. */
 export type CrtSource = HTMLVideoElement | HTMLCanvasElement | HTMLImageElement;
@@ -73,6 +92,18 @@ export class CrtRenderer {
   private rafId: number | null = null;
   private running = false;
 
+  // --- Transition envelopes (task 4.2) --------------------------------------
+  // The active boot/shutdown transition and when it began, in the same clock as
+  // the render loop. Advanced each frame in `applyEnvelope`; idle leaves the
+  // directly-set transient values (setPower/setStatic) untouched.
+  private envelopePhase: EnvelopePhase = 'idle';
+  private envelopeStartMs = 0;
+  private envelopeDurationMs = 0;
+  /** When true, hold full static (tuning). Released by setTuning(false). */
+  private tuning = false;
+  /** Fires once when the active boot/shutdown envelope finishes. */
+  private onEnvelopeDone: (() => void) | null = null;
+
   private constructor(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     this.gl = gl;
     this.canvas = canvas;
@@ -87,13 +118,16 @@ export class CrtRenderer {
    * Returning null (rather than throwing) is the seam task 4.3 uses to drop to
    * the non-WebGL fallback and keep the TV operable (requirement 5.3).
    */
-  static create(canvas: HTMLCanvasElement): CrtRenderer | null {
+  static create(
+    canvas: HTMLCanvasElement,
+    options: CrtRendererOptions = {},
+  ): CrtRenderer | null {
     const gl = canvas.getContext('webgl2', {
       alpha: false,
       antialias: false,
-      // Keep the last frame readable so pixel readback (the e2e proof that the
-      // shader actually drew) is deterministic rather than racing the compositor.
-      preserveDrawingBuffer: true,
+      // Off in production (see CrtRendererOptions). Tests opt in so readPixels
+      // on a later frame is reliable; the app reads pixels in-frame instead.
+      preserveDrawingBuffer: options.preserveDrawingBuffer ?? false,
       powerPreference: 'low-power',
     });
     if (!gl) return null;
@@ -128,6 +162,89 @@ export class CrtRenderer {
    */
   setSource(source: CrtSource | null): void {
     this.source = source;
+  }
+
+  // --- Transitions (task 4.2) ----------------------------------------------
+
+  /**
+   * Begin the CRT warm-up: over `durationMs` the picture expands from a dark
+   * collapsed line to a full bright image (requirement 1.3, ≤1500ms). The
+   * render loop advances the envelope each frame and calls `onDone` once at the
+   * end. Picks up the current clock so a boot started while running is smooth.
+   */
+  startBoot(durationMs: number, onDone?: () => void): void {
+    this.beginEnvelope('boot', durationMs, onDone);
+  }
+
+  /**
+   * Begin the shutdown collapse: over `durationMs` the picture collapses to a
+   * line and dot and darkens (requirement 1.4, ≤800ms). `onDone` fires once at
+   * the end so the caller can finish powering off (black, audio silenced).
+   */
+  startShutdown(durationMs: number, onDone?: () => void): void {
+    this.beginEnvelope('shutdown', durationMs, onDone);
+  }
+
+  /**
+   * Hold full static while acquiring a station (tuning), or release it. While
+   * active, uStatic is pinned to 1 regardless of setStatic; releasing restores
+   * the directly-set static value.
+   */
+  setTuning(active: boolean): void {
+    this.tuning = active;
+  }
+
+  /** The transition currently playing, or 'idle'. Exposed for tests/UI. */
+  get currentEnvelope(): EnvelopePhase {
+    return this.envelopePhase;
+  }
+
+  /** Read-only snapshot of the live transient uniforms (for tests/diagnostics). */
+  get drive(): Readonly<Transient> {
+    return { ...this.transient };
+  }
+
+  /** Current time in the same clock the render loop uses (performance.now). */
+  private clockMs(): number {
+    return performanceNow();
+  }
+
+  private beginEnvelope(
+    phase: Exclude<EnvelopePhase, 'idle'>,
+    durationMs: number,
+    onDone?: () => void,
+  ): void {
+    this.envelopePhase = phase;
+    this.envelopeDurationMs = Math.max(0, durationMs);
+    this.envelopeStartMs = this.clockMs();
+    this.onEnvelopeDone = onDone ?? null;
+    // Seed the transient immediately so the first frame is already at the start
+    // of the envelope rather than whatever the previous phase left behind.
+    this.applyEnvelope(this.envelopeStartMs);
+  }
+
+  /**
+   * Advance the active boot/shutdown envelope to time `now` and write its
+   * drive values into the transient uniforms. Tuning pins static to 1. When a
+   * transition completes it latches its end values, fires `onDone` once, and
+   * returns to idle.
+   */
+  private applyEnvelope(now: number): void {
+    if (this.envelopePhase !== 'idle') {
+      const drive =
+        this.envelopePhase === 'boot'
+          ? bootDrive(this.envelopeStartMs, now, this.envelopeDurationMs)
+          : shutdownDrive(this.envelopeStartMs, now, this.envelopeDurationMs);
+      this.transient.power = drive.power;
+      this.transient.collapse = drive.collapse;
+      if (isComplete(this.envelopeStartMs, now, this.envelopeDurationMs)) {
+        this.envelopePhase = 'idle';
+        const done = this.onEnvelopeDone;
+        this.onEnvelopeDone = null;
+        done?.();
+      }
+    }
+    if (this.tuning) this.transient.static = 1;
   }
 
   // --- Render loop ----------------------------------------------------------
@@ -172,6 +289,10 @@ export class CrtRenderer {
   /** Render a single frame at time `t` (ms, matching requestAnimationFrame). */
   renderFrame(t: number = performanceNow()): void {
     const gl = this.gl;
+
+    // Advance any active boot/shutdown transition and tuning hold before we
+    // read the transient uniforms for this frame.
+    this.applyEnvelope(t);
 
     // Keep the buffer at the capped resolution for the canvas's CSS box.
     this.resize(this.canvas.clientWidth || this.canvas.width, this.canvas.clientHeight || this.canvas.height);

@@ -8,6 +8,7 @@ import {
 } from '../core/tvMachine.ts';
 import { type ChannelId } from '../core/types.ts';
 import { channelInfo } from '../core/channels.ts';
+import { BOOT_MS, TUNE_MS } from './timing.ts';
 
 /**
  * Milestone 1 orchestrator.
@@ -43,9 +44,6 @@ export interface TelevisionApi {
   toggleReducedEffects: () => void;
   forgetMe: () => void;
 }
-
-const BOOT_MS = 1400;
-const TUNE_MS = 500;
 
 const DEFAULT_SETTINGS: UiSettings = {
   volume: 0.7,
