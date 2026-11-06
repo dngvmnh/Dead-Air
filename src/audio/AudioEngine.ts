@@ -1,0 +1,312 @@
+/**
+ * Procedural audio engine (design.md §11, requirements 12.1, 12.3).
+ *
+ * All of the television's own sounds — static, tuning, boot and power-off — are
+ * synthesised with the Web Audio API; no audio files are needed for them. The
+ * graph is:
+ *
+ *   noise ─┐
+ *   tuning ┼─► sfx bus ─┐
+ *          │            ├─► master gain ─► limiter ─► destination
+ *   (file/voice later) ─┘
+ *
+ * The AudioContext is created and resumed on the POWER gesture (browsers block
+ * audio before a user gesture). Volume is a single 0..1 applied to the master
+ * gain; mute forces it to zero. A limiter on the master bus keeps peaks in
+ * check so stingers never exceed a safe level (safety-and-rights.md).
+ *
+ * This is the audio layer, not core, so it may use Web Audio. The AudioContext
+ * is injectable so the graph wiring and gain/mute math can be unit-tested with
+ * a lightweight fake, without a real browser audio device.
+ */
+
+/** A factory for an AudioContext, injectable for tests. */
+export type AudioContextFactory = () => AudioContext;
+
+export interface AudioEngineOptions {
+  /** Supply a context (or a fake in tests). Defaults to a real AudioContext. */
+  createContext?: AudioContextFactory;
+}
+
+/** Master limiter settings: a fast compressor acting as a brickwall-ish limiter. */
+const LIMITER = {
+  threshold: -6, // dB; programme sits below, stingers are caught
+  knee: 0,
+  ratio: 20,
+  attack: 0.003,
+  release: 0.12,
+};
+
+/** Analog voice/file band: roughly 200 Hz–8 kHz (design §11). */
+export const ANALOG_BAND = { lowHz: 200, highHz: 8000 };
+
+function defaultFactory(): AudioContext {
+  const Ctor =
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!Ctor) throw new Error('Web Audio API is unavailable');
+  return new Ctor();
+}
+
+export class AudioEngine {
+  private readonly factory: AudioContextFactory;
+  private ctx: AudioContext | null = null;
+
+  // Persistent graph nodes (created on first unlock).
+  private masterGain: GainNode | null = null;
+  private sfxBus: GainNode | null = null;
+  private staticGain: GainNode | null = null;
+  private staticSource: AudioBufferSourceNode | null = null;
+  private noiseBuffer: AudioBuffer | null = null;
+
+  // Volume state (applied to the master gain).
+  private volume01 = 0.7;
+  private muted = false;
+
+  constructor(options: AudioEngineOptions = {}) {
+    this.factory = options.createContext ?? defaultFactory;
+  }
+
+  /** The context, or null before the first unlock. Exposed for diagnostics/tests. */
+  get context(): AudioContext | null {
+    return this.ctx;
+  }
+
+  get isUnlocked(): boolean {
+    return this.ctx !== null && this.ctx.state === 'running';
+  }
+
+  /**
+   * Create and resume the AudioContext on the POWER gesture, building the
+   * persistent graph the first time. Safe to call repeatedly: later calls just
+   * resume a suspended context. Returns the context's state.
+   */
+  async unlock(): Promise<AudioContextState> {
+    if (!this.ctx) {
+      this.ctx = this.factory();
+      this.buildGraph(this.ctx);
+    }
+    if (this.ctx.state === 'suspended') {
+      await this.ctx.resume();
+    }
+    return this.ctx.state;
+  }
+
+  private buildGraph(ctx: AudioContext): void {
+    const master = ctx.createGain();
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = LIMITER.threshold;
+    limiter.knee.value = LIMITER.knee;
+    limiter.ratio.value = LIMITER.ratio;
+    limiter.attack.value = LIMITER.attack;
+    limiter.release.value = LIMITER.release;
+
+    const sfx = ctx.createGain();
+    const staticGain = ctx.createGain();
+    staticGain.gain.value = 0; // silent until setStatic raises it
+
+    // master ─► limiter ─► destination
+    master.connect(limiter);
+    limiter.connect(ctx.destination);
+    // sfx ─► master ; static ─► sfx
+    sfx.connect(master);
+    staticGain.connect(sfx);
+
+    this.masterGain = master;
+    this.sfxBus = sfx;
+    this.staticGain = staticGain;
+    this.noiseBuffer = this.makeNoiseBuffer(ctx);
+
+    this.applyMasterGain();
+    this.startStaticSource(ctx);
+  }
+
+  /** One second of looping white noise, reused for static and hiss. */
+  private makeNoiseBuffer(ctx: AudioContext): AudioBuffer {
+    const length = Math.max(1, Math.floor(ctx.sampleRate));
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i += 1) data[i] = Math.random() * 2 - 1;
+    return buffer;
+  }
+
+  /** A continuously running noise source feeding the (initially silent) static gain. */
+  private startStaticSource(ctx: AudioContext): void {
+    if (!this.noiseBuffer || !this.staticGain) return;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuffer;
+    src.loop = true;
+    src.connect(this.staticGain);
+    src.start();
+    this.staticSource = src;
+  }
+
+  // --- Volume / mute (requirement 12.3) ------------------------------------
+
+  /** Set master volume 0..1. */
+  setVolume(volume01: number): void {
+    this.volume01 = clamp01(volume01);
+    this.applyMasterGain();
+  }
+
+  /** Mute or unmute the master bus. */
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    this.applyMasterGain();
+  }
+
+  /** The effective linear master gain given volume and mute. */
+  get effectiveGain(): number {
+    return this.muted ? 0 : this.volume01;
+  }
+
+  private applyMasterGain(): void {
+    if (!this.masterGain || !this.ctx) return;
+    const target = this.effectiveGain;
+    // A short ramp avoids clicks on volume/mute changes.
+    const g = this.masterGain.gain;
+    const now = this.ctx.currentTime;
+    g.cancelScheduledValues(now);
+    g.setTargetAtTime(target, now, 0.02);
+  }
+
+  // --- Static (tuning snow / dead-air hiss) --------------------------------
+
+  /**
+   * Set the static level, 0..1. Mirrors the renderer's `uStatic` so the snow
+   * you see is the snow you hear. Ramped to avoid clicks.
+   */
+  setStatic(amount: number): void {
+    if (!this.staticGain || !this.ctx) return;
+    const target = clamp01(amount) * 0.5; // headroom below master
+    const g = this.staticGain.gain;
+    const now = this.ctx.currentTime;
+    g.cancelScheduledValues(now);
+    g.setTargetAtTime(target, now, 0.03);
+  }
+
+  // --- One-shot procedural cues --------------------------------------------
+
+  /** A short tuning click/chirp, used when a channel is acquired (req 2.3). */
+  playTuningClick(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.sfxBus) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1200, now);
+    osc.frequency.exponentialRampToValueAtTime(320, now + 0.08);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.25, now + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+    osc.connect(gain);
+    gain.connect(this.sfxBus);
+    osc.start(now);
+    osc.stop(now + 0.14);
+  }
+
+  /** The CRT warm-up thunk: a low rising tone with a soft degauss knock. */
+  playBoot(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.sfxBus) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(60, now);
+    osc.frequency.exponentialRampToValueAtTime(220, now + 0.4);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.3, now + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+    osc.connect(gain);
+    gain.connect(this.sfxBus);
+    osc.start(now);
+    osc.stop(now + 0.65);
+  }
+
+  /** The power-off collapse: a descending tone that snaps to silence. */
+  playPowerOff(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.sfxBus) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.25);
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+    osc.connect(gain);
+    gain.connect(this.sfxBus);
+    osc.start(now);
+    osc.stop(now + 0.32);
+    // Snow collapses with the picture.
+    this.setStatic(0);
+  }
+
+  /**
+   * Build the analog filter chain for an owned file/voice source: a band-pass
+   * (roughly 200 Hz–8 kHz) with a little saturation, feeding the master bus
+   * (design §11). Returns the input node callers connect their source to. The
+   * chain itself is created here so Milestone-4 file playback can reuse it.
+   */
+  createAnalogChain(): AudioNode | null {
+    const ctx = this.ctx;
+    if (!ctx || !this.masterGain) return null;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = ANALOG_BAND.lowHz;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = ANALOG_BAND.highHz;
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = saturationCurve();
+    hp.connect(lp);
+    lp.connect(shaper);
+    shaper.connect(this.masterGain);
+    return hp;
+  }
+
+  /** Suspend audio (e.g. on power-off) without tearing the graph down. */
+  async suspend(): Promise<void> {
+    if (this.ctx && this.ctx.state === 'running') await this.ctx.suspend();
+  }
+
+  /** Release the context entirely. */
+  async close(): Promise<void> {
+    if (this.staticSource) {
+      try {
+        this.staticSource.stop();
+      } catch {
+        // Already stopped.
+      }
+      this.staticSource = null;
+    }
+    if (this.ctx) {
+      await this.ctx.close();
+      this.ctx = null;
+    }
+    this.masterGain = null;
+    this.sfxBus = null;
+    this.staticGain = null;
+    this.noiseBuffer = null;
+  }
+}
+
+function clamp01(x: number): number {
+  if (!Number.isFinite(x)) return 0;
+  return x < 0 ? 0 : x > 1 ? 1 : x;
+}
+
+/** A gentle odd saturation curve for the analog chain. */
+function saturationCurve(): Float32Array<ArrayBuffer> {
+  const n = 1024;
+  const curve = new Float32Array(new ArrayBuffer(n * Float32Array.BYTES_PER_ELEMENT));
+  const k = 2;
+  for (let i = 0; i < n; i += 1) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+  }
+  return curve;
+}

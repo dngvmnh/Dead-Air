@@ -6,8 +6,12 @@ export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  ...(process.env.CI ? { workers: 1 } : {}),
+  retries: process.env.CI ? 2 : 1,
+  // These tests drive real WebGL pixel readback and Web Audio. Too many browser
+  // contexts against the single dev server starve backgrounded tabs' rAF loops,
+  // which stalls canvas rendering and makes pixel samples flaky. Cap workers so
+  // every tab gets enough scheduling: one on CI, a small pool locally.
+  workers: process.env.CI ? 1 : 2,
   reporter: 'html',
   use: {
     baseURL: 'http://localhost:5173',

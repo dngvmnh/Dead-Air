@@ -120,3 +120,46 @@ done, how it was checked, and anything left unverified.
 - Unverified: real GPU driver context-loss (as opposed to the debug extension)
   is not exercised; actual cross-browser fallback on a device genuinely lacking
   WebGL2 (only simulated via the force flag); 60 fps budget (task 22.1).
+
+## Task 5.1 — Procedural AudioEngine (gesture unlock, buses, limiter, cues)
+
+- Mode: implemented directly in chat (spec-task-execution subagent still
+  unavailable in the registry).
+- Done: Added `src/audio/AudioEngine.ts`. Web Audio graph: a looping white-noise
+  source → static gain → SFX bus → master gain → DynamicsCompressor limiter →
+  destination (design §11). The AudioContext is created and resumed on the POWER
+  gesture (`unlock()`), with an injectable context factory so the graph is
+  unit-testable. Procedural cues synthesised in code — tuning click, boot thunk,
+  power-off collapse (requirement 12.1, no audio files). `setStatic` mirrors the
+  renderer's uStatic so the snow heard matches the snow seen. Volume/mute apply
+  to the master gain (requirement 12.3). `createAnalogChain()` builds the
+  band-pass + saturation chain (≈200 Hz–8 kHz) ready for Milestone-4 file audio.
+  Wired into `useTelevision`: unlock+boot on the POWER effect, tuning click +
+  full static on startTuning, faint bed on startSource, hiss on standBy,
+  power-off cue + context suspend on powerOff, snow cleared on stopAll; a
+  settings effect keeps volume/mute in sync; the context is closed on unmount.
+  Audio is non-critical — if Web Audio is unavailable (jsdom or a locked-down
+  browser) the unlock rejection is caught and the TV runs silently.
+- Checked: `npm test` 98 passed (12 new AudioEngine tests using a fake
+  AudioContext: gesture unlock→running, idempotent re-unlock, graph topology
+  master→limiter→destination with static source looping, volume/mute math and
+  clamping, one-shot cues create+start+stop oscillators, no-throw before unlock,
+  static gain raises/falls, analog chain = 2 biquads + shaper, suspend/close
+  lifecycle). `npm run lint` clean. `npm run build` clean, JS 79.31 KB gzip
+  (within the 300 KB budget). Browser: `npx playwright test --project=chromium`
+  10 passed, incl. a new `audio.spec.ts` proving real-browser behaviour jsdom
+  cannot — the AudioContext actually reaches 'running' after the POWER gesture,
+  and mute drops the effective master gain to zero. Chromium only.
+- Decisions made alone: (1) Exposed the engine on `window.__tvAudio` under the
+  existing test flag as a test seam (production never sets the flag; reversible).
+  (2) Capped Playwright workers (1 on CI, 2 locally) and added one local retry.
+  Running ~10 WebGL+AudioContext tests across 8 tabs on a single dev server
+  starved backgrounded tabs' rAF loops, stalling canvas rendering and causing
+  pixel-sample flakes/timeouts; limiting workers fixed it deterministically
+  without weakening any assertion. This is a test-infra change, not a product
+  change, and is reversible. (3) Hardened the CRT-renderer e2e to track the
+  brightest static frame via polling rather than catching the brief TUNING/
+  BOOTING phase label.
+- Unverified: actual audibility/mix quality (no automated assertion possible —
+  belongs to the manual checklist, task 22.2). The analog chain and voice stems
+  are built but not yet driven by real sources (Milestone 4 / task 15).

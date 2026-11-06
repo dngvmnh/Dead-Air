@@ -22,8 +22,8 @@ Work in order. Each milestone ends in something runnable. Commit after each comp
   - [x] 4.2 Implement boot and shutdown via `uPower`, plus tuning transitions.
   - [x] 4.3 Implement `flashLimiter` with tests, reduced-effects handling, context restore, and non-WebGL fallback.
   - _Requirements: 5.1–5.5, 13.1, 13.2, 1.4_
-- [ ] 5. Procedural audio
-  - [ ] 5.1 Implement AudioEngine: gesture unlock, buses, limiter, static, tuning click, boot and power-off sounds.
+- [x] 5. Procedural audio
+  - [x] 5.1 Implement AudioEngine: gesture unlock, buses, limiter, static, tuning click, boot and power-off sounds.
   - _Requirements: 12.1, 12.3_
 - [ ] 6. Checkpoint: POWER on, surf through static across four empty channels with correct LED and sound, POWER off. `npm test` passes.
 

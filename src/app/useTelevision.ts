@@ -9,6 +9,7 @@ import {
 import { type ChannelId } from '../core/types.ts';
 import { channelInfo } from '../core/channels.ts';
 import { BOOT_MS, TUNE_MS } from './timing.ts';
+import { AudioEngine } from '../audio/AudioEngine.ts';
 
 /**
  * Milestone 1 orchestrator.
@@ -74,6 +75,38 @@ export function useTelevision(): TelevisionApi {
   const bootTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tuneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // The procedural audio engine. Created lazily on the POWER gesture (browsers
+  // block audio before a user gesture); null until then.
+  const audioRef = useRef<AudioEngine | null>(null);
+  const getAudio = useCallback((): AudioEngine => {
+    if (!audioRef.current) {
+      audioRef.current = new AudioEngine();
+      // Test seam: expose the engine so a browser test can assert the context
+      // unlocked on the POWER gesture. Production never sets this flag.
+      if (
+        typeof window !== 'undefined' &&
+        (window as unknown as { __CRT_PRESERVE_DRAWING_BUFFER__?: boolean })
+          .__CRT_PRESERVE_DRAWING_BUFFER__ === true
+      ) {
+        (window as unknown as { __tvAudio?: AudioEngine }).__tvAudio = audioRef.current;
+      }
+    }
+    return audioRef.current;
+  }, []);
+
+  // Latest settings, readable from async callbacks (e.g. audio unlock) without
+  // recreating them on every settings change. Assigned in an effect (not during
+  // render) and used to keep the audio engine's volume/mute in sync.
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.setVolume(settings.volume);
+      audio.setMuted(settings.muted);
+    }
+  }, [settings]);
+
   const clearTimers = useCallback(() => {
     if (bootTimer.current !== null) {
       clearTimeout(bootTimer.current);
@@ -93,6 +126,24 @@ export function useTelevision(): TelevisionApi {
     (effects: Effect[]) => {
       for (const effect of effects) {
         switch (effect.type) {
+          case 'unlockAudio': {
+            // POWER gesture: unlock the context, then play the boot cue once it
+            // is running. Volume/mute are applied from the current settings.
+            // Audio is non-critical: if Web Audio is unavailable (e.g. jsdom or
+            // a locked-down browser) the TV keeps working silently.
+            const audio = getAudio();
+            audio
+              .unlock()
+              .then(() => {
+                audio.setVolume(settingsRef.current.volume);
+                audio.setMuted(settingsRef.current.muted);
+                audio.playBoot();
+              })
+              .catch(() => {
+                // No audio device; degrade to a silent television.
+              });
+            break;
+          }
           case 'startBoot': {
             if (bootTimer.current !== null) clearTimeout(bootTimer.current);
             bootTimer.current = setTimeout(() => {
@@ -103,12 +154,26 @@ export function useTelevision(): TelevisionApi {
           }
           case 'startTuning': {
             if (tuneTimer.current !== null) clearTimeout(tuneTimer.current);
+            // Tuning click + full static snow while acquiring the station.
+            audioRef.current?.playTuningClick();
+            audioRef.current?.setStatic(1);
             const token = effect.token;
             tuneTimer.current = setTimeout(() => {
               tuneTimer.current = null;
               // Milestone 1: nothing is unplayable yet; always resolve to air.
               sendRef.current({ type: 'TUNE_RESOLVED', token, playable: true });
             }, TUNE_MS);
+            break;
+          }
+          case 'startSource': {
+            // On air: drop the snow to a faint bed (real source audio arrives in
+            // Milestone 4).
+            audioRef.current?.setStatic(0.08);
+            break;
+          }
+          case 'standBy': {
+            // Dead-air hiss over the stand-by slate.
+            audioRef.current?.setStatic(0.4);
             break;
           }
           case 'announceChannel': {
@@ -118,23 +183,27 @@ export function useTelevision(): TelevisionApi {
           }
           case 'powerOff': {
             clearTimers();
+            // Power-off cue, then suspend the context so nothing plays while off.
+            audioRef.current?.playPowerOff();
+            void audioRef.current?.suspend();
             setAnnouncement('Television off');
             break;
           }
-          case 'unlockAudio':
-          case 'startSource':
-          case 'standBy':
+          case 'stopAll': {
+            // Silence the snow bed between sources during a tune.
+            audioRef.current?.setStatic(0);
+            break;
+          }
           case 'runEvent':
           case 'reResolve':
-          case 'stopAll':
           case 'signOffText':
           case 'setAfterHours':
-            // Handled by later-milestone systems (audio, clock, adapters).
+            // Handled by later-milestone systems (clock, director, adapters).
             break;
         }
       }
     },
-    [clearTimers],
+    [clearTimers, getAudio],
   );
 
   /**
@@ -159,6 +228,14 @@ export function useTelevision(): TelevisionApi {
   }, [send]);
 
   useEffect(() => clearTimers, [clearTimers]);
+
+  // Release the audio context when the television unmounts.
+  useEffect(() => {
+    return () => {
+      void audioRef.current?.close();
+      audioRef.current = null;
+    };
+  }, []);
 
   const power = useCallback(() => send({ type: 'POWER' }), [send]);
   const channelUp = useCallback(() => send({ type: 'CHANNEL_UP' }), [send]);
