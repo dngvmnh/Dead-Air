@@ -15,7 +15,8 @@ inclusion: always
 ## Privacy
 
 - Viewer memory is stored only in the viewer's browser. No analytics, no fingerprinting, no network transmission.
-- Never request camera, microphone, location, or notifications.
+- Never request microphone, location, or notifications.
+- The camera may be requested only by the optional Reflection control, after the viewer's own click and plain disclosure. Never on load or from an event. Frames are never analysed, saved, read back, or transmitted. Tracks stop when it is switched off, on Forget me, and when the tab is hidden. The choice is not persisted, and no content depends on it.
 - Local clock time may be read and quoted. Never infer or display a location or IP address, even as a joke.
 - Provide a real way to erase memory: `?reset=1` and a "Forget me" control on the rear panel.
 - The fiction must never suggest real harm or tell the viewer to do anything in the real world. No self-harm themes. No real people, organisations, emergency services, or real-world locations. Emergency-style content must be visibly fictional and name the fictional network, and never imitate a real emergency alert tone.

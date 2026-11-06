@@ -139,6 +139,7 @@ Copy for `src/content/events/events.json`. `{…}` values come only from real me
 | E10 | 3 | 13 | tune-in | Act 3 | 1/viewer | **Sign-off.** Voice: "This concludes tonight's broadcast. Thank you for your attention. We have enjoyed yours." Picture collapses, then fixed sign-off text. Priority highest. |
 | E11 | 4 | 02 | tune-in | After hours | 1/viewer | Empty news desk. Ticker: `WELCOME BACK`. Programming continues. |
 | E12 | 4 | 13 | tune-in | Session count ≥ 2 | 1/session | Slate: `YOU CAME BACK.` / `VISIT {visitCountCurrent}.` |
+| E13 | 3 | 02, 04, 07 | tune-in | E07 fired | 1/viewer | **It rips back.** The programme carries on. Room lights sink, a shape pushes the wallpaper from behind, then the wall rips from the other side. Lights return. Nobody mentions it. |
 
 **Writing rules:** every line must be possible on real TV, understated, and short. Threats stay implied and never instruct the viewer to do anything. Prefer one wrong detail to five.
 

@@ -114,7 +114,7 @@ DEAD AIR is a static web application that simulates a four-channel analog televi
 #### Acceptance Criteria
 
 1. THE SYSTEM SHALL compute the act from memory using the thresholds in the design, and the act SHALL never decrease except after a memory reset.
-2. WHEN `?demo=1` is present THE SYSTEM SHALL divide time thresholds and event cooldowns by 6 without persisting them.
+2. WHEN `?demo=1` is present THE SYSTEM SHALL divide time thresholds and event cooldowns by 8 without persisting them.
 3. WHEN a channel with a revisit variant is tuned with enough visits THE SYSTEM SHALL present that variant.
 4. WHEN channel 07 is revisited THE SYSTEM SHALL change at least one set object relative to the previous visit.
 
@@ -177,7 +177,7 @@ DEAD AIR is a static web application that simulates a four-channel analog televi
 3. THE SYSTEM SHALL provide captions for all owned speech and event voice, with a CC control on the chassis.
 4. THE SYSTEM SHALL make all controls keyboard-operable with visible focus and accessible names.
 5. WHEN the channel changes THE SYSTEM SHALL announce it through an ARIA live region.
-6. THE SYSTEM SHALL NOT request camera, microphone, location, or notification permissions.
+6. THE SYSTEM SHALL NOT request microphone, location, or notification permissions, and SHALL request the camera only as defined by the optional Reflection control in `.kiro/specs/dead-air-room/` requirement 7.
 
 ## Requirement 14: Catalogue validation
 

@@ -20,6 +20,8 @@ src/
     conditions.ts          Evaluates event condition data
     template.ts            Fills {lastChannel}-style variables
     tvMachine.ts           TV state machine reducer
+    tearSheet.ts           Deterministic tear simulation
+    roomState.ts           deriveRoom()
     types.ts
   content/
     catalog/               ch02.json, ch04.json, ch07.json, ch13.json
@@ -37,6 +39,10 @@ src/
     CrtRenderer.ts         WebGL2 pipeline
     sceneRenderer.ts       Draws a scene at a time offset onto a 2D canvas
     looks.ts               broadcast, vhs, deadair presets
+    tearRenderer.ts        Draws a torn sheet
+    behindRenderer.ts      What a tear reveals
+    roomRenderer.ts        Room canvas
+    reflection.ts          Optional camera reflection
   audio/
     AudioEngine.ts         Context, noise, tuning, buses
     stems.ts               Voice stem stitching

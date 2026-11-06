@@ -60,7 +60,7 @@ Room
 ```
 
 - While a YouTube item is on screen, the canvas draws tube black only. The surface occupies a plain rectangle.
-- Room vignette, dust, and reflection live **outside** `TubeOpening`, or are switched off for its rectangle. Never use a full-screen overlay.
+- Room vignette, dust, and reflection live **outside** `TubeOpening`, or are switched off for its rectangle. Never use a full-screen overlay. The tearable room canvas is a full-viewport layer behind the chassis, not an overlay; see `.kiro/specs/dead-air-room/design.md`.
 - `TubeOpening` and every ancestor must have no `transform`, `filter`, `opacity`, `clip-path`, `mask`, or `mix-blend-mode`. Screen shake is done inside the shader, never by moving DOM.
 - When switching to an owned source: pause the player, set `.yt-surface` to `visibility: hidden`, then play.
 - Create one `YT.Player` lazily on first use and reuse it. Do not destroy it per item.
@@ -254,7 +254,7 @@ Key `deadair.memory.v1`. Reads go through Zod; on failure, start fresh. All acce
 | 3 | Terminal | Total watch ≥ 14 min, all 4 channels visited, and E07 has fired |
 | 4 | After hours | Sign-off completed |
 
-`?demo=1` divides time thresholds and cooldowns by 6 in memory only. Fourteen minutes becomes about 2 min 20 s.
+`?demo=1` divides time thresholds and cooldowns by 8 in memory only. Fourteen minutes becomes 1 min 45 s. A divisor of 6 was measured at 4 min 12 s to sign-off on a naive surf path, so it was too slow.
 
 ## 9. Horror director
 
@@ -380,7 +380,7 @@ Static hosting, with headers set in hosting configuration:
 
 ```
 Referrer-Policy: strict-origin-when-cross-origin
-Permissions-Policy: camera=(), microphone=(), geolocation=()
+Permissions-Policy: camera=(self), microphone=(), geolocation=()
 ```
 
 Keep any CSP compatible with `youtube.com`, `youtube-nocookie.com`, and the media host. Long video goes in object storage with CORS and range requests enabled.
