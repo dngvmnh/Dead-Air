@@ -33,6 +33,10 @@ export function useKeyboardControls(tv: TelevisionApi): void {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      // The first-run notice is modal: nothing behind it responds yet.
+      if (!tv.state.noticeSeen) return;
+      // Holding a toggle key must not flip it on and off.
+      if (e.repeat && ['p', 'm'].includes(e.key.toLowerCase())) return;
       if (focusInYouTube()) return;
 
       // The volume range and buttons handle their own keys; don't double-act.

@@ -40,7 +40,9 @@ export function StartNotice({ onAcknowledge }: StartNoticeProps) {
           Flashing is limited to three flashes per second. You can turn on
           Reduced Effects on the set&rsquo;s rear panel at any time, and your
           system&rsquo;s reduced-motion setting is respected automatically.
-          Nothing you do is recorded or sent anywhere.
+          Your viewing history stays in this browser, and this site never
+          sends it anywhere. Programmes from YouTube are played by YouTube,
+          under its own terms.
         </p>
         <div className={styles.actions}>
           <button

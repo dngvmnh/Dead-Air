@@ -1,3 +1,4 @@
+import { type RefObject } from 'react';
 import styles from './Remote.module.css';
 import { type TvState } from '../../core/tvMachine.ts';
 import { type UiSettings } from '../../app/useTelevision.ts';
@@ -11,6 +12,7 @@ export interface RemoteProps {
   state: TvState;
   settings: UiSettings;
   channelLabel: string;
+  powerRef: RefObject<HTMLButtonElement | null>;
   onPower: () => void;
   onChannelUp: () => void;
   onChannelDown: () => void;
@@ -23,6 +25,7 @@ export function Remote({
   state,
   settings,
   channelLabel,
+  powerRef,
   onPower,
   onChannelUp,
   onChannelDown,
@@ -51,6 +54,7 @@ export function Remote({
       </div>
 
       <button
+        ref={powerRef}
         type="button"
         className={`${styles.button} ${styles.power}`}
         data-on={powered}

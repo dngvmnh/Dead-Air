@@ -40,6 +40,15 @@
   color: #1a0603;
 }
 
+@media (min-width: 769px) {
+  .panel {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+}
+
 .forget {
   color: var(--led-on);
   border-color: var(--led-dim);

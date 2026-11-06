@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App.tsx';
 
@@ -116,6 +116,37 @@ describe('App chassis and controls', () => {
       () => expect(screen.getByRole('status')).toHaveTextContent(/channel 04/i),
       { timeout: 3000 },
     );
+  });
+
+  it('makes the set inert and ignores shortcuts behind the notice', () => {
+    const { container } = render(<App />);
+    expect(container.querySelector('[inert]')).toContainElement(
+      screen.getByRole('button', { name: /^mute$/i }),
+    );
+
+    fireEvent.keyDown(window, { key: 'm' });
+    expect(screen.getByRole('button', { name: /^mute$/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('moves focus to Power when the notice closes', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    await user.click(screen.getByRole('button', { name: /i understand/i }));
+
+    expect(screen.getByRole('button', { name: /^power$/i })).toHaveFocus();
+    expect(container.querySelector('[inert]')).toBeNull();
+  });
+
+  it('does not toggle power or mute when a key is held down', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: /i understand/i }));
+
+    fireEvent.keyDown(window, { key: 'p', repeat: true });
+    fireEvent.keyDown(window, { key: 'm', repeat: true });
+
+    expect(screen.getByRole('button', { name: /^power$/i })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /^mute$/i })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('disables channel buttons while powered off', async () => {

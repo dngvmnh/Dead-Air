@@ -120,6 +120,35 @@
   accent-color: var(--led-on);
 }
 
+@media (min-width: 769px) {
+  .remote {
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--space-3);
+    gap: var(--space-3);
+  }
+
+  .ledPanel {
+    justify-content: space-between;
+  }
+
+  .group {
+    flex-wrap: wrap;
+  }
+
+  .group .button {
+    flex: 1;
+  }
+
+  .label {
+    width: 100%;
+  }
+
+  .volume {
+    width: 100%;
+  }
+}
+
 @media (max-width: 768px) {
   .remote {
     justify-content: space-between;

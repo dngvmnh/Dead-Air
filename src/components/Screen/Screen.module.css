@@ -37,6 +37,14 @@
   font-size: 0.8rem;
 }
 
+/* Keep the whole set on a laptop screen: 9rem is the room, chassis and bezel
+   padding above and below the tube. */
+@media (min-width: 769px) {
+  .tube {
+    width: min(100%, calc((100dvh - 9rem) * 4 / 3));
+  }
+}
+
 .off {
   background: var(--tube-black);
 }
