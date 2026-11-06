@@ -95,6 +95,14 @@ async function lastEventText(page: Page): Promise<string> {
   return page.evaluate(() => (window as unknown as { __tv?: TvSeam }).__tv?.lastEventText() ?? '');
 }
 
+/** Read the live CRT static uniform (0..1) via the __crt test seam. */
+async function staticLevel(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const r = (window as unknown as { __crt?: { drive?: { static?: number } } }).__crt;
+    return r?.drive?.static ?? -1;
+  });
+}
+
 /**
  * Advance the fake clock in small steps, collecting every distinct value the
  * sign-off/slate text seam reported, until `pattern` is seen or `maxMs` of
@@ -219,6 +227,14 @@ test.describe('event output is visible on real WebGL', () => {
     expect(text).toContain('NO SIGNAL');
     expect(text).toContain('THANK YOU FOR WATCHING.');
     expect(text).toContain('BROADCAST TERMINATED · 00:00:13');
+
+    // The picture is near-clean for the FULL 8s window (room requirement 9.1:
+    // static 0.05 or less), so the text is legible the whole time — not buried
+    // under dead-air snow.
+    expect(await staticLevel(page)).toBeLessThanOrEqual(0.05);
+    await page.clock.runFor(6000); // still inside the 8s window
+    expect((await tv(page)).phase).toBe('SIGN_OFF');
+    expect(await staticLevel(page)).toBeLessThanOrEqual(0.05);
   });
 });
 

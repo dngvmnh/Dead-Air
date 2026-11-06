@@ -140,7 +140,8 @@ export function useTelevision(): TelevisionApi {
   // Timer that fires ITEM_ENDED when the current item's remaining time elapses.
   const itemEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // --- Viewer memory (task 12) -------------------------------------------
-  // `?demo=1` divides time thresholds by six (requirement 8.2).
+  // `?demo=1` divides time thresholds and cooldowns by DEMO_DIVISOR (8); see
+  // core/memory.ts (requirement 8.2 / dead-air-room 9.3).
   const demo = typeof window !== 'undefined' ? demoActive(window.location.search) : false;
   const storeRef = useRef<MemoryStore | null>(null);
   const getStore = useCallback((): MemoryStore => {

@@ -749,3 +749,41 @@ the real director/clock/presenter path, only the entry conditions are seeded.
 task 21); 60 fps budget and the manual cross-browser/soak checklist (task 22);
 firefox/webkit (Chromium only, as configured). Milestone 4 (file/YouTube
 adapters, tasks 17+) is intentionally not started.
+
+## dead-air-room Task 1 — MVP corrections (9.1–9.3, 9.5)
+
+Full gate green: `npm test` 267, `npm run lint` clean, `npm run build` 119.47 KB
+gzip (budget 300 KB), `npm run validate:catalog` OK (4 channels, 11 scenes, 12
+events), `npx playwright test --project=chromium` 28/28 with local retries 0.
+
+- **1.1 Sign-off near-clean for 8 s (req 9.1).** `steadyDrive('SIGN_OFF')` in
+  `src/components/Screen/Screen.tsx` returned `static: 0.4`, and that phase
+  effect ran after the orchestrator's `setStatic(0)`, so the sign-off text sat
+  behind heavy dead-air snow. Changed SIGN_OFF to `static: 0.04` (STAND_BY keeps
+  0.4). `events-visible.spec.ts` now reads the live `__crt.drive.static` on real
+  WebGL and asserts ≤ 0.05 at the start of the window and ~6 s in. Verified in a
+  real browser: `docs/screenshots/signoff-e10.png` is now crisp (file shrank
+  874 KB → 444 KB as the snow dropped).
+- **1.2 E02 cooldown (req 9.2).** Added `cooldownMs: 1440000` (24 min) to E02 in
+  `events.json`. In demo that is 24 min / 8 = 3 min, so E02 cannot repeat within
+  a demo run's first few minutes. New director unit test proves the cooldown
+  blocks a repeat and is demo-scaled.
+- **1.3 `DEMO_DIVISOR` = 8, single constant (req 9.3).** Set `DEMO_DIVISOR = 8`
+  in `core/memory.ts` and made `core/director.ts` import and use it instead of a
+  hard-coded `6` for cooldowns and the global gap. Updated the memory and
+  director tests (names, a value-lock `expect(DEMO_DIVISOR).toBe(8)`, and the
+  gap-shortening test now derives its window from the constant). Fixed the stale
+  "by six" comment in `useTelevision.ts`.
+- **1.4 Tests do not modify committed files (req 9.5).** `screenshots.spec.ts`
+  writes PNGs only when `UPDATE_SCREENSHOTS=1`; otherwise it still drives the
+  flow and asserts the text reached the picture, but touches no file. Confirmed:
+  after a full `npx playwright test` run, `git status` shows no change under
+  `docs/screenshots`.
+
+Decisions made alone: (1) E02 cooldown 24 min real = 3 min demo — long enough to
+cover "the first few minutes" of a demo run per req 9.2, short enough that a
+second fire is still possible much later; reversible by editing the JSON.
+(2) SIGN_OFF static 0.04 (not 0) so a faint analog grain remains while staying
+≤ 0.05; reversible. Unverified: nothing new for Task 1 — the divisor-8 change was
+exercised end to end by the milestone-3 checkpoint reaching sign-off (now ~2.8
+min of mocked surfing).

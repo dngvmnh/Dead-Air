@@ -39,8 +39,12 @@ export const MEMORY_SCHEMA_VERSION = 1 as const;
 export const VISIT_ORDER_LIMIT = 50;
 /** A gap longer than this since last activity starts a new session (req 7.5). */
 export const NEW_SESSION_GAP_MS = 30 * 60 * 1000;
-/** `?demo=1` divides time thresholds and cooldowns by this (requirement 8.2). */
-export const DEMO_DIVISOR = 6;
+/**
+ * `?demo=1` divides time thresholds and cooldowns by this (requirement 8.2,
+ * dead-air-room requirement 9.3). This is the SINGLE source of the demo
+ * divisor: the director reads it too, so a demo run is consistent everywhere.
+ */
+export const DEMO_DIVISOR = 8;
 
 function emptyChannels(): Record<ChannelId, ChannelMemory> {
   const out = {} as Record<ChannelId, ChannelMemory>;

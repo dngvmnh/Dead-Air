@@ -13,6 +13,14 @@ import path from 'node:path';
 
 const SHOTS_DIR = path.resolve(fileURLToPath(new URL('../../docs/screenshots', import.meta.url)));
 
+/**
+ * Screenshots are written ONLY when UPDATE_SCREENSHOTS=1 (dead-air-room
+ * requirement 9.5: a plain test run must not modify committed files). Without
+ * it the tests still drive the flow and assert the text reached the picture;
+ * they just do not touch the PNGs on disk.
+ */
+const UPDATE_SCREENSHOTS = process.env.UPDATE_SCREENSHOTS === '1';
+
 interface SeedMemory {
   act?: number;
   totalWatchMs?: number;
@@ -73,7 +81,12 @@ async function shootWhen(page: Page, pattern: RegExp, file: string, maxMs = 1200
   // frame, and let the shader draw it (the fake clock drives rAF too).
   await page.clock.runFor(800);
   await page.waitForTimeout(200);
-  await page.getByTestId('tube-opening').screenshot({ path: path.join(SHOTS_DIR, file) });
+  // Assert the picture is showing the expected text, so the test proves the
+  // behaviour whether or not it writes a file.
+  if (!pattern.test(await text(page))) throw new Error(`expected picture to show ${pattern}`);
+  if (UPDATE_SCREENSHOTS) {
+    await page.getByTestId('tube-opening').screenshot({ path: path.join(SHOTS_DIR, file) });
+  }
 }
 
 test.describe('screenshots (committed evidence)', () => {

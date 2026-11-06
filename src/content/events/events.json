@@ -20,6 +20,7 @@
       "seams": ["tune-in"],
       "when": { "distinctChannelsGte": 0 },
       "limit": { "perSession": 2 },
+      "cooldownMs": 1440000,
       "priority": 1,
       "steps": [
         { "do": "static", "ms": 800 },

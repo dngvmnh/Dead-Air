@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { decideEvent, GLOBAL_GAP_MS, type DecideInput } from './director.ts';
-import { createMemory, memoryReducer, type ViewerMemory } from './memory.ts';
+import { createMemory, DEMO_DIVISOR, memoryReducer, type ViewerMemory } from './memory.ts';
 import type { HorrorEventInput } from '../content/schema.ts';
 import type { Item, Seam } from './types.ts';
 
@@ -121,6 +121,31 @@ describe('decideEvent: global 90s gap (requirement 9.7)', () => {
     expect(decideEvent(after)?.id).toBe('E');
   });
 
+  it('a cooldown blocks a repeat within the window, demo-scaled (room 9.2)', () => {
+    const now = 10_000_000;
+    const cooldownMs = 1_440_000; // E02's cooldown
+    const e = ev({ id: 'E02', cooldownMs, chain: true }); // chain so only the cooldown gates it
+    const firedRecently: ViewerMemory = {
+      ...createMemory(0),
+      firedEvents: { E02: { count: 1, lastAt: now - 120_000 } }, // 2 min ago
+    };
+    // Normal run: 2 min < 24 min cooldown → blocked.
+    expect(decideEvent(baseInput({ events: [e], memory: firedRecently, nowMs: now }))).toBeNull();
+    // Demo run: cooldown is 24min / 8 = 3 min, and only 2 min has passed → still
+    // blocked, so E02 can't repeat within the demo's first few minutes.
+    expect(
+      decideEvent(baseInput({ events: [e], memory: firedRecently, nowMs: now, demo: true })),
+    ).toBeNull();
+    // Well past the demo cooldown (4 min): allowed again in demo.
+    const longAgo: ViewerMemory = {
+      ...createMemory(0),
+      firedEvents: { E02: { count: 1, lastAt: now - 240_000 } },
+    };
+    expect(
+      decideEvent(baseInput({ events: [e], memory: longAgo, nowMs: now, demo: true }))?.id,
+    ).toBe('E02');
+  });
+
   it('a chain event bypasses the gap', () => {
     const chain = ev({ id: 'C', chain: true });
     const input = baseInput({ events: [chain], lastEventAt: 1_000_000 - 1, nowMs: 1_000_000 });
@@ -139,10 +164,15 @@ describe('decideEvent: global 90s gap (requirement 9.7)', () => {
     );
   });
 
-  it('demo shortens the gap by six', () => {
+  it('demo shortens the gap by DEMO_DIVISOR (room 9.3)', () => {
     const now = 2_000_000;
-    // 20s since last: blocked normally, allowed in demo (gap/6 = 15s).
-    const input = baseInput({ events: [ev()], lastEventAt: now - 20_000, nowMs: now });
+    // A gap between gap/DEMO_DIVISOR and the full gap: blocked normally, allowed
+    // in demo. With DEMO_DIVISOR = 8 the demo gap is 11.25s, so 30s is well
+    // inside the full 90s gap but well past the demo gap.
+    const sinceLast = Math.floor(GLOBAL_GAP_MS / 3); // 30s
+    expect(sinceLast).toBeGreaterThan(GLOBAL_GAP_MS / DEMO_DIVISOR);
+    expect(sinceLast).toBeLessThan(GLOBAL_GAP_MS);
+    const input = baseInput({ events: [ev()], lastEventAt: now - sinceLast, nowMs: now });
     expect(decideEvent(input)).toBeNull();
     expect(decideEvent({ ...input, demo: true })?.id).toBe('E');
   });

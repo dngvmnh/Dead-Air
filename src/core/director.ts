@@ -13,7 +13,7 @@
 
 import type { HorrorEventInput } from '../content/schema.ts';
 import { evaluateCondition } from './conditions.ts';
-import { effectiveAct, type ViewerMemory } from './memory.ts';
+import { DEMO_DIVISOR, effectiveAct, type ViewerMemory } from './memory.ts';
 import type { ChannelId, Item, Seam } from './types.ts';
 
 /** The global minimum gap between events (requirement 9.7), `chain` exempt. */
@@ -75,7 +75,9 @@ function cooldownOk(ev: HorrorEventInput, mem: ViewerMemory, nowMs: number, divi
  */
 export function decideEvent(input: DecideInput): HorrorEventInput | null {
   const { memory, channel, seam, currentSource, nowMs, lastEventAt, sessionFired, events } = input;
-  const divisor = input.demo ? 6 : 1;
+  // Single demo divisor from core/memory (dead-air-room req 9.3): cooldowns and
+  // the global gap shrink by the same factor as the act time thresholds.
+  const divisor = input.demo ? DEMO_DIVISOR : 1;
   const act = effectiveAct(memory, input.demo ?? false);
 
   const gapElapsed = lastEventAt === null || nowMs - lastEventAt >= GLOBAL_GAP_MS / divisor;

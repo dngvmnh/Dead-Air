@@ -49,8 +49,12 @@ export interface ScreenProps {
 function steadyDrive(phase: TvPhase): { power: number; static: number } {
   switch (phase) {
     case 'STAND_BY':
-    case 'SIGN_OFF':
       return { power: 1, static: 0.4 };
+    // The sign-off text must sit on a near-clean picture for its full 8s
+    // (dead-air-room requirement 9.1: static 0.05 or less). STAND_BY keeps its
+    // dead-air hiss; SIGN_OFF does not.
+    case 'SIGN_OFF':
+      return { power: 1, static: 0.04 };
     case 'ON_AIR':
     case 'EVENT':
       return { power: 1, static: 0.08 };

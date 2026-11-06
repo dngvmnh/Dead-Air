@@ -6,11 +6,11 @@ Tick a task only when the behaviour has been seen in a real browser, not because
 
 ## Phase A: Corrections
 
-- [ ] 1. MVP corrections
-  - [ ] 1.1 Sign-off static at 0.05 or less, for the full 8 seconds.
-  - [ ] 1.2 E02 cooldown, so it can't repeat within minutes.
-  - [ ] 1.3 `DEMO_DIVISOR` = 8. Remove the hard-coded 6 in `core/director.ts`, and update tests and comments.
-  - [ ] 1.4 Stop test runs modifying committed files. Write screenshots only when `UPDATE_SCREENSHOTS=1`.
+- [x] 1. MVP corrections
+  - [x] 1.1 Sign-off static at 0.05 or less, for the full 8 seconds.
+  - [x] 1.2 E02 cooldown, so it can't repeat within minutes.
+  - [x] 1.3 `DEMO_DIVISOR` = 8. Remove the hard-coded 6 in `core/director.ts`, and update tests and comments.
+  - [x] 1.4 Stop test runs modifying committed files. Write screenshots only when `UPDATE_SCREENSHOTS=1`.
   - _Requirements: 9.1–9.3, 9.5_
 
 ## Phase B: Tear the wall
