@@ -410,3 +410,52 @@ done, how it was checked, and anything left unverified.
 - Unverified: nothing new for this checkpoint; it proves the clock → adapter →
   re-resolve continuity directly. Milestone 3 (viewer memory, director, channels
   04/07/13, sign-off) is next, ending at the task 16 MVP checkpoint.
+## Task 12 — Viewer memory (reducer, acts, demo divisor, store, watch time)
+
+- Mode: direct implementation (the `spec-task-execution` subagent is still
+  absent from the registry).
+- Done:
+  - `src/core/memory.ts` (pure, 12.1): `ViewerMemory` shape (design §8), the
+    `memoryReducer` (visit/watch/eventFired/signOffComplete/touch/setSettings/
+    ackNotice), act computation (`naturalAct`/`effectiveAct`) with the design §8
+    thresholds, monotonicity (act never decreases except act 4 on sign-off,
+    requirement 8.1), the demo divisor (÷6 on time thresholds, requirement 8.2),
+    visit-order capped at 50 (7.1), and `beginSession` (bumps the count after a
+    >30min gap, 7.5). No Date.now/Math.random — time is an argument.
+  - `src/content/schema.ts`: `viewerMemorySchema` (strict Zod) for the persisted
+    shape, so a corrupt/wrong-version value is rejected and memory starts fresh.
+  - `src/persistence/memoryStore.ts` (12.2): versioned localStorage at
+    `deadair.memory.v1`, Zod-validated load with fresh fallback (7.4), writes
+    throttled to ≤ every 5s with a `flush()` for visibilitychange (7.3), `erase()`
+    for `?reset=1`/Forget me (7.6), and a `resetRequested` helper. All access is
+    try/catch so a blocked/quota storage never throws (7.4). Injectable storage
+    and clock for tests.
+  - `useTelevision` (12.3): loads memory on mount (honouring `?reset=1`), starts
+    a session, restores persisted settings + noticeSeen, records a `visit` on
+    every tune, and runs a 1s watch-time ticker that counts only while the
+    document is visible, phase is ON_AIR, and an owned source is playing (7.2);
+    persists throttled and flushes on hidden/unmount. Scene `when` variants and
+    the act now read real memory. Forget me erases storage and resets live
+    memory without immediately re-persisting (storage stays empty until the next
+    activity, 7.6). `?demo=1` is read once and threaded into the reducer.
+- Checked: `npm test` 219 passed (15 new memory-core tests incl. a fast-check
+  act-monotonicity property; 9 memoryStore tests covering fresh/round-trip/
+  corrupt/wrong-version/throttle+flush/erase/no-storage/quota; existing App
+  "Forget me" test still green after fixing the re-persist). `npm run lint`
+  clean (fixed two new react-hooks rule hits: an impure `Date.now()` in a useRef
+  initializer → seed with epoch 0 then set the real memory in the load effect; a
+  missing dep). `npm run build` clean (JS 112.96 KB gzip, within budget).
+  `npm run validate:catalog` passes. Browser: full e2e 14/14 green on chromium.
+  Rewrote `channel02`'s item-boundary test to use Playwright's fake clock (it
+  was a real-time race flaky under parallel workers); it is now deterministic
+  and passes on repeat-each=2. Chromium only; firefox/webkit not run.
+- Decisions made alone: (1) a per-channel visit map was replaced wholesale by
+  real memory; act monotonicity and demo divisor are enforced in the reducer so
+  every caller gets them. (2) Forget me suppresses the one settings-reset
+  re-persist via a ref so storage genuinely empties (matches requirement 7.6 and
+  the existing test). (3) the item-boundary e2e moved to a mocked clock to be
+  deterministic — this strengthens, not weakens, the assertion. All reversible.
+- Unverified: the director does not yet consume memory (task 13); escalation
+  acts are computed and stored but no event fires on them until the director and
+  channels 04/07/13 land. Watch-time visibility gating is exercised by unit
+  logic; the real document.hidden path is only lightly covered.

@@ -58,6 +58,14 @@ async function readPixels(page: Page): Promise<Pixels> {
   });
 }
 
+function broadcastPos(page: Page): Promise<number | null> {
+  return page.evaluate(
+    () =>
+      (window as unknown as { __tv?: { broadcastPositionMs: () => number | null } }).__tv
+        ?.broadcastPositionMs() ?? null,
+  );
+}
+
 test.describe('Channel 02 rundown', () => {
   test('tunes to channel 02 and draws the scene on the tube', async ({ page }) => {
     await ready(page);
@@ -95,22 +103,42 @@ test.describe('Channel 02 rundown', () => {
   test('advances across an item boundary without user action (requirement 3.3)', async ({
     page,
   }) => {
-    await ready(page);
+    // Use a fake clock so progression is deterministic (no real-time race under
+    // parallel workers). The first item (station ID) is 8s; after ~10s the
+    // clock must have re-resolved to a later item with no user input.
+    await page.clock.install({ time: new Date('2026-01-01T20:00:00Z') });
+    await page.addInitScript(() => {
+      (window as unknown as { __CRT_PRESERVE_DRAWING_BUFFER__?: boolean })
+        .__CRT_PRESERVE_DRAWING_BUFFER__ = true;
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: /i understand/i }).click();
     const tube = page.getByTestId('tube-opening');
 
     await page.getByRole('button', { name: /^power$/i }).click();
-    await expect
-      .poll(async () => tube.getAttribute('data-phase'), { timeout: 15000 })
-      .toBe('ON_AIR');
+    await page.clock.runFor(2500); // boot + tune
+    await expect.poll(async () => tube.getAttribute('data-phase'), { timeout: 10000 }).toBe('ON_AIR');
 
-    // The first item (station ID) is 8s. Within ~12s the clock should re-resolve
-    // to the next item without any input, and the TV stays ON_AIR (or passes
-    // through a brief EVENT/TUNING re-resolve) with a lit picture throughout.
-    // We prove progression by observing the canvas keeps drawing a lit picture
-    // after the first item's duration elapses.
-    await page.waitForTimeout(9000);
-    const px = await readPixels(page);
-    expect(px.meanLum).toBeGreaterThan(10);
+    const pos0 = await broadcastPos(page);
+    expect(pos0).not.toBeNull();
+
+    // Advance 10s of wall-clock time: past the 8s first item. The clock-driven
+    // item-end fires ITEM_ENDED and re-resolves with no user action.
+    await page.clock.runFor(10_000);
+
+    const TOTAL_MS = 92_000;
+    await expect
+      .poll(
+        async () => {
+          const p = await broadcastPos(page);
+          if (p === null) return 0;
+          return ((p - (pos0 as number)) % TOTAL_MS + TOTAL_MS) % TOTAL_MS;
+        },
+        { timeout: 8000, intervals: [200] },
+      )
+      .toBeGreaterThan(8000);
+
+    // The TV is still playing a programme (not off/idle) after the boundary.
     expect(['ON_AIR', 'EVENT', 'TUNING']).toContain(await tube.getAttribute('data-phase'));
   });
 });

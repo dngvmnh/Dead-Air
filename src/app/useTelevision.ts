@@ -17,6 +17,15 @@ import { type SceneContext } from '../playback/PlaybackAdapter.ts';
 import { type Renderer } from '../render/Renderer.ts';
 import { type CrtSource } from '../render/CrtRenderer.ts';
 import { type SceneVars } from '../core/scene.ts';
+import {
+  beginSession,
+  createMemory,
+  demoActive,
+  memoryReducer,
+  type MemoryAction,
+  type ViewerMemory,
+} from '../core/memory.ts';
+import { MemoryStore, resetRequested } from '../persistence/memoryStore.ts';
 
 /**
  * Milestone 1 orchestrator.
@@ -112,11 +121,41 @@ export function useTelevision(): TelevisionApi {
   const adapterOffRef = useRef<(() => void) | null>(null);
   // Timer that fires ITEM_ENDED when the current item's remaining time elapses.
   const itemEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Per-channel visit counts, so scene `when` variants work before viewer
-  // memory lands (task 12). Keyed by channel id; first tune is visit 1.
-  const visitsRef = useRef<Map<ChannelId, number>>(new Map());
-  // The act is 0 until escalation lands in Milestone 3.
-  const actRef = useRef(0);
+  // --- Viewer memory (task 12) -------------------------------------------
+  // `?demo=1` divides time thresholds by six (requirement 8.2).
+  const demo = typeof window !== 'undefined' ? demoActive(window.location.search) : false;
+  const storeRef = useRef<MemoryStore | null>(null);
+  const getStore = useCallback((): MemoryStore => {
+    if (!storeRef.current) storeRef.current = new MemoryStore();
+    return storeRef.current;
+  }, []);
+  // The live memory. Loaded on mount (honouring ?reset=1), then advanced by the
+  // reducer. Held in a ref so async callbacks read the latest without re-running
+  // effects; the act is mirrored into state so the UI/escalation can react.
+  // Seeded with a placeholder (epoch 0) during render — pure. The load effect
+  // replaces it with the real memory (seeded from Date.now) on mount.
+  const memoryRef = useRef<ViewerMemory>(createMemory(0));
+  // Watch-time accumulator: a 1s ticker counts only while visible, on air, and
+  // the adapter is playing (requirement 7.2). `playingRef` tracks that.
+  const playingRef = useRef(false);
+  const watchTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // True once memory has loaded, so the settings effect does not write the
+  // default settings over the persisted ones before the load runs.
+  const memoryReadyRef = useRef(false);
+  // Set by Forget me so the settings reset it triggers does not immediately
+  // re-persist a fresh memory (requirement 7.6: storage stays empty until the
+  // viewer does something again).
+  const skipSettingsPersistRef = useRef(false);
+
+  // Apply a memory action, persist (throttled), and mirror the act into state.
+  const dispatchMemory = useCallback(
+    (action: MemoryAction) => {
+      const next = memoryReducer(memoryRef.current, action, demo);
+      memoryRef.current = next;
+      getStore().save(next);
+    },
+    [demo, getStore],
+  );
 
   const getSceneAdapter = useCallback((): SceneAdapter => {
     if (!sceneAdapterRef.current) sceneAdapterRef.current = new SceneAdapter();
@@ -142,10 +181,11 @@ export function useTelevision(): TelevisionApi {
         // Preloaded bitmaps arrive with real art (task 21); placeholder scenes
         // draw labelled blocks until then, so no images to hand over yet.
         getImages: () => undefined,
-        getVars: (): SceneVars => ({
-          visits: visitsRef.current.get((stateRef.current.channel ?? 2) as ChannelId) ?? 1,
-          act: actRef.current,
-        }),
+        getVars: (): SceneVars => {
+          const ch = (stateRef.current.channel ?? 2) as ChannelId;
+          const visits = memoryRef.current.channels[ch]?.visits ?? 0;
+          return { visits: Math.max(1, visits), act: memoryRef.current.act };
+        },
         setSource: (source) => rendererRef.current?.setSource(source as CrtSource | null),
         setLook: (look: Look) => rendererRef.current?.setLook(look),
         now: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
@@ -218,6 +258,7 @@ export function useTelevision(): TelevisionApi {
 
   const stopPlayback = useCallback(() => {
     clearItemEndTimer();
+    playingRef.current = false;
     adapterOffRef.current?.();
     adapterOffRef.current = null;
     sceneAdapterRef.current?.stop();
@@ -234,6 +275,16 @@ export function useTelevision(): TelevisionApi {
       audio.setVolume(settings.volume);
       audio.setMuted(settings.muted);
     }
+    // Persist settings into viewer memory so they survive a reload. Guard the
+    // first run (before memory loads), and the one tick right after Forget me
+    // (which must leave storage empty — requirement 7.6 — until real activity
+    // resumes), with refs.
+    if (memoryReadyRef.current && !skipSettingsPersistRef.current) {
+      dispatchMemory({ type: 'setSettings', settings });
+    }
+    skipSettingsPersistRef.current = false;
+    // dispatchMemory is stable; settings is the trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
 
   const clearTimers = useCallback(() => {
@@ -262,9 +313,12 @@ export function useTelevision(): TelevisionApi {
         const dispatchEnded = (): void => sendRef.current({ type: 'ITEM_ENDED', token });
         const remainingMs = startResolvedSource(channel, dispatchEnded);
         if (remainingMs === null) {
+          playingRef.current = false;
           sendRef.current({ type: 'NOTHING_PLAYABLE', token });
           return;
         }
+        // An owned source is now playing: watch time may accrue (req 7.2).
+        playingRef.current = true;
         clearItemEndTimer();
         itemEndTimer.current = setTimeout(() => {
           itemEndTimer.current = null;
@@ -302,9 +356,10 @@ export function useTelevision(): TelevisionApi {
           }
           case 'startTuning': {
             if (tuneTimer.current !== null) clearTimeout(tuneTimer.current);
-            // Count this visit so scene `when` variants escalate on revisit
-            // (requirement 8.3). Real viewer memory supersedes this in task 12.
-            visitsRef.current.set(effect.channel, (visitsRef.current.get(effect.channel) ?? 0) + 1);
+            // Record the visit (visit count, last channel, visit order) so
+            // scene `when` variants escalate on revisit and the act advances
+            // (requirements 7.1, 8.1, 8.3).
+            dispatchMemory({ type: 'visit', channel: effect.channel, atMs: Date.now() });
             // Tuning click + full static snow while acquiring the station.
             audioRef.current?.playTuningClick();
             audioRef.current?.setStatic(1);
@@ -368,7 +423,7 @@ export function useTelevision(): TelevisionApi {
         }
       }
     },
-    [clearTimers, getAudio, startResolvedSource, stopPlayback, clearItemEndTimer],
+    [clearTimers, getAudio, startResolvedSource, stopPlayback, clearItemEndTimer, dispatchMemory],
   );
 
   /**
@@ -403,6 +458,59 @@ export function useTelevision(): TelevisionApi {
     };
   }, [stopPlayback]);
 
+  // Load viewer memory on mount: honour ?reset=1 (requirement 7.6), start a
+  // session (bumping the count after a >30min gap, requirement 7.5), apply the
+  // persisted settings and noticeSeen, start the watch-time ticker, and flush
+  // on hidden (requirement 7.3). Everything is best-effort; a blocked storage
+  // never crashes the TV (requirement 7.4).
+  useEffect(() => {
+    const store = getStore();
+    if (typeof window !== 'undefined' && resetRequested(window.location.search)) {
+      store.erase();
+    }
+    const loaded = beginSession(store.load(), Date.now(), demo);
+    memoryRef.current = loaded;
+    store.save(loaded);
+    // Restore persisted settings, but keep reduced-effects honouring the OS
+    // setting if either asks for it.
+    setSettings((s) => ({
+      ...s,
+      ...loaded.settings,
+      reducedEffects: loaded.settings.reducedEffects || prefersReducedMotion(),
+    }));
+    if (loaded.noticeSeen) setState((st) => ({ ...st, noticeSeen: true }));
+    stateRef.current = { ...stateRef.current, noticeSeen: loaded.noticeSeen };
+    memoryReadyRef.current = true;
+
+    // Watch-time ticker: count only while visible, on air, and playing (7.2).
+    const TICK_MS = 1000;
+    watchTimer.current = setInterval(() => {
+      const visible = typeof document === 'undefined' || document.visibilityState === 'visible';
+      const onAir = stateRef.current.phase === 'ON_AIR';
+      const channel = stateRef.current.channel;
+      if (visible && onAir && playingRef.current && channel !== null) {
+        dispatchMemory({ type: 'watch', channel, deltaMs: TICK_MS });
+      }
+    }, TICK_MS);
+
+    const onVisibility = (): void => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        store.flush(memoryRef.current);
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility);
+    }
+    return () => {
+      if (watchTimer.current !== null) clearInterval(watchTimer.current);
+      watchTimer.current = null;
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility);
+      }
+      store.flush(memoryRef.current);
+    };
+  }, [demo, getStore, dispatchMemory]);
+
   const power = useCallback(() => send({ type: 'POWER' }), [send]);
   const channelUp = useCallback(() => send({ type: 'CHANNEL_UP' }), [send]);
   const channelDown = useCallback(() => send({ type: 'CHANNEL_DOWN' }), [send]);
@@ -410,7 +518,10 @@ export function useTelevision(): TelevisionApi {
     (channel: ChannelId) => send({ type: 'SET_CHANNEL', channel }),
     [send],
   );
-  const acknowledgeNotice = useCallback(() => send({ type: 'ACK_NOTICE' }), [send]);
+  const acknowledgeNotice = useCallback(() => {
+    dispatchMemory({ type: 'ackNotice' });
+    send({ type: 'ACK_NOTICE' });
+  }, [send, dispatchMemory]);
 
   const setVolume = useCallback((volume: number) => {
     const clamped = Math.max(0, Math.min(1, volume));
@@ -426,16 +537,15 @@ export function useTelevision(): TelevisionApi {
     [],
   );
   const forgetMe = useCallback(() => {
-    // Memory persistence arrives in Milestone 3. For now clear any stored key
-    // and reset the session settings so "Forget me" is wired and honest.
-    try {
-      window.localStorage.removeItem('deadair.memory.v1');
-    } catch {
-      // Storage unavailable; nothing persisted to clear.
-    }
+    // Erase all persisted memory and reset the live memory (requirement 7.6).
+    // Suppress the re-persist that the settings reset below would otherwise
+    // trigger, so storage stays empty until the viewer acts again.
+    skipSettingsPersistRef.current = true;
+    getStore().erase();
+    memoryRef.current = createMemory(Date.now());
     setSettings({ ...DEFAULT_SETTINGS, reducedEffects: prefersReducedMotion() });
     setAnnouncement('Memory erased');
-  }, []);
+  }, [getStore]);
 
   return useMemo(
     () => ({

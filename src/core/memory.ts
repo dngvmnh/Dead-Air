@@ -1,0 +1,221 @@
+/**
+ * Viewer memory (design §8, requirement 7 and 8). Pure logic only: the reducer,
+ * the act computation and the demo-divisor live here; persistence to
+ * localStorage is `persistence/memoryStore.ts`. No DOM, no Date.now,
+ * no Math.random — time is always an argument (tech.md core purity).
+ *
+ * The memory is the single input to escalation: the director and scene `when`
+ * variants read it, and the act it yields never decreases except after a reset
+ * (requirement 8.1).
+ */
+
+import { CHANNEL_CYCLE, type ChannelId } from './types.ts';
+
+export type Act = 0 | 1 | 2 | 3 | 4;
+
+export interface ChannelMemory {
+  visits: number;
+  watchMs: number;
+  lastVisitedAt: number | null;
+}
+
+export interface ViewerMemory {
+  schemaVersion: 1;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  sessionCount: number;
+  totalWatchMs: number;
+  channels: Record<ChannelId, ChannelMemory>;
+  /** The 50 most recent channel visits, oldest first. */
+  visitOrder: ChannelId[];
+  lastChannel: ChannelId | null;
+  firedEvents: Record<string, { count: number; lastAt: number }>;
+  act: Act;
+  noticeSeen: boolean;
+  settings: { volume: number; muted: boolean; captions: boolean; reducedEffects: boolean };
+}
+
+export const MEMORY_SCHEMA_VERSION = 1 as const;
+export const VISIT_ORDER_LIMIT = 50;
+/** A gap longer than this since last activity starts a new session (req 7.5). */
+export const NEW_SESSION_GAP_MS = 30 * 60 * 1000;
+/** `?demo=1` divides time thresholds and cooldowns by this (requirement 8.2). */
+export const DEMO_DIVISOR = 6;
+
+function emptyChannels(): Record<ChannelId, ChannelMemory> {
+  const out = {} as Record<ChannelId, ChannelMemory>;
+  for (const id of CHANNEL_CYCLE) {
+    out[id] = { visits: 0, watchMs: 0, lastVisitedAt: null };
+  }
+  return out;
+}
+
+export function createMemory(nowMs: number): ViewerMemory {
+  return {
+    schemaVersion: MEMORY_SCHEMA_VERSION,
+    firstSeenAt: nowMs,
+    lastSeenAt: nowMs,
+    sessionCount: 1,
+    totalWatchMs: 0,
+    channels: emptyChannels(),
+    visitOrder: [],
+    lastChannel: null,
+    firedEvents: {},
+    act: 0,
+    noticeSeen: false,
+    settings: { volume: 0.7, muted: false, captions: false, reducedEffects: false },
+  };
+}
+
+// --- Act computation (design §8) -------------------------------------------
+
+function distinctChannels(mem: ViewerMemory): number {
+  return CHANNEL_CYCLE.filter((id) => mem.channels[id].visits > 0).length;
+}
+
+function anyRevisited(mem: ViewerMemory): boolean {
+  return CHANNEL_CYCLE.some((id) => mem.channels[id].visits >= 2);
+}
+
+function allFourVisited(mem: ViewerMemory): boolean {
+  return CHANNEL_CYCLE.every((id) => mem.channels[id].visits > 0);
+}
+
+/**
+ * The act implied by the memory right now, before monotonicity. `demo` divides
+ * the time thresholds by {@link DEMO_DIVISOR} (requirement 8.2). Act 4 is only
+ * ever set by the sign-off completing (design §8), never derived here, so this
+ * returns at most 3.
+ */
+export function naturalAct(mem: ViewerMemory, demo: boolean): Act {
+  const d = demo ? DEMO_DIVISOR : 1;
+  const min = (minutes: number): number => (minutes * 60 * 1000) / d;
+
+  // Act 3 — Terminal: ≥14 min, all four channels, and E07 fired.
+  if (mem.totalWatchMs >= min(14) && allFourVisited(mem) && (mem.firedEvents['E07']?.count ?? 0) > 0) {
+    return 3;
+  }
+  // Act 2 — Aware: ≥8 min and ≥3 distinct channels, OR ≥2 sessions and ≥2 distinct.
+  const distinct = distinctChannels(mem);
+  if (
+    (mem.totalWatchMs >= min(8) && distinct >= 3) ||
+    (mem.sessionCount >= 2 && distinct >= 2)
+  ) {
+    return 2;
+  }
+  // Act 1 — Unease: ≥3 min total, or a channel revisited.
+  if (mem.totalWatchMs >= min(3) || anyRevisited(mem)) {
+    return 1;
+  }
+  return 0;
+}
+
+/**
+ * The effective act: the natural act, floored by the act already recorded so it
+ * never decreases (requirement 8.1), and pinned to 4 once after-hours is set.
+ */
+export function effectiveAct(mem: ViewerMemory, demo: boolean): Act {
+  if (mem.act === 4) return 4;
+  const natural = naturalAct(mem, demo);
+  return (natural > mem.act ? natural : mem.act) as Act;
+}
+
+// --- Reducer (design §8) ---------------------------------------------------
+
+export type MemoryAction =
+  | { type: 'visit'; channel: ChannelId; atMs: number }
+  | { type: 'watch'; channel: ChannelId; deltaMs: number }
+  | { type: 'eventFired'; eventId: string; atMs: number }
+  | { type: 'signOffComplete' }
+  | { type: 'touch'; atMs: number }
+  | { type: 'setSettings'; settings: Partial<ViewerMemory['settings']> }
+  | { type: 'ackNotice' };
+
+/**
+ * Advance memory by one action, recomputing the monotonic act. `demo` only
+ * affects the thresholds, never what is stored (requirement 8.2). Pure: returns
+ * a new object, never mutates the input.
+ */
+export function memoryReducer(mem: ViewerMemory, action: MemoryAction, demo: boolean): ViewerMemory {
+  const next = applyAction(mem, action);
+  return { ...next, act: effectiveAct(next, demo) };
+}
+
+function applyAction(mem: ViewerMemory, action: MemoryAction): ViewerMemory {
+  switch (action.type) {
+    case 'visit': {
+      const ch = mem.channels[action.channel];
+      const visitOrder = [...mem.visitOrder, action.channel].slice(-VISIT_ORDER_LIMIT);
+      return {
+        ...mem,
+        lastSeenAt: action.atMs,
+        lastChannel: action.channel,
+        visitOrder,
+        channels: {
+          ...mem.channels,
+          [action.channel]: {
+            ...ch,
+            visits: ch.visits + 1,
+            lastVisitedAt: action.atMs,
+          },
+        },
+      };
+    }
+    case 'watch': {
+      if (action.deltaMs <= 0) return mem;
+      const ch = mem.channels[action.channel];
+      return {
+        ...mem,
+        totalWatchMs: mem.totalWatchMs + action.deltaMs,
+        channels: {
+          ...mem.channels,
+          [action.channel]: { ...ch, watchMs: ch.watchMs + action.deltaMs },
+        },
+      };
+    }
+    case 'eventFired': {
+      const prev = mem.firedEvents[action.eventId];
+      return {
+        ...mem,
+        firedEvents: {
+          ...mem.firedEvents,
+          [action.eventId]: { count: (prev?.count ?? 0) + 1, lastAt: action.atMs },
+        },
+      };
+    }
+    case 'signOffComplete':
+      return { ...mem, act: 4 };
+    case 'touch':
+      return { ...mem, lastSeenAt: action.atMs };
+    case 'setSettings':
+      return { ...mem, settings: { ...mem.settings, ...action.settings } };
+    case 'ackNotice':
+      return { ...mem, noticeSeen: true };
+  }
+}
+
+/**
+ * Begin a session at `nowMs`: bump `sessionCount` when more than
+ * {@link NEW_SESSION_GAP_MS} has elapsed since last activity (requirement 7.5).
+ * Always refreshes `lastSeenAt`. A fresh memory (sessionCount 1, lastSeenAt ==
+ * firstSeenAt) is left at 1.
+ */
+export function beginSession(mem: ViewerMemory, nowMs: number, demo: boolean): ViewerMemory {
+  const isFresh = mem.sessionCount === 1 && mem.firstSeenAt === mem.lastSeenAt;
+  const gap = nowMs - mem.lastSeenAt;
+  const bumped = !isFresh && gap > NEW_SESSION_GAP_MS;
+  const next: ViewerMemory = {
+    ...mem,
+    sessionCount: bumped ? mem.sessionCount + 1 : mem.sessionCount,
+    lastSeenAt: nowMs,
+  };
+  return { ...next, act: effectiveAct(next, demo) };
+}
+
+/**
+ * The demo time divisor applied to a fresh memory's visible act, exposed for
+ * the UI to reason about `?demo=1`. (The act itself is computed above.)
+ */
+export function demoActive(search: string): boolean {
+  return new URLSearchParams(search).get('demo') === '1';
+}

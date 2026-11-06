@@ -319,6 +319,54 @@ export const horrorEventSchema = z
 export type SeamInput = z.infer<typeof seamSchema>;
 export type EventStepInput = z.infer<typeof eventStepSchema>;
 export type HorrorEventInput = z.infer<typeof horrorEventSchema>;
+// --- Persisted viewer memory (design §8, requirement 7) --------------------
+
+const channelMemorySchema = z
+  .object({
+    visits: z.number().int().nonnegative(),
+    watchMs: z.number().nonnegative(),
+    lastVisitedAt: z.number().nullable(),
+  })
+  .strict();
+
+/**
+ * Schema for `deadair.memory.v1`. Reads go through this; on any failure the
+ * store starts fresh (requirement 7.4), so the shape is validated strictly.
+ */
+export const viewerMemorySchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    firstSeenAt: z.number(),
+    lastSeenAt: z.number(),
+    sessionCount: z.number().int().positive(),
+    totalWatchMs: z.number().nonnegative(),
+    channels: z.object({
+      2: channelMemorySchema,
+      4: channelMemorySchema,
+      7: channelMemorySchema,
+      13: channelMemorySchema,
+    }).strict(),
+    visitOrder: z.array(channelIdSchema),
+    lastChannel: channelIdSchema.nullable(),
+    firedEvents: z.record(
+      z.string(),
+      z.object({ count: z.number().int().nonnegative(), lastAt: z.number() }).strict(),
+    ),
+    act: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+    noticeSeen: z.boolean(),
+    settings: z
+      .object({
+        volume: z.number().min(0).max(1),
+        muted: z.boolean(),
+        captions: z.boolean(),
+        reducedEffects: z.boolean(),
+      })
+      .strict(),
+  })
+  .strict();
+
+export type ViewerMemoryInput = z.infer<typeof viewerMemorySchema>;
+
 export type KeyframeInput = z.infer<typeof keyframeSchema>;
 export type CaptionInput = z.infer<typeof captionSchema>;
 export type RightsInput = z.infer<typeof rightsSchema>;

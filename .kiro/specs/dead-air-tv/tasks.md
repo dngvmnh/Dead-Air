@@ -49,10 +49,10 @@ Work in order. Each milestone ends in something runnable. Commit after each comp
 
 ## Milestone 3: Memory and horror
 
-- [ ] 12. Viewer memory
-  - [ ] 12.1 Implement the reducer, act computation, and demo divisor with tests.
-  - [ ] 12.2 Implement `memoryStore` with versioning, throttling, fallback, session detection, `?reset=1`, and Forget me.
-  - [ ] 12.3 Track watch time only while visible, on air, and playing.
+- [x] 12. Viewer memory
+  - [x] 12.1 Implement the reducer, act computation, and demo divisor with tests.
+  - [x] 12.2 Implement `memoryStore` with versioning, throttling, fallback, session detection, `?reset=1`, and Forget me.
+  - [x] 12.3 Track watch time only while visible, on air, and playing.
   - _Requirements: 7.1–7.7, 8.1, 8.2_
 - [ ] 13. Director
   - [ ] 13.1 Implement conditions and templates with tests.
