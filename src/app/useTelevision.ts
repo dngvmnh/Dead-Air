@@ -25,6 +25,7 @@ import { type SceneVars } from '../core/scene.ts';
 import { EventPresenter } from '../playback/EventPresenter.ts';
 import { channelInfo as channelInfoLookup } from '../core/channels.ts';
 import { deriveRoom, type RoomState } from '../core/roomState.ts';
+import { deriveBehind, type BehindView } from '../core/behindState.ts';
 import {
   beginSession,
   createMemory,
@@ -82,6 +83,8 @@ export interface TelevisionApi {
    * smooths the result; it never samples a YouTube player.
    */
   getRoomState: (reduced: boolean, localHour: number, localMinute: number) => RoomState;
+  /** What a tear reveals for this viewer now (design §4). Memory stays in here. */
+  getBehindView: (localHour: number, localMinute: number) => BehindView;
 }
 
 const DEFAULT_SETTINGS: UiSettings = {
@@ -630,6 +633,17 @@ export function useTelevision(): TelevisionApi {
     [getRoomPicture],
   );
 
+  const getBehindView = useCallback((localHour: number, localMinute: number): BehindView => {
+    const first = new Date(memoryRef.current.firstSeenAt);
+    return deriveBehind(memoryRef.current, {
+      channel: stateRef.current.channel ?? 2,
+      localHour,
+      localMinute,
+      firstSeenHour: first.getHours(),
+      firstSeenMinute: first.getMinutes(),
+    });
+  }, []);
+
   // Latest settings, readable from async callbacks (e.g. audio unlock) without
   // recreating them on every settings change. Assigned in an effect (not during
   // render) and used to keep the audio engine's volume/mute in sync.
@@ -1084,6 +1098,7 @@ export function useTelevision(): TelevisionApi {
       registerRenderer,
       getAudio,
       getRoomState,
+      getBehindView,
     }),
     [
       state,
@@ -1102,6 +1117,7 @@ export function useTelevision(): TelevisionApi {
       registerRenderer,
       getAudio,
       getRoomState,
+      getBehindView,
     ],
   );
 }

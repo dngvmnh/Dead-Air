@@ -14,9 +14,11 @@ import {
   type TearSheet,
 } from '../../core/tearSheet.ts';
 import { TearGLRenderer } from '../../render/tearRenderer.ts';
-import { bakeRoom, bakeBehindPlaster } from '../../render/roomWallpaper.ts';
+import { bakeRoom } from '../../render/roomWallpaper.ts';
+import { bakeBehindLayer } from '../../render/behindRenderer.ts';
 import type { AudioEngine } from '../../audio/AudioEngine.ts';
 import type { RoomState } from '../../core/roomState.ts';
+import type { BehindView } from '../../core/behindState.ts';
 
 /**
  * The tearable wall behind the set (design §1, §3). A full-viewport canvas at
@@ -36,6 +38,8 @@ export interface RoomCanvasProps {
   getAudio: () => AudioEngine;
   /** Derive the lit room state (ambient by act + picture glow), design §5. */
   getRoomState: (reduced: boolean, localHour: number, localMinute: number) => RoomState;
+  /** What a tear reveals for this viewer now (design §4). */
+  getBehindView: (localHour: number, localMinute: number) => BehindView;
   /** Reduced Effects / reduced motion: calmer light, no auto motion (req 8.4). */
   reduced: boolean;
 }
@@ -46,22 +50,26 @@ interface RoomSeam {
   ripSeeded: () => void;
   /** Paint everything behind the paper solid magenta, so a test can measure holes. */
   showHoleMask: (on: boolean) => void;
+  /** The act and words currently behind the wall. */
+  behind: () => { act: number; tally: number; lines: string[] };
 }
 
 const IDLE_CORNER_RADIUS = 0.12; // fraction of the sheet near the top-right corner
 
-export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: RoomCanvasProps) {
+export function RoomCanvas({ interactive, getAudio, getRoomState, getBehindView, reduced }: RoomCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const interactiveRef = useRef(interactive);
   const getRoomStateRef = useRef(getRoomState);
+  const getBehindViewRef = useRef(getBehindView);
   const reducedRef = useRef(reduced);
   // Sync the latest props into refs from an effect (not during render); the
   // loop and handlers read them live.
   useEffect(() => {
     interactiveRef.current = interactive;
     getRoomStateRef.current = getRoomState;
+    getBehindViewRef.current = getBehindView;
     reducedRef.current = reduced;
-  }, [interactive, getRoomState, reduced]);
+  }, [interactive, getRoomState, getBehindView, reduced]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -79,14 +87,18 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
     // the room simply does not render and the rest of the app is unaffected.
     const now0 = new Date();
     let front: { canvas: HTMLCanvasElement };
-    let behind: { canvas: HTMLCanvasElement };
+    let behindCanvas: TexImageSource;
+    let behindView: BehindView;
+    let behindLayer: ReturnType<typeof bakeBehindLayer>;
     try {
       // Bake the full room (wallpaper + objects + wall clock at the real local
       // time) and the plaster behind. objectVariant comes from the derived room
       // state (task 8 moves it during unobserved moments).
       const variant = getRoomStateRef.current(reducedRef.current, now0.getHours(), now0.getMinutes()).objectVariant;
       front = bakeRoom(now0.getHours(), now0.getMinutes(), variant);
-      behind = bakeBehindPlaster();
+      behindView = getBehindViewRef.current(now0.getHours(), now0.getMinutes());
+      behindLayer = bakeBehindLayer(behindView, reducedRef.current);
+      behindCanvas = behindLayer.albedo;
     } catch {
       return; // no 2D context (e.g. jsdom): render nothing, never crash.
     }
@@ -115,8 +127,49 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
     if (gl) {
       gl.setSheet(sheet);
       gl.setFrontTexture(front.canvas);
-      gl.setBehindLayer({ albedo: behind.canvas, emissive: null, holeFloor: 0.12, motion: 0 });
+      gl.setBehindLayer(behindLayer);
     }
+
+    // Memory loads after this effect and keeps changing, so what is behind the wall
+    // is re-derived on the idle tick and baked only when it would look different.
+    const syncBehind = (): boolean => {
+      const d = new Date();
+      const view = getBehindViewRef.current(d.getHours(), d.getMinutes());
+      if (view.key === behindView.key) return false;
+      behindView = view;
+      try {
+        const layer = bakeBehindLayer(view, reducedRef.current);
+        behindCanvas = layer.albedo;
+        gl?.setBehindLayer(layer);
+      } catch {
+        return false;
+      }
+      return true;
+    };
+
+    // Act 3: a shape in the dark, turning towards the pointer with a long delay.
+    // It starts behind the viewer's own tear and drifts, so it never jumps.
+    const strokeMid = { x: 0.08, y: 0.5 };
+    const pointer = { x: 0.5, y: 0.5 };
+    const shape = { x: 0.08, y: 0.5 };
+    const SHAPE_LAG_MS = 2600;
+    // The dark drifts over tens of seconds, so 5 Hz looks the same as 60 and costs
+    // a twelfth of the fill on a wall that may be torn for the rest of the session.
+    const SHAPE_REDRAW_MS = 200;
+    let lastShapeDraw = 0;
+    const updateShape = (dt: number): void => {
+      const on = behindView.act === 3 && strokeCount > 0;
+      if (!on) {
+        gl?.setShape(shape.x, shape.y, 0);
+        return;
+      }
+      if (!reducedRef.current) {
+        const k = Math.min(1, dt / SHAPE_LAG_MS);
+        shape.x += (strokeMid.x + (pointer.x - strokeMid.x) * 0.1 - shape.x) * k;
+        shape.y += (strokeMid.y + (pointer.y - strokeMid.y) * 0.1 - shape.y) * k;
+      }
+      gl?.setShape(shape.x, shape.y, 1);
+    };
 
     const cap = { w: 1280, h: 800 };
     const resize = (): void => {
@@ -193,6 +246,9 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
     };
 
     const onMove = (e: PointerEvent): void => {
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = (e.clientX - rect.left) / Math.max(1, rect.width);
+      pointer.y = (e.clientY - rect.top) / Math.max(1, rect.height);
       const d = drags.get(e.pointerId);
       if (!d) {
         // Hover feedback: grab cursor near an edge or the idle corner.
@@ -240,6 +296,10 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
       const d = drags.get(e.pointerId);
       if (!d) return;
       release(sheet, d.node);
+      if (d.points.length > 1) {
+        strokeMid.x = d.points.reduce((sum, p) => sum + p[0], 0) / d.points.length;
+        strokeMid.y = d.points.reduce((sum, p) => sum + p[1], 0) / d.points.length;
+      }
       drags.delete(e.pointerId);
       try {
         canvas.releasePointerCapture?.(e.pointerId);
@@ -307,6 +367,7 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
     let raf = 0;
     let last = performance.now();
     let lastLightAt = 0;
+    let lastBehindAt = 0;
     // The idle light refresh is throttled hard: the wall glow only needs to
     // track the picture a few times a second, and a lower cadence keeps the
     // always-on room cheap (task 10 budget) and the TV's long mocked-clock
@@ -341,22 +402,41 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
     };
     const draw = (now: number): void => {
       if (gl) gl.render(now);
-      else if (fallbackCtx) drawFallback(fallbackCtx, canvas, front.canvas, behind.canvas);
+      else if (fallbackCtx) drawFallback(fallbackCtx, canvas, front.canvas, behindCanvas);
     };
     const loop = (now: number): void => {
       const dt = now - last;
       last = now;
       const busy = drags.size > 0 || activeFrames > 0;
+      updateShape(dt);
+      // Checked whether or not the wall is busy: memory loads during the first
+      // painted second, and a tear made then must still show the right act.
+      let changedBehind = false;
+      if (now - lastBehindAt >= LIGHT_INTERVAL_MS) {
+        lastBehindAt = now;
+        changedBehind = syncBehind();
+      }
       if (busy) {
         if (activeFrames > 0) activeFrames -= 1;
         stepSheet(sheet, dt);
         applyLight();
         draw(now);
-      } else if (now - lastLightAt >= LIGHT_INTERVAL_MS) {
-        // Idle: only redraw when the light actually changed (no sim step), so a
-        // static picture costs a sample and nothing more.
-        lastLightAt = now;
-        if (applyLight()) draw(now);
+      } else {
+        let redraw = false;
+        if (now - lastLightAt >= LIGHT_INTERVAL_MS) {
+          // Idle: only redraw when something actually changed (no sim step), so a
+          // static picture costs a sample and nothing more.
+          lastLightAt = now;
+          redraw = applyLight();
+        }
+        if (changedBehind) redraw = true;
+        // Movement in the dark only exists once there is a tear to see it through.
+        const moving = behindView.act === 3 && strokeCount > 0 && !reducedRef.current;
+        if (moving && now - lastShapeDraw >= SHAPE_REDRAW_MS) redraw = true;
+        if (redraw) {
+          lastShapeDraw = now;
+          draw(now);
+        }
       }
       raf = requestAnimationFrame(loop);
     };
@@ -375,6 +455,7 @@ export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: Roo
           gl?.setHoleMask(on);
           gl?.render(performance.now());
         },
+        behind: () => ({ act: behindView.act, tally: behindView.tally, lines: behindView.lines }),
       };
     }
 
@@ -447,11 +528,11 @@ function drawFallback(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   front: HTMLCanvasElement,
-  behind: HTMLCanvasElement,
+  behind: TexImageSource,
 ): void {
   const w = canvas.width;
   const h = canvas.height;
-  ctx.drawImage(behind, 0, 0, w, h);
+  ctx.drawImage(behind as CanvasImageSource, 0, 0, w, h);
   // The room is dark, so what is behind the paper must be too.
   ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
   ctx.fillRect(0, 0, w, h);

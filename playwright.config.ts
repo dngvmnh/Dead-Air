@@ -20,7 +20,21 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        // PW_GPU=1 uses the machine's real GPU. Software WebGL cannot keep up with
+        // long drags at 1440x900: the page stops answering and tests time out,
+        // which says nothing about how the app runs on real hardware.
+        ...(process.env.PW_GPU
+          ? {
+              channel: 'chromium',
+              launchOptions: { args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-gpu'] },
+            }
+          : {}),
+      },
+    },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],

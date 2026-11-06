@@ -35,6 +35,7 @@ export function App() {
           interactive={noticeSeen}
           getAudio={tv.getAudio}
           getRoomState={tv.getRoomState}
+          getBehindView={tv.getBehindView}
           reduced={tv.settings.reducedEffects}
         />
         <Room announcement={tv.announcement}>

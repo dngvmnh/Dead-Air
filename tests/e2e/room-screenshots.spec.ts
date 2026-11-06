@@ -3,8 +3,8 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 /**
- * Task 5 visual checkpoint: committed screenshots of the room in Acts 0 and 3,
- * and of a tear, for a human to judge whether it looks good and frightening.
+ * Visual checkpoint: committed screenshots of the room and of tears at each act,
+ * for a human to judge whether it looks good and frightening.
  * Real WebGL. Written ONLY when UPDATE_SCREENSHOTS=1 so a plain test run does
  * not modify committed files (dead-air-room requirement 9.5); otherwise the
  * specs still drive the flow and assert the room rendered.
@@ -75,59 +75,94 @@ async function shoot(page: Page, file: string): Promise<void> {
   if (UPDATE) await page.screenshot({ path: path.join(SHOTS_DIR, file), animations: 'disabled', timeout: 20000 });
 }
 
-/** A big vertical gash down the exposed left band, in small stepped moves. */
-async function tearLeftBand(page: Page): Promise<void> {
-  const sx = Math.round(page.viewportSize()!.width * 0.12);
+/** A plain 300 px rip down the exposed left band. */
+async function rip300(page: Page): Promise<void> {
+  const chassis = await page.locator('[class*="chassis"]').first().boundingBox();
+  const sx = Math.round((chassis?.x ?? 200) / 2);
   const sy = Math.round(page.viewportSize()!.height * 0.22);
-  const len = Math.round(page.viewportSize()!.height * 0.42);
   await page.mouse.move(sx, sy);
   await page.mouse.down();
-  for (let i = 1; i <= 22; i += 1) {
-    await page.mouse.move(sx, sy + (len * i) / 22, { steps: 1 });
+  for (let i = 1; i <= 24; i += 1) {
+    await page.mouse.move(sx, sy + (300 * i) / 24, { steps: 1 });
     await page.waitForTimeout(16);
   }
   await page.mouse.up();
   await page.waitForTimeout(700);
 }
 
-test.describe('room visual checkpoint (task 5 / 5a)', () => {
-  test('room in Act 0 (1440x900)', async ({ page }) => {
+/** Three rips around the set: left, right and across the top. */
+async function ripThree(page: Page): Promise<void> {
+  const size = page.viewportSize()!;
+  const chassis = await page.locator('[class*="chassis"]').first().boundingBox();
+  const left = chassis?.x ?? 200;
+  const right = left + (chassis?.width ?? 800);
+  const top = chassis?.y ?? 100;
+  const drag = async (pts: Array<[number, number]>, n: number): Promise<void> => {
+    await page.mouse.move(pts[0]![0], pts[0]![1]);
+    await page.mouse.down();
+    for (let i = 1; i < pts.length; i += 1) {
+      const [a, b] = pts[i - 1]!;
+      const [c, d] = pts[i]!;
+      for (let s = 1; s <= n; s += 1) {
+        await page.mouse.move(a + ((c - a) * s) / n, b + ((d - b) * s) / n, { steps: 1 });
+        await page.waitForTimeout(14);
+      }
+    }
+    await page.mouse.up();
+    await page.waitForTimeout(250);
+  };
+  await drag([[left / 2, size.height * 0.2], [left / 2 - 8, size.height * 0.72]], 22);
+  const rx = right + (size.width - right) / 2;
+  await drag([[rx - 20, size.height * 0.14], [rx + 30, size.height * 0.5], [rx - 30, size.height * 0.84]], 14);
+  await drag([[size.width * 0.3, top * 0.4], [size.width * 0.62, top * 0.66]], 18);
+  await page.waitForTimeout(600);
+}
+
+const HISTORY = { visits: { 2: 4, 4: 2, 7: 2, 13: 1 } } as const;
+
+test.describe('room visual checkpoint (tasks 5b and 6)', () => {
+  test('a normal 300 px tear (1440x900)', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await seed(page, { act: 0 });
     await powerOn(page);
-    await room(page); // asserts the room seam exists / rendered
-    await shoot(page, 'room-act0.png');
+    await rip300(page);
+    await shoot(page, 'room-tear-300px-1440x900.png');
   });
 
-  test('room in Act 3 (1440x900)', async ({ page }) => {
+  test('a three-drag tear (1440x900)', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await seed(page, { act: 3, totalWatchMs: 15 * 60000, visits: { 2: 2, 4: 1, 7: 1, 13: 2 }, sessionCount: 2 });
-    await powerOn(page);
-    await room(page);
-    await shoot(page, 'room-act3.png');
-  });
-
-  test('a large tear (1440x900)', async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await seed(page, { act: 0, visits: { 2: 1 } });
-    await powerOn(page);
-    await tearLeftBand(page);
-    await shoot(page, 'room-tear-1440x900.png');
-  });
-
-  test('room in Act 0 (1280x720)', async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 720 });
     await seed(page, { act: 0 });
     await powerOn(page);
-    await room(page);
-    await shoot(page, 'room-act0-1280x720.png');
+    await ripThree(page);
+    await shoot(page, 'room-tear-three-1440x900.png');
   });
 
   test('a tear (1280x720)', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
-    await seed(page, { act: 0, visits: { 2: 1 } });
+    await seed(page, { act: 0 });
     await powerOn(page);
-    await tearLeftBand(page);
+    await ripThree(page);
     await shoot(page, 'room-tear-1280x720.png');
+  });
+
+  for (const act of [0, 1, 2, 3, 4] as const) {
+    test(`a torn wall in Act ${act} (1440x900)`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await seed(page, { act, totalWatchMs: act * 5 * 60000, ...(act > 0 ? HISTORY : {}), sessionCount: act >= 2 ? 2 : 1 });
+      await powerOn(page);
+      await ripThree(page);
+      await shoot(page, `room-act${act}-torn.png`);
+    });
+  }
+
+  test('room in Act 0 (1440x900 and 1280x720)', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await seed(page, { act: 0 });
+    await powerOn(page);
+    await room(page);
+    await shoot(page, 'room-act0.png');
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.waitForTimeout(600);
+    await shoot(page, 'room-act0-1280x720.png');
   });
 });

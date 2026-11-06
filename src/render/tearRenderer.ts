@@ -143,13 +143,6 @@ void main() {
     float n = noise(uv * vec2(5.0, 3.0) + vec2(uTime * 0.018, uTime * 0.027));
     c *= mix(1.0, n * 1.7, uMotion);
   }
-  if (uShapeAmt > 0.0) {
-    // Head and shoulders, far back. It only catches light near a torn edge.
-    vec2 p = (uv - uShapePos) * vec2(uRes.x / uRes.y, 1.0);
-    float head = 1.0 - smoothstep(0.05, 0.09, length(p - vec2(0.0, -0.09)));
-    float body = 1.0 - smoothstep(0.1, 0.2, length(p * vec2(0.8, 1.6) - vec2(0.0, 0.1)));
-    c += vec3(0.2, 0.19, 0.18) * max(head, body) * uShapeAmt;
-  }
 
   float pool = roomPool(uv);
   float lit = roomLit(pool);
@@ -168,6 +161,15 @@ void main() {
   // Whatever the picture does, the inside of a wall is never the brightest thing
   // in the room.
   col = min(col, vec3(0.42));
+
+  if (uShapeAmt > 0.0) {
+    // Head and shoulders, far back. Added after the hole floor, which would
+    // otherwise hide it, and only ever a shade above the dark around it.
+    vec2 p = (uv - uShapePos) * vec2(uRes.x / uRes.y, 1.0);
+    float head = 1.0 - smoothstep(0.05, 0.085, length(p - vec2(0.0, -0.09)));
+    float body = 1.0 - smoothstep(0.1, 0.19, length(p * vec2(0.8, 1.6) - vec2(0.0, 0.1)));
+    col += vec3(0.075, 0.07, 0.066) * max(head, body) * uShapeAmt * (0.5 + 0.5 * uLevel);
+  }
 
   // Things behind the wall that give their own light.
   col += texture(uEmissive, uv).rgb * (0.35 + 0.65 * uLevel);

@@ -78,7 +78,8 @@ async function dwell(page: Page, ms: number): Promise<void> {
 
 test.describe('MVP checkpoint (task 16)', () => {
   test('`/?demo=1` reaches the sign-off within about three minutes of surfing', async ({ page }) => {
-    test.setTimeout(300_000);
+    // The mocked clock replays every frame, and each is a real draw on a real GPU.
+    test.setTimeout(process.env.PW_GPU ? 900_000 : 300_000);
     await setup(page);
 
     await page.getByRole('button', { name: /^power$/i }).click();

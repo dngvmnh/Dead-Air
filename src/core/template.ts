@@ -6,7 +6,7 @@
  *
  * Supported variables (design §9):
  *   {lastChannel} {lastChannelName} {visitedList} {mostWatchedChannel}
- *   {totalMinutes} {visitCountCurrent} {localTime}
+ *   {totalMinutes} {visitCountCurrent} {localTime} {firstViewing}
  */
 
 import { CHANNEL_INFO } from './channels.ts';
@@ -18,6 +18,9 @@ export interface TemplateContext {
   /** Local hour 0..23 and minute 0..59, for {localTime}. */
   localHour: number;
   localMinute: number;
+  /** Local time of the viewer's first viewing, for {firstViewing}, when known. */
+  firstSeenHour?: number;
+  firstSeenMinute?: number;
 }
 
 /** The variable names a template may reference. */
@@ -75,6 +78,12 @@ function resolveVar(name: string, mem: ViewerMemory, ctx: TemplateContext): stri
     case 'localTime': {
       const hh = String(ctx.localHour).padStart(2, '0');
       const mm = String(ctx.localMinute).padStart(2, '0');
+      return `${hh}:${mm}`;
+    }
+    case 'firstViewing': {
+      if (ctx.firstSeenHour === undefined || ctx.firstSeenMinute === undefined) return null;
+      const hh = String(ctx.firstSeenHour).padStart(2, '0');
+      const mm = String(ctx.firstSeenMinute).padStart(2, '0');
       return `${hh}:${mm}`;
     }
     default:

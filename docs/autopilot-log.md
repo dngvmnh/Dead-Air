@@ -1067,3 +1067,18 @@ the unlit plaster was the brightest thing on screen.
 - Tests: `showHoleMask` paints behind the paper a flat colour, so the opening test
   reads the real hole. Median width 40 to 80, peak under 110, area over 6000 canvas
   px (the 5a floor was 1000).
+
+## Task 6: Behind layer per act
+
+- `core/behindState.ts` derives what is behind the wall from memory, and text goes
+  through `core/template.ts`. A line with no real value is left out. New template
+  variable: `{firstViewing}`.
+- `render/behindRenderer.ts` bakes each act: older wallpaper and plaster (0), a
+  pencil tally of real visits (1), scratched history and far televisions showing
+  snow (2), near-total darkness (3), rows of sets with the fixed sign-off text (4).
+- Act 3's slow movement and shape are shader work. The shape starts behind the
+  viewer's own tear and turns towards the pointer with a 2.6 s lag, so it never
+  jumps. Reduced effects removes the movement and holds the shape still.
+- Marks and text repeat across the wall because a rip shows only a slot of it.
+- The layer re-bakes only when its key changes, checked on the idle tick. Act 3
+  redraws at 5 Hz only once a tear exists.

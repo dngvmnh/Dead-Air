@@ -52,7 +52,7 @@ Tick a task only when the behaviour has been seen in a real browser, not because
 
 ## Phase C: Depth
 
-- [ ] 6. Behind layer per act, using real viewer values.
+- [x] 6. Behind layer per act, using real viewer values.
   - _Requirements: 3.1–3.4_
 - [ ] 7. Memory v2
   - [ ] 7.1 Add schema version 2 and migration, with tests.

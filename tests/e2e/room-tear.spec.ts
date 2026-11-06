@@ -373,6 +373,43 @@ test.describe('room wall tear (real WebGL)', () => {
     expect(lum!.mean).toBeLessThan(45);
   });
 
+  // Requirement 3: what a tear reveals follows the act, from real viewer values.
+  test('what is behind the wall follows the act and the real history', async ({ page }) => {
+    const firstSeen = new Date('2026-06-01T21:07:00').getTime();
+    const seedMemory = (act: number, visits: Record<number, number>) =>
+      page.addInitScript(
+        ([a, v, first]) => {
+          (window as unknown as { __CRT_PRESERVE_DRAWING_BUFFER__?: boolean }).__CRT_PRESERVE_DRAWING_BUFFER__ = true;
+          const ch = (n: number) => ({ visits: v[n] ?? 0, watchMs: 0, lastVisitedAt: v[n] ? 1 : null });
+          localStorage.setItem(
+            'deadair.memory.v1',
+            JSON.stringify({
+              schemaVersion: 1,
+              firstSeenAt: first,
+              lastSeenAt: first,
+              sessionCount: 1,
+              totalWatchMs: 0,
+              channels: { 2: ch(2), 4: ch(4), 7: ch(7), 13: ch(13) },
+              visitOrder: [],
+              lastChannel: 2,
+              firedEvents: {},
+              act: a,
+              noticeSeen: true,
+              settings: { volume: 0.7, muted: false, captions: true, reducedEffects: false },
+            }),
+          );
+        },
+        [act, visits, firstSeen] as const,
+      );
+    await seedMemory(2, { 2: 2, 7: 1 });
+    await page.goto('/');
+    const read = () =>
+      page.evaluate(() => (window as unknown as { __room: { behind: () => unknown } }).__room.behind());
+    await expect
+      .poll(read, { timeout: 5000 })
+      .toEqual({ act: 2, tally: 0, lines: ['CHANNELS 02, 07', 'FIRST WATCHED 21:07'] });
+  });
+
   test('at least half the viewport is wall, and no plastic sits under the tube', async ({ page }) => {
     for (const [width, height] of [[1440, 900], [1280, 720]] as const) {
       await page.setViewportSize({ width, height });
