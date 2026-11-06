@@ -344,22 +344,33 @@ function isNearTornEdge(sheet: TearSheet, gx: number, gy: number): boolean {
   return false;
 }
 
-/** Yank a seeded diagonal run of interior nodes to force a tear (T key). */
+/**
+ * Rip a seeded path across the middle of the wall (the `T` key). Keyboard users
+ * get the same discovery as a drag (requirement 8.2). The path sweeps a broad
+ * arc through the interior — away from the pinned edges — so it opens a clear,
+ * visible gash rather than a nick in the corner.
+ */
 function ripSeededPath(sheet: TearSheet): void {
-  const steps = Math.min(sheet.cols, sheet.rows) - 2;
-  for (let i = 1; i <= steps; i += 1) {
-    const c = Math.min(sheet.cols - 2, i);
-    const r = Math.min(sheet.rows - 2, i);
+  // Tear down the LEFT margin of the wall (columns ~8-18% in), which is the
+  // part NOT covered by the centred chassis, so a keyboard user sees the gash
+  // (requirement 8.2). A gentle arc keeps it from being a straight slit.
+  const c0 = Math.max(1, Math.floor(sheet.cols * 0.08));
+  const c1 = Math.max(c0 + 1, Math.floor(sheet.cols * 0.2));
+  const r0 = Math.floor(sheet.rows * 0.2);
+  const r1 = Math.floor(sheet.rows * 0.8);
+  for (let r = r0; r <= r1; r += 1) {
+    const t = (r - r0) / Math.max(1, r1 - r0);
+    const c = Math.min(sheet.cols - 2, Math.max(1, c0 + Math.round((c1 - c0) * Math.sin(t * Math.PI))));
     const n = nodeIndex(sheet, c, r);
     if (sheet.pinned[n] === 1) continue;
-    // The grab id is the node index (design §2); pull it far to tear.
-    grab(sheet, n, sheet.xs[n]! + sheet.cols * 2, sheet.ys[n]! + sheet.rows * 2);
+    // The grab id is the node index (design §2); pull it sideways to tear.
+    grab(sheet, n, sheet.xs[n]! + sheet.cols, sheet.ys[n]!);
     stepSheet(sheet, 16.67);
     stepSheet(sheet, 16.67);
     release(sheet, n);
   }
-  // A few settle steps so the tear opens.
-  for (let s = 0; s < 20; s += 1) stepSheet(sheet, 16.67);
+  // Settle so the flap falls open.
+  for (let s = 0; s < 30; s += 1) stepSheet(sheet, 16.67);
 }
 
 /** 2D fallback: a static pre-torn room with the behind layer showing (req 8.5). */

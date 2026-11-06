@@ -923,3 +923,37 @@ moves to unobserved moments. Unverified: the full figure silhouette and the
 object-move-while-unobserved behaviour are task 8; the behind-layer-per-act art
 is task 6; in-browser 60 fps with both canvases is the task 13 budget check. The
 task-5 STOP is where a human judges whether the room looks frightening enough.
+
+## dead-air-room Task 5 — visual checkpoint (STOP)
+
+Full gate green: `npm test` 282, `npm run lint` clean, `npm run build` 127.09 KB
+gzip (budget 300 KB), `validate:catalog` OK, `npx playwright test
+--project=chromium` 38/38 with local retries 0.
+
+Committed screenshots under `docs/screenshots/` (written only under
+`UPDATE_SCREENSHOTS=1`, requirement 9.5):
+
+- `room-act0.png` — the room lit at Act 0 (brighter ambient, the set on, the
+  picture glowing on the wall; window, garland, pumpkins visible in the margins).
+- `room-act3.png` — the room at Act 3: visibly darker (ambient fell by act), a
+  tear in the top-left corner revealing plaster, E02 playing on the tube.
+- `room-tear.png` — a `T`-key seeded tear down the exposed left margin, the
+  wallpaper ripped open to the dark plaster behind.
+
+`tests/e2e/room-screenshots.spec.ts` drives these on real WebGL and asserts the
+room rendered; it writes files only under the flag.
+
+Grid size and measured cost (design §2 / requirement 10.2): wall **48×30**
+(1440 nodes, 5528 constraints), tube **36×28** (1008 nodes). `stepSheet` cost,
+measured with `tsx` on this machine (an upper bound vs the browser's JIT, under
+an active drag): wall ≈ **2.3 ms/frame**, tube ≈ **1.6 ms/frame** — both under
+the 3 ms budget. The authoritative in-browser 60 fps measurement with both
+canvases is the task 13 budget check.
+
+A short screen recording was NOT produced (the task says "if possible"); the
+three screenshots cover the checkpoint. Reduced the seeded `T`-key tear to sweep
+the exposed left margin so keyboard users actually see the gash (the chassis
+covers the centre); still a seeded path (requirement 8.2), e2e unchanged.
+
+**STOP per the plan.** A person must judge whether the room looks good and
+frightening before Phase C builds on it. Not proceeding to task 6.

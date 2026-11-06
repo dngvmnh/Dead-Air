@@ -29,7 +29,7 @@ Tick a task only when the behaviour has been seen in a real browser, not because
   - [x] 4.1 Bake wallpaper and room objects, and record authorship in `docs/room-assets.md`.
   - [x] 4.2 Implement `core/roomState.ts` with tests, light from picture, and ambient by act.
   - _Requirements: 5.1–5.4, 5.7, 10.3_
-- [ ] 5. **STOP: Visual checkpoint.** Commit screenshots of the room in Acts 0 and 3, and of a tear, plus a short screen recording if possible. Stop and report. A person must judge whether it looks good and frightening before more is built on it.
+- [x] 5. **STOP: Visual checkpoint.** Commit screenshots of the room in Acts 0 and 3, and of a tear, plus a short screen recording if possible. Stop and report. A person must judge whether it looks good and frightening before more is built on it.
 
 ## Phase C: Depth
 
