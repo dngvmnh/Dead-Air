@@ -31,7 +31,12 @@ export function App() {
             opaque and establishes its own stacking context above it, so the room
             can never overlap the tube or a YouTube surface (design §1). Tear
             input is ignored until the notice is acknowledged (requirement 1.8). */}
-        <RoomCanvas interactive={noticeSeen} getAudio={tv.getAudio} />
+        <RoomCanvas
+          interactive={noticeSeen}
+          getAudio={tv.getAudio}
+          getRoomState={tv.getRoomState}
+          reduced={tv.settings.reducedEffects}
+        />
         <Room announcement={tv.announcement}>
           <Chassis tv={tv} powerRef={powerRef} />
         </Room>

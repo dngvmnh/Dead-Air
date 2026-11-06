@@ -42,13 +42,20 @@ in vec2 vUV;
 in float vZ;
 uniform sampler2D uFront;
 uniform float uTime;
+uniform float uAmbient;      // base room light 0..1 (falls by act)
+uniform vec3 uLight;         // picture glow colour 0..1
+uniform float uLightAmount;  // picture glow strength 0..1
 out vec4 frag;
 void main() {
   vec4 c = texture(uFront, vUV);
-  // Light from the lift/curl: a lifted flap (|z|>0) catches a highlight on one
-  // side and a shadow on the other, so torn paper reads as 3D.
+  // Lift/curl shading so torn paper reads as 3D.
   float shade = clamp(0.5 + vZ * 0.9, 0.2, 1.3);
-  frag = vec4(c.rgb * shade, 1.0);
+  vec3 col = c.rgb * shade;
+  // The TV glow falls off from the centre of the wall (where the set sits).
+  float d = distance(vUV, vec2(0.5, 0.52));
+  float glow = uLightAmount * clamp(1.0 - d * 1.4, 0.0, 1.0);
+  col = col * uAmbient + col * uLight * glow;
+  frag = vec4(col, 1.0);
 }`;
 
 /** Full-screen pass that fills the frame with the behind texture (the reveal). */
@@ -106,6 +113,10 @@ export class TearGLRenderer {
   private zArray = new Float32Array(0);
   private contextLost = false;
   private startMs = 0;
+  // Lighting (set by the room each frame from deriveRoom).
+  private ambient = 0.6;
+  private light: [number, number, number] = [0, 0, 0];
+  private lightAmount = 0;
   /** All triangles as node-index triples (static), and their 3 edge-constraint ids. */
   private triangles: Int32Array = new Int32Array(0);
   private triEdges: Int32Array = new Int32Array(0);
@@ -303,6 +314,13 @@ export class TearGLRenderer {
     this.uploadTex(this.behindTex, src);
   }
 
+  /** Set the room lighting for the next frame (ambient + picture glow). */
+  setLight(ambient: number, light: { r: number; g: number; b: number; amount: number }): void {
+    this.ambient = ambient;
+    this.light = [light.r / 255, light.g / 255, light.b / 255];
+    this.lightAmount = light.amount;
+  }
+
   private uploadTex(tex: WebGLTexture, src: TexImageSource): void {
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -359,6 +377,9 @@ export class TearGLRenderer {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.frontTex);
     gl.uniform1i(uFront, 0);
+    gl.uniform1f(gl.getUniformLocation(this.program, 'uAmbient'), this.ambient);
+    gl.uniform3f(gl.getUniformLocation(this.program, 'uLight'), this.light[0], this.light[1], this.light[2]);
+    gl.uniform1f(gl.getUniformLocation(this.program, 'uLightAmount'), this.lightAmount);
 
     gl.drawElements(gl.TRIANGLES, this.indexCount, gl.UNSIGNED_INT, 0);
     gl.bindVertexArray(null);

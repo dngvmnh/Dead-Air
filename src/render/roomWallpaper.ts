@@ -119,6 +119,129 @@ export function bakeWallpaper(w = 1024, h = 768): BakedTexture {
   return { canvas };
 }
 
+/**
+ * Bake the full room front: the wallpaper plus the dim Halloween living-room
+ * objects (requirement 5.1) — a paper garland, a candy bowl on a shelf, a
+ * framed picture, a window onto darkness, and a wall clock showing the viewer's
+ * real local time. Original procedural art. These are baked onto the tearable
+ * paper so the whole room rips as one sheet (the world is paper, design/product
+ * principle 7). `objectVariant` moves one object (design §5): 1 tilts the frame,
+ * 2 empties the bowl.
+ */
+export function bakeRoom(
+  localHour: number,
+  localMinute: number,
+  objectVariant = 0,
+  w = 1024,
+  h = 768,
+): BakedTexture {
+  const base = bakeWallpaper(w, h);
+  const ctx = base.canvas.getContext('2d');
+  if (!ctx) return base;
+
+  // Window onto darkness (upper-left): a cold rectangle with a faint cross bar.
+  ctx.save();
+  ctx.fillStyle = '#0a0d14';
+  ctx.fillRect(w * 0.06, h * 0.12, w * 0.2, h * 0.26);
+  ctx.strokeStyle = '#2a2016';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(w * 0.06, h * 0.12, w * 0.2, h * 0.26);
+  ctx.beginPath();
+  ctx.moveTo(w * 0.16, h * 0.12);
+  ctx.lineTo(w * 0.16, h * 0.38);
+  ctx.moveTo(w * 0.06, h * 0.25);
+  ctx.lineTo(w * 0.26, h * 0.25);
+  ctx.stroke();
+  // A faint moon.
+  ctx.fillStyle = 'rgba(180, 180, 150, 0.22)';
+  ctx.beginPath();
+  ctx.arc(w * 0.2, h * 0.18, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Paper garland across the top: a sagging string of little triangles.
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+  ctx.lineWidth = 2;
+  const gy = h * 0.06;
+  ctx.beginPath();
+  ctx.moveTo(0, gy);
+  for (let x = 0; x <= w; x += 60) ctx.quadraticCurveTo(x + 30, gy + 22, x + 60, gy);
+  ctx.stroke();
+  for (let x = 20; x < w; x += 60) {
+    ctx.fillStyle = (x / 60) % 2 === 0 ? 'rgba(255,123,0,0.5)' : 'rgba(106,13,173,0.5)';
+    ctx.beginPath();
+    ctx.moveTo(x, gy + 12);
+    ctx.lineTo(x + 16, gy + 12);
+    ctx.lineTo(x + 8, gy + 34);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Shelf (lower-right) with a candy bowl and a framed picture.
+  ctx.save();
+  const shelfY = h * 0.66;
+  ctx.fillStyle = '#2a2018';
+  ctx.fillRect(w * 0.62, shelfY, w * 0.3, 10);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(w * 0.62, shelfY + 10, w * 0.3, 6);
+  // Candy bowl (empty at variant ≥ 2).
+  ctx.fillStyle = '#3a2d22';
+  ctx.beginPath();
+  ctx.ellipse(w * 0.7, shelfY - 6, 34, 16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (objectVariant < 2) {
+    for (let i = 0; i < 6; i += 1) {
+      ctx.fillStyle = i % 2 === 0 ? '#c8318a' : '#ff7b00';
+      ctx.beginPath();
+      ctx.arc(w * 0.7 - 20 + i * 8, shelfY - 12, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  // Framed picture, tilted at variant ≥ 1.
+  ctx.translate(w * 0.84, shelfY - 40);
+  if (objectVariant >= 1) ctx.rotate(-0.12);
+  ctx.fillStyle = '#1a1410';
+  ctx.fillRect(-34, -40, 68, 52);
+  ctx.strokeStyle = '#4a3a2a';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(-34, -40, 68, 52);
+  ctx.fillStyle = 'rgba(120,110,90,0.4)';
+  ctx.fillRect(-28, -34, 56, 40);
+  ctx.restore();
+
+  // Wall clock showing the real local time (requirement 5.1).
+  ctx.save();
+  const cx = w * 0.46;
+  const cy = h * 0.2;
+  const rad = 44;
+  ctx.fillStyle = '#1c1610';
+  ctx.beginPath();
+  ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#6a5a3a';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  // Hands from the real local time.
+  const hourAng = ((localHour % 12) + localMinute / 60) * (Math.PI / 6) - Math.PI / 2;
+  const minAng = localMinute * (Math.PI / 30) - Math.PI / 2;
+  ctx.strokeStyle = '#d8cfbf';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(hourAng) * rad * 0.5, cy + Math.sin(hourAng) * rad * 0.5);
+  ctx.stroke();
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(minAng) * rad * 0.8, cy + Math.sin(minAng) * rad * 0.8);
+  ctx.stroke();
+  ctx.restore();
+
+  return base;
+}
+
 /** Dark plaster/lath behind the paper, so a tear reveals a believable layer. */
 export function bakeBehindPlaster(w = 1024, h = 768): BakedTexture {
   const { canvas, ctx } = makeCanvas(w, h);

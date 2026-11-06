@@ -24,6 +24,7 @@ import { type CrtSource } from '../render/CrtRenderer.ts';
 import { type SceneVars } from '../core/scene.ts';
 import { EventPresenter } from '../playback/EventPresenter.ts';
 import { channelInfo as channelInfoLookup } from '../core/channels.ts';
+import { deriveRoom, type RoomState } from '../core/roomState.ts';
 import {
   beginSession,
   createMemory,
@@ -75,6 +76,12 @@ export interface TelevisionApi {
    * first POWER or tear gesture.
    */
   getAudio: () => AudioEngine;
+  /**
+   * Derive the room's lit state (design §5) from the live memory, phase and the
+   * sampled owned-picture colour. The room canvas calls this at ≤ 8 Hz and
+   * smooths the result; it never samples a YouTube player.
+   */
+  getRoomState: (reduced: boolean, localHour: number, localMinute: number) => RoomState;
 }
 
 const DEFAULT_SETTINGS: UiSettings = {
@@ -139,6 +146,12 @@ export function useTelevision(): TelevisionApi {
   // --- Broadcast playback (Milestone 2) ----------------------------------
   // The renderer Screen created (owned sources publish their canvas here).
   const rendererRef = useRef<Renderer | null>(null);
+  // The last owned-source canvas published to the renderer, so the room can
+  // sample the picture colour to light the wall (design §5). Null when off or
+  // on a YouTube item — the player is never sampled (requirement 5.3). A tiny
+  // 8×8 scratch canvas does the averaging.
+  const lastSourceRef = useRef<HTMLCanvasElement | null>(null);
+  const sampleCanvasRef = useRef<{ canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null>(null);
   // The current owned-source adapter (scenes now; file/YouTube in Milestone 4).
   const sceneAdapterRef = useRef<SceneAdapter | null>(null);
   // Unsubscribe for the current adapter's event listener.
@@ -439,7 +452,12 @@ export function useTelevision(): TelevisionApi {
           });
           return missing.length > 0 ? null : text;
         },
-        setSource: (source) => rendererRef.current?.setSource(source as CrtSource | null),
+        setSource: (source) => {
+          // Remember the owned-source canvas for room lighting; an HTMLCanvas
+          // is a scene/file picture (sampleable), anything else is cleared.
+          lastSourceRef.current = source instanceof HTMLCanvasElement ? source : null;
+          rendererRef.current?.setSource(source as CrtSource | null);
+        },
         setLook: (look: Look) => rendererRef.current?.setLook(look),
         now: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
       };
@@ -555,10 +573,62 @@ export function useTelevision(): TelevisionApi {
     if (playingRef.current) rendererRef.current?.captureFrame();
     playingRef.current = false;
     watchSinceRef.current = null;
+    lastSourceRef.current = null;
     adapterOffRef.current?.();
     adapterOffRef.current = null;
     sceneAdapterRef.current?.stop();
   }, [clearItemEndTimer]);
+
+  // Sample the current owned picture's average colour (8×8 downscale) for room
+  // lighting (design §5), or null when off / on a YouTube item. Never reads a
+  // YouTube iframe — only the owned scene/file canvas. The room throttles the
+  // call rate; this just does one cheap downscaled average.
+  const getRoomPicture = useCallback((): { r: number; g: number; b: number } | null => {
+    if (stateRef.current.phase === 'OFF') return null;
+    const src = lastSourceRef.current;
+    if (!src || src.width === 0 || src.height === 0) return null;
+    if (!sampleCanvasRef.current) {
+      const c = document.createElement('canvas');
+      c.width = 8;
+      c.height = 8;
+      const cx = c.getContext('2d', { willReadFrequently: true });
+      if (!cx) return null;
+      sampleCanvasRef.current = { canvas: c, ctx: cx };
+    }
+    const { ctx } = sampleCanvasRef.current;
+    try {
+      ctx.drawImage(src, 0, 0, 8, 8);
+      const d = ctx.getImageData(0, 0, 8, 8).data;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        r += d[i]!;
+        g += d[i + 1]!;
+        b += d[i + 2]!;
+      }
+      const n = d.length / 4;
+      return { r: r / n, g: g / n, b: b / n };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Derive the room state from live memory, phase and the sampled picture
+  // (design §5). Kept here so memory never leaves the orchestrator; the room
+  // canvas consumes the result.
+  const getRoomState = useCallback(
+    (reduced: boolean, localHour: number, localMinute: number): RoomState =>
+      deriveRoom({
+        memory: memoryRef.current,
+        phase: stateRef.current.phase,
+        picture: getRoomPicture(),
+        localHour,
+        localMinute,
+        reduced,
+      }),
+    [getRoomPicture],
+  );
 
   // Latest settings, readable from async callbacks (e.g. audio unlock) without
   // recreating them on every settings change. Assigned in an effect (not during
@@ -1013,6 +1083,7 @@ export function useTelevision(): TelevisionApi {
       forgetMe,
       registerRenderer,
       getAudio,
+      getRoomState,
     }),
     [
       state,
@@ -1030,6 +1101,7 @@ export function useTelevision(): TelevisionApi {
       forgetMe,
       registerRenderer,
       getAudio,
+      getRoomState,
     ],
   );
 }

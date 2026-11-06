@@ -883,3 +883,43 @@ buffer rebuilt on break events (noted above). Unverified: the fibre-edge/flap-
 shadow look is minimal (functional tear, dark reveal); the task-5 STOP is where
 a human judges whether it looks frightening enough before more is built on it.
 In-browser 60 fps with both canvases is re-confirmed at the task 13 budget check.
+
+## dead-air-room Task 4 — room look and lighting
+
+Full gate green: `npm test` 282 (6 new roomState), `npm run lint` clean,
+`npm run build` 127.02 KB gzip (budget 300 KB), `validate:catalog` OK,
+`npx playwright test --project=chromium` 35/35 with local retries 0. Seen in a
+real browser at Act 0 (dim, lit) and Act 3 (darker, with a tear) — screenshots
+committed at task 5.
+
+- **4.1 Room art + authorship.** `roomWallpaper.ts` gained `bakeRoom`, composing
+  the dim Halloween living room onto the tearable paper (requirement 5.1): the
+  olive/umber wallpaper with faded bats and jack-o'-lanterns, a paper garland, a
+  candy bowl on a shelf, a framed picture, a window onto darkness with a faint
+  moon, and a wall clock whose hands show the viewer's REAL local time.
+  `objectVariant` moves one object (frame tilts at 1, bowl empties at 2). All
+  original and procedural; recorded in `docs/room-assets.md` (requirement 10.3).
+- **4.2 `core/roomState.ts` + lighting.** Pure `deriveRoom(input)` (design §5):
+  ambient falls by act (0.60 → 0.18, never fully dark, requirement 5.4); the
+  TV glow takes the sampled picture colour while an owned source plays
+  (requirement 5.2); a soft neutral light for YouTube/off, never sampling the
+  player (requirement 5.3); and `figureStep`/`objectVariant`/`repairVisible`
+  derived from act and session count. 6 unit tests. Wired through the
+  orchestrator: `useTelevision` samples the current owned-source canvas into an
+  8×8 buffer for the average colour (`getRoomPicture`, null for off/YouTube) and
+  exposes `getRoomState`; the tear shader now takes `uAmbient` + `uLight` +
+  `uLightAmount` and lights the wall from the centre outward.
+
+Decisions made alone: (1) **Light re-render is change-gated.** The room light
+must track the TV picture, but an always-on re-render replayed under the TV's
+mocked-clock tests and timed them out. The idle loop now samples at 5 Hz and
+re-renders ONLY when the quantised light changed, so a static picture costs a
+cheap sample and nothing more — keeping both the task-10 budget and the long
+checkpoints fast; reversible. (2) Ambient-by-act table `[0.60,0.48,0.36,0.24,
+0.18]` and the glow falloff from the wall centre — tuned for a dim room that
+darkens with dread; reversible. (3) `figureStep`/`objectVariant` are derived
+from act/session for now; task 8 stores the applied step in memory v2 and gates
+moves to unobserved moments. Unverified: the full figure silhouette and the
+object-move-while-unobserved behaviour are task 8; the behind-layer-per-act art
+is task 6; in-browser 60 fps with both canvases is the task 13 budget check. The
+task-5 STOP is where a human judges whether the room looks frightening enough.

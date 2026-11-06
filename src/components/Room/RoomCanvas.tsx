@@ -13,8 +13,9 @@ import {
   type TearSheet,
 } from '../../core/tearSheet.ts';
 import { TearGLRenderer } from '../../render/tearRenderer.ts';
-import { bakeWallpaper, bakeBehindPlaster } from '../../render/roomWallpaper.ts';
+import { bakeRoom, bakeBehindPlaster } from '../../render/roomWallpaper.ts';
 import type { AudioEngine } from '../../audio/AudioEngine.ts';
+import type { RoomState } from '../../core/roomState.ts';
 
 /**
  * The tearable wall behind the set (design §1, §3). A full-viewport canvas at
@@ -32,6 +33,10 @@ export interface RoomCanvasProps {
   interactive: boolean;
   /** Audio engine for the procedural rip (shared with the TV). */
   getAudio: () => AudioEngine;
+  /** Derive the lit room state (ambient by act + picture glow), design §5. */
+  getRoomState: (reduced: boolean, localHour: number, localMinute: number) => RoomState;
+  /** Reduced Effects / reduced motion: calmer light, no auto motion (req 8.4). */
+  reduced: boolean;
 }
 
 interface RoomSeam {
@@ -42,14 +47,18 @@ interface RoomSeam {
 
 const IDLE_CORNER_RADIUS = 0.12; // fraction of the sheet near the top-right corner
 
-export function RoomCanvas({ interactive, getAudio }: RoomCanvasProps) {
+export function RoomCanvas({ interactive, getAudio, getRoomState, reduced }: RoomCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const interactiveRef = useRef(interactive);
-  // Sync the latest `interactive` into the ref from an effect (not during
-  // render); the pointer/key handlers read it live.
+  const getRoomStateRef = useRef(getRoomState);
+  const reducedRef = useRef(reduced);
+  // Sync the latest props into refs from an effect (not during render); the
+  // loop and handlers read them live.
   useEffect(() => {
     interactiveRef.current = interactive;
-  }, [interactive]);
+    getRoomStateRef.current = getRoomState;
+    reducedRef.current = reduced;
+  }, [interactive, getRoomState, reduced]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -65,10 +74,15 @@ export function RoomCanvas({ interactive, getAudio }: RoomCanvasProps) {
     // Baking and renderer creation need a real canvas context. Under jsdom
     // (unit tests) getContext returns null and the bake throws; in that case
     // the room simply does not render and the rest of the app is unaffected.
+    const now0 = new Date();
     let front: { canvas: HTMLCanvasElement };
     let behind: { canvas: HTMLCanvasElement };
     try {
-      front = bakeWallpaper();
+      // Bake the full room (wallpaper + objects + wall clock at the real local
+      // time) and the plaster behind. objectVariant comes from the derived room
+      // state (task 8 moves it during unobserved moments).
+      const variant = getRoomStateRef.current(reducedRef.current, now0.getHours(), now0.getMinutes()).objectVariant;
+      front = bakeRoom(now0.getHours(), now0.getMinutes(), variant);
       behind = bakeBehindPlaster();
     } catch {
       return; // no 2D context (e.g. jsdom): render nothing, never crash.
@@ -237,8 +251,35 @@ export function RoomCanvas({ interactive, getAudio }: RoomCanvasProps) {
     window.addEventListener('keydown', onKeyW);
 
     // --- Loop -------------------------------------------------------------
+    // Two cadences: while interacting, full-rate sim + render; otherwise a
+    // throttled (~10 Hz) light-only re-render so the wall tracks the TV picture
+    // colour (design §5) without a 60 fps sim replay — which also keeps the TV's
+    // mocked-clock tests fast. The picture itself is sampled at ≤ 8 Hz inside
+    // getRoomState.
     let raf = 0;
     let last = performance.now();
+    let lastLightAt = 0;
+    // The idle light refresh is throttled hard: the wall glow only needs to
+    // track the picture a few times a second, and a lower cadence keeps the
+    // always-on room cheap (task 10 budget) and the TV's long mocked-clock
+    // tests fast, since page.clock replays every scheduled callback.
+    const LIGHT_INTERVAL_MS = 200;
+    let lastLightKey = '';
+    // Apply the derived light; returns true if it changed meaningfully.
+    const applyLight = (): boolean => {
+      const d = new Date();
+      const rs = getRoomStateRef.current(reducedRef.current, d.getHours(), d.getMinutes());
+      gl?.setLight(rs.ambient, rs.tvLight);
+      const l = rs.tvLight;
+      const key = `${rs.ambient.toFixed(2)}|${Math.round(l.r / 16)}|${Math.round(l.g / 16)}|${Math.round(l.b / 16)}|${l.amount.toFixed(2)}`;
+      if (key === lastLightKey) return false;
+      lastLightKey = key;
+      return true;
+    };
+    const draw = (now: number): void => {
+      if (gl) gl.render(now);
+      else if (fallbackCtx) drawFallback(fallbackCtx, canvas, front.canvas, behind.canvas);
+    };
     const loop = (now: number): void => {
       const dt = now - last;
       last = now;
@@ -246,8 +287,13 @@ export function RoomCanvas({ interactive, getAudio }: RoomCanvasProps) {
       if (busy) {
         if (activeFrames > 0) activeFrames -= 1;
         stepSheet(sheet, dt);
-        if (gl) gl.render(now);
-        else if (fallbackCtx) drawFallback(fallbackCtx, canvas, front.canvas, behind.canvas);
+        applyLight();
+        draw(now);
+      } else if (now - lastLightAt >= LIGHT_INTERVAL_MS) {
+        // Idle: only redraw when the light actually changed (no sim step), so a
+        // static picture costs a sample and nothing more.
+        lastLightAt = now;
+        if (applyLight()) draw(now);
       }
       raf = requestAnimationFrame(loop);
     };

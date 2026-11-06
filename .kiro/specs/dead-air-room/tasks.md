@@ -25,9 +25,9 @@ Tick a task only when the behaviour has been seen in a real browser, not because
   - [x] 3.3 Add rip audio, the `T` key, context restore, and the 2D fallback.
   - [x] 3.4 Real-WebGL Playwright tests: a drag changes pixels in the region, two pointers work, notice blocks tearing, and a check that the room canvas cannot cover the tube (`elementFromPoint`).
   - _Requirements: 1.1–1.9, 8.2, 8.5–8.7_
-- [ ] 4. Room look
-  - [ ] 4.1 Bake wallpaper and room objects, and record authorship in `docs/room-assets.md`.
-  - [ ] 4.2 Implement `core/roomState.ts` with tests, light from picture, and ambient by act.
+- [x] 4. Room look
+  - [x] 4.1 Bake wallpaper and room objects, and record authorship in `docs/room-assets.md`.
+  - [x] 4.2 Implement `core/roomState.ts` with tests, light from picture, and ambient by act.
   - _Requirements: 5.1–5.4, 5.7, 10.3_
 - [ ] 5. **STOP: Visual checkpoint.** Commit screenshots of the room in Acts 0 and 3, and of a tear, plus a short screen recording if possible. Stop and report. A person must judge whether it looks good and frightening before more is built on it.
 
