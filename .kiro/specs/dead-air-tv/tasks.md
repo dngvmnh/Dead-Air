@@ -45,7 +45,7 @@ Work in order. Each milestone ends in something runnable. Commit after each comp
   - [x] 10.1 Author the channel 02 rundown from `docs/media-bible.md` using scenes, marked `placeholder: true` where art is temporary.
   - [x] 10.2 Wire `useTelevision`: tune, resolve, play, re-resolve at item end.
   - _Requirements: 3.1–3.3, 4.4_
-- [ ] 11. Checkpoint: leave channel 02, return 60 s later, and the programme has advanced about 60 s. Add this as an end-to-end test using a mocked clock.
+- [x] 11. Checkpoint: leave channel 02, return 60 s later, and the programme has advanced about 60 s. Add this as an end-to-end test using a mocked clock.
 
 ## Milestone 3: Memory and horror
 

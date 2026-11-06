@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { resolveBroadcast } from './clock.ts';
+import { broadcastPosition, resolveBroadcast } from './clock.ts';
 import type { Channel, ChannelId, Item } from './types.ts';
 
 // --- Fixtures --------------------------------------------------------------
@@ -182,6 +182,34 @@ describe('resolveBroadcast properties (design §5)', () => {
         const r = resolveBroadcast(c, now, () => playable);
         if (playable) expect(r).not.toBeNull();
         else expect(r).toBeNull();
+      }),
+    );
+  });
+});
+
+describe('broadcastPosition', () => {
+  const c = channel([sceneItem('a', 1000), sceneItem('b', 2000), sceneItem('c', 3000)]); // total 6000
+
+  it('is the offset into one looped cycle', () => {
+    expect(broadcastPosition(c, 0, alwaysPlayable)).toBe(0);
+    expect(broadcastPosition(c, 1500, alwaysPlayable)).toBe(1500);
+    expect(broadcastPosition(c, 6000, alwaysPlayable)).toBe(0);
+    expect(broadcastPosition(c, 6250, alwaysPlayable)).toBe(250);
+  });
+
+  it('returns null when nothing is playable', () => {
+    expect(broadcastPosition(c, 0, () => false)).toBeNull();
+  });
+
+  it('advances one-for-one with nowMs and wraps at the period (continuity)', () => {
+    fc.assert(
+      fc.property(arbChannel(), arbNow(), fc.integer({ min: 0, max: 30_000 }), (ch, now, dt) => {
+        const p0 = broadcastPosition(ch, now, alwaysPlayable);
+        const p1 = broadcastPosition(ch, now + dt, alwaysPlayable);
+        if (p0 === null || p1 === null) return;
+        const total = ch.rundown.reduce((s, i) => s + i.durationMs, 0);
+        // The forward delta modulo the period equals dt modulo the period.
+        expect(((p1 - p0) % total + total) % total).toBe(dt % total);
       }),
     );
   });

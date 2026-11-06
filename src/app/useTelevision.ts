@@ -10,7 +10,7 @@ import { type ChannelId, type Look, type Resolved } from '../core/types.ts';
 import { channelInfo } from '../core/channels.ts';
 import { BOOT_MS, TUNE_MS } from './timing.ts';
 import { AudioEngine } from '../audio/AudioEngine.ts';
-import { resolveBroadcast } from '../core/clock.ts';
+import { broadcastPosition, resolveBroadcast } from '../core/clock.ts';
 import { getChannel, getScene } from '../content/catalog.ts';
 import { SceneAdapter } from '../playback/SceneAdapter.ts';
 import { type SceneContext } from '../playback/PlaybackAdapter.ts';
@@ -156,6 +156,32 @@ export function useTelevision(): TelevisionApi {
 
   const registerRenderer = useCallback((renderer: Renderer | null) => {
     rendererRef.current = renderer;
+  }, []);
+
+  // Test seam: expose the live channel and the clock-resolved broadcast
+  // position so the mocked-clock continuity e2e (task 11) can prove the
+  // programme advanced with wall-clock time across a leave-and-return.
+  // Published only under the existing test flag; production never sets it.
+  useEffect(() => {
+    if (
+      typeof window === 'undefined' ||
+      (window as unknown as { __CRT_PRESERVE_DRAWING_BUFFER__?: boolean })
+        .__CRT_PRESERVE_DRAWING_BUFFER__ !== true
+    ) {
+      return;
+    }
+    (
+      window as unknown as {
+        __tv?: { channel: () => ChannelId | null; broadcastPositionMs: () => number | null };
+      }
+    ).__tv = {
+      channel: () => stateRef.current.channel,
+      broadcastPositionMs: () => {
+        const ch = stateRef.current.channel;
+        const channel = ch === null ? undefined : getChannel(ch);
+        return channel ? broadcastPosition(channel, Date.now(), () => true) : null;
+      },
+    };
   }, []);
 
   /**

@@ -62,3 +62,21 @@ export function resolveBroadcast(
   if (last === undefined) return null;
   return { item: last, index: playable.length - 1, offsetMs: 0, remainingMs: last.durationMs };
 }
+
+/**
+ * The absolute looped position of `channel` at `nowMs`: how far into one full
+ * rundown cycle the clock is, in ms, `0 <= position < total`. Returns null when
+ * nothing is playable. Used to prove continuity across a leave-and-return (the
+ * position advances one-for-one with wall-clock time regardless of which item
+ * is showing), independent of item boundaries.
+ */
+export function broadcastPosition(
+  channel: Channel,
+  nowMs: number,
+  isPlayable: (item: Item) => boolean,
+): number | null {
+  const playable = channel.rundown.filter(isPlayable);
+  if (playable.length === 0) return null;
+  const total = playable.reduce((sum, item) => sum + item.durationMs, 0);
+  return floorMod(nowMs - channel.epochMs, total);
+}

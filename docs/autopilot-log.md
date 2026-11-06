@@ -379,3 +379,34 @@ done, how it was checked, and anything left unverified.
   leave-and-return continuity assertion (that is task 11's mocked-clock e2e,
   next). Non-scene (file/YouTube) items are treated as unplayable for now
   (Milestone 4).
+## Task 11 — Milestone 2 checkpoint (leave/return continuity, mocked clock)
+
+- Mode: direct implementation (the `spec-task-execution` subagent is still
+  absent from the registry).
+- Done:
+  - `src/core/clock.ts`: added `broadcastPosition(channel, nowMs, isPlayable)`
+    returning the absolute looped position (`0 <= pos < total`), the
+    item-boundary-independent measure of "how far the programme has run".
+  - `src/app/useTelevision.ts`: a test-only `window.__tv` seam
+    (`channel()`, `broadcastPositionMs()`), published only under the existing
+    preserve-drawing-buffer flag; production never exposes it.
+  - `tests/e2e/milestone2-checkpoint.spec.ts` (Chromium only): installs
+    Playwright's fake clock, powers on to ON_AIR on channel 02, records the
+    broadcast position, surfs away to channel 04 (stand-by, no ch02 timers),
+    `fastForward`s 60s of wall-clock time, returns to channel 02, and asserts
+    the position advanced ~60s. Because the position is an offset into the 92s
+    rundown loop, the assertion compares the FORWARD delta modulo the period, so
+    a 60s advance reads correctly even when it wraps.
+- Checked: `npm test` 195 passed (3 new `broadcastPosition` tests incl. a
+  fast-check continuity property: forward delta mod period == dt mod period).
+  `npm run lint` clean. `npm run build` clean (JS 110.38 KB gzip, within budget).
+  Browser: the new checkpoint passes on chromium, and the full e2e suite is
+  14/14 green on chromium. Chromium only; firefox/webkit not run.
+- Decisions made alone: the continuity assertion is forward-delta-mod-period,
+  not a raw subtraction — the fake clock's absolute time does not start the loop
+  at 0, so a raw delta wraps and reads negative. The mod-period form is the
+  correct, not weakened, continuity check (it is exactly what the clock
+  guarantees). Reversible.
+- Unverified: nothing new for this checkpoint; it proves the clock → adapter →
+  re-resolve continuity directly. Milestone 3 (viewer memory, director, channels
+  04/07/13, sign-off) is next, ending at the task 16 MVP checkpoint.
