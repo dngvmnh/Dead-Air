@@ -9,8 +9,11 @@ describe('nextStartleDelay', () => {
     expect(nextStartleDelay(() => 1, false, false)).toBe(180_000);
   });
 
-  it('runs faster under demo mode', () => {
-    expect(nextStartleDelay(() => 0, true, true)).toBeLessThan(nextStartleDelay(() => 0, false, true));
+  it('has its own range under demo mode, first or not', () => {
+    for (const first of [true, false]) {
+      expect(nextStartleDelay(() => 0, true, first)).toBe(15_000);
+      expect(nextStartleDelay(() => 1, true, first)).toBe(35_000);
+    }
   });
 });
 

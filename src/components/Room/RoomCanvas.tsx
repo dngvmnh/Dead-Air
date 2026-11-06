@@ -191,7 +191,7 @@ export function RoomCanvas({
       gl?.setShape(shape.x, shape.y, 1);
     };
 
-    // The lights sinking and the glimpse (requirement 15). Both ease, so neither
+    // The lights sinking and the glimpse (requirement 11). Both ease, so neither
     // can read as a flash, and they stop costing anything once settled.
     let levelNow = 1;
     let levelFrom = 1;

@@ -1083,7 +1083,7 @@ the unlit plaster was the brightest thing on screen.
 - The layer re-bakes only when its key changes, checked on the idle tick. Act 3
   redraws at 5 Hz only once a tear exists.
 
-## Startles (requirement 15, requested by the owner)
+## Startles (requirement 11, requested by the owner)
 
 - Short scares that come back to normal: four picture apparitions, three room
   events, two answers to a tear. Data in `events.json`, so adding one needs no

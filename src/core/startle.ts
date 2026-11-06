@@ -1,23 +1,26 @@
 /**
  * Startles: short, scarce scares that come back to the programme (requirement
- * 15). Pure, with randomness injected. Scheduling, what counts as room-only, and
+ * 11). Pure, with randomness injected. Scheduling, what counts as room-only, and
  * how long an event holds the picture all live here, so they can be tested and
  * the validator can use the same answers.
  */
 
 import type { EventStepInput, HorrorEventInput } from '../content/schema.ts';
-import { DEMO_DIVISOR } from './memory.ts';
 
 /** The first startle of a session waits this long, so it cannot greet the viewer. */
 const FIRST_MS: readonly [number, number] = [45_000, 90_000];
 /** Later ones are far enough apart that the viewer stops expecting them. */
 const LATER_MS: readonly [number, number] = [60_000, 180_000];
+/**
+ * Demo mode has its own range rather than the act divisor: that would put the
+ * first startle about 6 s in, on top of the opening.
+ */
+const DEMO_MS: readonly [number, number] = [15_000, 35_000];
 
 /** How long until the next startle check. */
 export function nextStartleDelay(random: () => number, demo: boolean, first: boolean): number {
-  const [low, high] = first ? FIRST_MS : LATER_MS;
-  const divisor = demo ? DEMO_DIVISOR : 1;
-  return (low + random() * (high - low)) / divisor;
+  const [low, high] = demo ? DEMO_MS : first ? FIRST_MS : LATER_MS;
+  return low + random() * (high - low);
 }
 
 const ROOM_STEPS: ReadonlySet<EventStepInput['do']> = new Set(['sfx', 'roomLights', 'roomGlimpse']);

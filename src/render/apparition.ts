@@ -1,6 +1,6 @@
 /**
  * The wrong pictures a startle puts on the tube for a few seconds (requirement
- * 15). Original and procedural: figures, not people, with no gore. Nothing here
+ * 11). Original and procedural: figures, not people, with no gore. Nothing here
  * flashes or strobes, and the frame stays dark. With reduced effects the figure
  * holds still.
  *

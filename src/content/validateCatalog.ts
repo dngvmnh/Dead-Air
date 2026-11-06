@@ -245,18 +245,18 @@ export function validateCatalog(
     }
   }
 
-  // --- Rule 15: startles stay short and rare, and a tear never cuts the picture ---
+  // --- Rule 11: startles stay short and rare, and a tear never cuts the picture ---
   for (const e of events) {
     const isStartle = e.seams.includes('startle') || e.seams.includes('tear');
     if (!isStartle) continue;
     if (eventLengthMs(e) > STARTLE_MAX_MS) {
-      errors.push({ rule: '15.1', where: `event ${e.id}`, message: `runs longer than ${STARTLE_MAX_MS} ms` });
+      errors.push({ rule: '11.1', where: `event ${e.id}`, message: `runs longer than ${STARTLE_MAX_MS} ms` });
     }
     if (e.limit.perSession === undefined && e.limit.perViewer === undefined) {
-      errors.push({ rule: '15.2', where: `event ${e.id}`, message: 'has no limit, so it could repeat all session' });
+      errors.push({ rule: '11.2', where: `event ${e.id}`, message: 'has no limit, so it could repeat all session' });
     }
     if (e.seams.includes('tear') && !isRoomOnly(e)) {
-      errors.push({ rule: '15.3', where: `event ${e.id}`, message: 'fires on a tear but touches the picture' });
+      errors.push({ rule: '11.3', where: `event ${e.id}`, message: 'fires on a tear but touches the picture' });
     }
   }
 

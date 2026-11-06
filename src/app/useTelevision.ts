@@ -98,7 +98,7 @@ export interface RoomEffects {
   glimpse: (ms: number) => void;
 }
 
-/** A finished tear answers back about this often (requirement 15.5). */
+/** A finished tear answers back about this often (requirement 11.5). */
 const TEAR_ANSWER_CHANCE = 0.35;
 
 const DEFAULT_SETTINGS: UiSettings = {
@@ -256,7 +256,7 @@ export function useTelevision(): TelevisionApi {
   const midItemTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const midItemRandomRef = useRef<() => number>(Math.random);
 
-  // Startles (requirement 15). The room is reached through a handle so nothing
+  // Startles (requirement 11). The room is reached through a handle so nothing
   // here depends on the room's canvas, and room-only events keep their own
   // cancel flag because they run while the machine stays ON_AIR.
   const roomEffectsRef = useRef<RoomEffects | null>(null);
@@ -1021,7 +1021,7 @@ export function useTelevision(): TelevisionApi {
             stopPlayback();
             eventCancelRef.current = false;
             // A startle leaves the story's gap alone: the two must not delay
-            // each other, or the demo path would drift (requirement 15.4).
+            // each other, or the demo path would drift (requirement 11.4).
             if (!event.seams.includes('startle')) lastEventAtRef.current = Date.now();
             sessionFiredRef.current[event.id] = (sessionFiredRef.current[event.id] ?? 0) + 1;
             // A sign-off event counts as fired only when it REACHES the sign-off

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Startles (requirement 15). The timer is off under the test flag, so each test
+ * Startles (requirement 11). The timer is off under the test flag, so each test
  * fires one on demand and then proves it comes back to the programme.
  */
 
