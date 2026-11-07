@@ -245,6 +245,9 @@ export function useTelevision(): TelevisionApi {
   const adapterOffRef = useRef<(() => void) | null>(null);
   // Timer that fires ITEM_ENDED when the current item's remaining time elapses.
   const itemEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const itemEndsAtRef = useRef(0);
+  // Test seam only: a surface a test forced stays forced across item boundaries.
+  const forcedSurfaceRef = useRef<'canvas' | 'youtube' | null>(null);
   // --- Viewer memory (task 12) -------------------------------------------
   // `?demo=1` divides time thresholds and cooldowns by DEMO_DIVISOR (8); see
   // core/memory.ts (requirement 8.2 / dead-air-room 9.3).
@@ -720,6 +723,7 @@ export function useTelevision(): TelevisionApi {
           forceStartle: (id: string) => string | null;
           forceSurface: (surface: 'canvas' | 'youtube') => void;
           tubeTearable: () => boolean;
+          itemLeftMs: () => number;
           forceTearAnswer: () => void;
           lastStartle: () => string | null;
           roomEventRunning: () => boolean;
@@ -755,8 +759,12 @@ export function useTelevision(): TelevisionApi {
       // the suite stays deterministic. These fire them on demand.
       forceStartle: (id: string) => fireStartleRef.current('startle', id),
       // Stands in for a YouTube item until the adapter exists (task 9.3).
-      forceSurface: (s) => setSurface(s),
+      forceSurface: (s) => {
+        forcedSurfaceRef.current = s;
+        setSurface(s);
+      },
       tubeTearable: () => tubeTearableRef.current,
+      itemLeftMs: () => itemEndsAtRef.current - Date.now(),
       forceTearAnswer: () => {
         tearRandomRef.current = () => 0;
       },
@@ -793,7 +801,7 @@ export function useTelevision(): TelevisionApi {
         setSurface('youtube');
         return null;
       }
-      setSurface('canvas');
+      setSurface(forcedSurfaceRef.current ?? 'canvas');
       // Behind the picture, this channel's dark. On 13 from Act 2, the viewer's own
       // wall, so the picture seems to be a hole in the set.
       {
@@ -1145,6 +1153,7 @@ export function useTelevision(): TelevisionApi {
         // An owned source is now playing: watch time may accrue (req 7.2).
         playingRef.current = true;
         clearItemEndTimer();
+        itemEndsAtRef.current = Date.now() + remainingMs;
         itemEndTimer.current = setTimeout(() => {
           itemEndTimer.current = null;
           dispatchEnded();

@@ -14,6 +14,7 @@ interface TvSeam {
   lastEventText: () => string;
   forceSurface: (surface: 'canvas' | 'youtube') => void;
   tubeTearable: () => boolean;
+  itemLeftMs: () => number;
 }
 type Win = { __crt: CrtSeam; __tv: TvSeam; __tubeListeners: number };
 
@@ -65,6 +66,8 @@ async function onAir(page: Page, stored = memory()): Promise<void> {
   await page.waitForFunction(() => (window as unknown as Win).__tv.phase() === 'ON_AIR', undefined, { timeout: 15000 });
   await page.waitForFunction(() => (window as unknown as Win).__tv.tubeTearable());
   await page.waitForTimeout(600);
+  // A torn picture does not survive an item boundary, so do not tear just before one.
+  await page.waitForFunction(() => (window as unknown as Win).__tv.itemLeftMs() > 4000, undefined, { timeout: 20000 });
 }
 
 async function dragAcross(page: Page): Promise<void> {
