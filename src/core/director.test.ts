@@ -1,3 +1,5 @@
+import { getEvents } from '../content/catalog.ts';
+import { keepsProgramme } from './startle.ts';
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { decideEvent, GLOBAL_GAP_MS, type DecideInput } from './director.ts';
@@ -212,3 +214,46 @@ function baseEventForStartle() {
     steps: [{ do: 'sfx' as const, cue: 'knock' as const }],
   };
 }
+
+describe('E13, as authored (requirement 6)', () => {
+  const e13 = getEvents().find((e) => e.id === 'E13')!;
+  const seen = (m: ViewerMemory): ViewerMemory => ({
+    ...m,
+    act: 3,
+    firedEvents: { E07: { count: 1, lastAt: 0 } },
+  });
+  const decide = (over: Partial<Parameters<typeof decideEvent>[0]>) =>
+    decideEvent({
+      memory: seen(createMemory(0)),
+      channel: 2,
+      seam: 'tune-in',
+      currentSource: null,
+      nowMs: 1000,
+      localHour: 12,
+      lastEventAt: null,
+      sessionFired: {},
+      events: getEvents(),
+      random: () => 0,
+      ...over,
+    });
+
+  it('exists and leaves the programme running', () => {
+    expect(e13).toBeDefined();
+    expect(keepsProgramme(e13)).toBe(true);
+  });
+
+  it('fires on a tune after E07, ignoring the global gap', () => {
+    expect(decide({ lastEventAt: 999 })?.id).toBe('E13');
+  });
+
+  it('needs E07, and fires once per viewer', () => {
+    expect(decide({ memory: { ...seen(createMemory(0)), firedEvents: {} } })?.id).not.toBe('E13');
+    const fired = seen(createMemory(0));
+    expect(decide({ memory: { ...fired, firedEvents: { ...fired.firedEvents, E13: { count: 1, lastAt: 0 } } } })?.id).not.toBe('E13');
+  });
+
+  it('never on channel 13, where the sign-off is, and not after hours', () => {
+    expect(decide({ channel: 13 })?.id).toBe('E10');
+    expect(decide({ memory: { ...seen(createMemory(0)), act: 4 } })?.id).not.toBe('E13');
+  });
+});

@@ -6,6 +6,7 @@ import {
   moveGrab,
   release,
   cutPath,
+  pushSheet,
   replayStrokes,
   stepSheet,
   nodeIndex,
@@ -73,6 +74,9 @@ interface RoomSeam {
   glimpseAmount: () => number;
   figureStep: () => number;
   objectVariant: () => number;
+  /** How far the wall is being pressed out right now, and whether it is. */
+  lift: () => number;
+  pushing: () => boolean;
 }
 
 const IDLE_CORNER_RADIUS = 0.12; // fraction of the sheet near the top-right corner
@@ -159,6 +163,20 @@ export function RoomCanvas({
     let strokeCount = 0;
     let repairedCount = 0;
     let appliedEpoch = -1;
+    // The wall coming at the viewer (requirement 6).
+    const PUSH_SETTLE_FRAMES = 45;
+    let push: { points: ReadonlyArray<readonly [number, number]>; start: number; ms: number } | null = null;
+    let rip: {
+      points: ReadonlyArray<readonly [number, number]>;
+      start: number;
+      ms: number;
+      cutTo: number;
+      resolve: () => void;
+      lastSound: number;
+    } | null = null;
+    let settlePush = 0;
+    let lastPush = { gx: 0, gy: 0 };
+    let pushLift = 0;
     let mended: StoredStroke[] = [];
     // What is painted on the wall right now.
     let figureStep = 0;
@@ -294,8 +312,112 @@ export function RoomCanvas({
       syncLook: () => {
         if (syncLook()) draw(performance.now());
       },
+      wallPush: (points, ms) => {
+        push = { points, start: performance.now(), ms };
+        wake();
+      },
+      wallRip: (points, ms, instant) =>
+        new Promise((resolve) => {
+          rip = { points, start: performance.now(), ms, cutTo: 0, resolve, lastSound: 0 };
+          wake();
+          if (instant) finishRip(false);
+          // A hidden tab runs no frames, and the event must still get its answer.
+          else window.setTimeout(() => finishRip(true), ms + 250);
+        }),
+      cancelWall: () => {
+        if (push) settlePush = PUSH_SETTLE_FRAMES;
+        push = null;
+        finishRip(true);
+      },
     };
     registerRoomRef.current?.(effects);
+
+    // Where along a path `t` (0..1) falls, by distance, in grid units.
+    const alongPath = (points: ReadonlyArray<readonly [number, number]>, t: number): { gx: number; gy: number } => {
+      const toX = (v: number): number => v * (WALL_COLS - 1);
+      const toY = (v: number): number => v * (WALL_ROWS - 1);
+      const f = Math.max(0, Math.min(0.9999, t)) * (points.length - 1);
+      const i = Math.floor(f);
+      const [ax, ay] = points[i]!;
+      const [bx, by] = points[i + 1]!;
+      return { gx: toX(ax + (bx - ax) * (f - i)), gy: toY(ay + (by - ay) * (f - i)) };
+    };
+
+    // Cut as far as `t`. Each tear starts from where the last frame's left off.
+    const cutRipTo = (t: number): void => {
+      if (!rip) return;
+      const STEP = 1 / 48;
+      while (rip.cutTo < t) {
+        const next = Math.min(t, rip.cutTo + STEP);
+        const a = alongPath(rip.points, rip.cutTo);
+        const b = alongPath(rip.points, next);
+        cutPath(sheet, a.gx, a.gy, b.gx, b.gy);
+        rip.cutTo = next;
+      }
+    };
+
+    function finishRip(withSound: boolean): void {
+      const r = rip;
+      if (!r) return;
+      cutRipTo(1);
+      rip = null;
+      strokeCount += 1;
+      strokeMid.x = r.points.reduce((sum, p) => sum + p[0], 0) / r.points.length;
+      strokeMid.y = r.points.reduce((sum, p) => sum + p[1], 0) / r.points.length;
+      shape.x = strokeMid.x;
+      shape.y = strokeMid.y;
+      if (withSound) {
+        try {
+          getAudio().playDetachThump();
+        } catch {
+          /* audio optional */
+        }
+      }
+      wake();
+      r.resolve();
+    }
+
+    // Frame by frame: the push leans and lurches along its path, then the rip runs.
+    const stepWallEvents = (now: number): void => {
+      if (push) {
+        const t = (now - push.start) / push.ms;
+        if (t >= 1) {
+          push = null;
+          settlePush = PUSH_SETTLE_FRAMES;
+        } else {
+          // Three heaves, each stronger, not a smooth slide.
+          const heave = 0.55 + 0.45 * Math.abs(Math.sin(t * Math.PI * 3));
+          const at = alongPath(push.points, t * t * 0.4 + 0.3);
+          lastPush = at;
+          pushLift = 3.4 * heave * Math.min(1, t * 5);
+          pushSheet(sheet, at.gx, at.gy, 3.6, pushLift);
+          activeFrames = Math.max(activeFrames, 2);
+        }
+      }
+      if (settlePush > 0) {
+        settlePush -= 1;
+        pushLift *= 0.9;
+        pushSheet(sheet, lastPush.gx, lastPush.gy, 3.6, 0);
+      }
+      if (rip) {
+        const t = Math.min(1, (now - rip.start) / rip.ms);
+        // Fast, and not at an even speed: it gets through the middle in one go.
+        cutRipTo(t * t * (3 - 2 * t));
+        const at = alongPath(rip.points, rip.cutTo);
+        pushSheet(sheet, at.gx, at.gy, 2.2, 2.6);
+        if (now - rip.lastSound > 85) {
+          rip.lastSound = now;
+          try {
+            getAudio().playRip(1);
+          } catch {
+            /* audio optional */
+          }
+        }
+        activeFrames = Math.max(activeFrames, 2);
+        if (t >= 1) finishRip(true);
+      }
+    };
+
     const stepEffects = (now: number, dt: number): boolean => {
       let changed = false;
       if (levelMoving) {
@@ -585,8 +707,9 @@ export function RoomCanvas({
     const loop = (now: number): void => {
       const dt = now - last;
       last = now;
-      const busy = drags.size > 0 || activeFrames > 0;
       updateShape(dt);
+      stepWallEvents(now);
+      const busy = drags.size > 0 || activeFrames > 0;
       const effectsMoved = stepEffects(now, dt);
       // Checked whether or not the wall is busy: memory loads during the first
       // painted second, and a tear made then must still show the right act.
@@ -642,6 +765,8 @@ export function RoomCanvas({
         glimpseAmount: () => glimpseNow,
         figureStep: () => figureStep,
         objectVariant: () => objectVariant,
+        lift: () => pushLift,
+        pushing: () => push !== null,
       };
     }
 

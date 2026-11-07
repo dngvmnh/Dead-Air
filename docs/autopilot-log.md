@@ -1174,3 +1174,18 @@ the unlit plaster was the brightest thing on screen.
 - The first tear of a session answers whether it is on the wall or the picture.
 - Spec change: `resetTubeTear` returns whether there was damage, and `setTubeBehind` is
   added to the `Renderer`. Mesh code shared with the wall moved to `sheetMesh.ts`.
+
+## Task 10: E13 (2026-11-07)
+
+- New steps `wallPush` and `wallRip`, along paths in `content/room/paths.json`. The
+  validator checks references, once per viewer, not channel 13, and that it leaves the
+  programme running.
+- E13 runs in the room while the programme stays on air: lights sink, something heaves
+  the paper out from behind, the wall rips with the wraith in the hole, lights return.
+- Pressed paper picks up a little light of its own, or a push at 8% light shows nothing.
+- It counts when the rip happens, not when it starts. Leaving before the rip means it
+  comes again on the next tune. Leaving during the rip finishes the tear at once.
+- The rip is stored with a reserved seed: never mended, never dropped at the cap.
+- Reduced motion: 2% light, the tear applied in the dark, no push.
+- Reaching Act 4 without it: the wall is torn on load. `maxAct: 3` so nothing is pending.
+- Story events at an item boundary wait while a room event runs, so no line lands on it.

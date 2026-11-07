@@ -28,7 +28,7 @@ export function nextStartleDelay(random: () => number, demo: boolean, first: boo
   return low + random() * (high - low);
 }
 
-const ROOM_STEPS: ReadonlySet<EventStepInput['do']> = new Set(['sfx', 'roomLights', 'roomGlimpse']);
+const ROOM_STEPS: ReadonlySet<EventStepInput['do']> = new Set(['sfx', 'silence', 'roomLights', 'roomGlimpse', 'wallPush', 'wallRip']);
 
 /** A room-only event plays over the programme and never touches the picture. */
 export function isRoomOnly(event: Pick<HorrorEventInput, 'steps'>): boolean {

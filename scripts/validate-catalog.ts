@@ -22,6 +22,7 @@ const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const CATALOG_DIR = join(ROOT, 'src', 'content', 'catalog');
 const EVENTS_DIR = join(ROOT, 'src', 'content', 'events');
 const SCENES_DIR = join(ROOT, 'src', 'content', 'scenes');
+const ROOM_PATHS_FILE = join(ROOT, 'src', 'content', 'room', 'paths.json');
 const MEDIA_DIR = join(ROOT, 'public', 'media');
 
 function listJson(dir: string): string[] {
@@ -96,7 +97,8 @@ function main(): void {
   const localAssets = hasMediaDir ? collectLocalAssets(MEDIA_DIR) : undefined;
   if (!hasMediaDir) warnings.push(`no media directory yet (${relative(ROOT, MEDIA_DIR)}); local-asset references not checked`);
 
-  const input: CatalogInput = { channels, events, scenes, ...(localAssets ? { localAssets } : {}) };
+  const roomPaths = existsSync(ROOM_PATHS_FILE) ? (readJson(ROOM_PATHS_FILE) as Record<string, unknown>) : {};
+  const input: CatalogInput = { channels, events, scenes, roomPaths, ...(localAssets ? { localAssets } : {}) };
   const result = validateCatalog(input, { release });
 
   const mode = release ? 'release' : 'standard';

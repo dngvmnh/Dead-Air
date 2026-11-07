@@ -9,7 +9,7 @@ import {
   stepSheet,
   nodeIndex,
   countBroken,
-  type TearSheet, replayStrokes, WALL_COLS, WALL_ROWS } from './tearSheet.ts';
+  type TearSheet, replayStrokes, WALL_COLS, WALL_ROWS, pushSheet } from './tearSheet.ts';
 
 /**
  * The tear simulation is pure core logic (design §2): no DOM, no Date.now, no
@@ -280,5 +280,27 @@ describe('replayStrokes', () => {
     const sheet = createSheet(WALL_COLS, WALL_ROWS, 1);
     expect(replayStrokes(sheet, [], () => 0)).toBe(0);
     expect(countBroken(sheet)).toBe(0);
+  });
+});
+
+describe('pushSheet', () => {
+  it('raises a dome around the push and tears nothing', () => {
+    const sheet = createSheet(WALL_COLS, WALL_ROWS, 1);
+    for (let i = 0; i < 60; i += 1) {
+      pushSheet(sheet, 10, 10, 4, 3);
+      stepSheet(sheet, 16.67);
+    }
+    expect(sheet.zs[nodeIndex(sheet, 10, 10)]).toBeGreaterThan(2);
+    expect(sheet.zs[nodeIndex(sheet, 30, 25)]).toBe(0);
+    expect(countBroken(sheet)).toBe(0);
+  });
+
+  it('lets the paper back down at strength 0, and leaves pinned nodes alone', () => {
+    const sheet = createSheet(WALL_COLS, WALL_ROWS, 1);
+    const corner = sheet.xs[0];
+    for (let i = 0; i < 30; i += 1) pushSheet(sheet, 2, 2, 4, 3);
+    for (let i = 0; i < 40; i += 1) pushSheet(sheet, 2, 2, 4, 0);
+    expect(Math.abs(sheet.zs[nodeIndex(sheet, 2, 2)]!)).toBeLessThan(0.01);
+    expect(sheet.xs[0]).toBe(corner);
   });
 });

@@ -986,6 +986,66 @@
       },
       "chain": true,
       "cooldownMs": 25000
+    },
+    {
+      "id": "E13",
+      "minAct": 3,
+      "maxAct": 3,
+      "channels": [
+        2,
+        4,
+        7
+      ],
+      "seams": [
+        "tune-in"
+      ],
+      "when": {
+        "eventFired": "E07"
+      },
+      "limit": {
+        "perViewer": 1
+      },
+      "priority": 50,
+      "chain": true,
+      "steps": [
+        {
+          "do": "roomLights",
+          "level": 0.08,
+          "ms": 1400
+        },
+        {
+          "do": "silence",
+          "ms": 1200
+        },
+        {
+          "do": "sfx",
+          "cue": "rumble"
+        },
+        {
+          "do": "wallPush",
+          "path": "left-of-set",
+          "ms": 2200
+        },
+        {
+          "do": "sfx",
+          "cue": "scrape",
+          "gain": 0.9
+        },
+        {
+          "do": "wallRip",
+          "path": "left-of-set",
+          "ms": 900
+        },
+        {
+          "do": "silence",
+          "ms": 1800
+        },
+        {
+          "do": "roomLights",
+          "level": 1,
+          "ms": 1200
+        }
+      ]
     }
   ]
 }

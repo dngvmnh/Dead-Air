@@ -10,7 +10,7 @@ import {
   NEW_SESSION_GAP_MS,
   previousDifferentChannel,
   VISIT_ORDER_LIMIT,
-  type ViewerMemory, splitTears, STROKE_CAP, STROKE_POINT_CAP, thinPoints } from './memory.ts';
+  type ViewerMemory, splitTears, STROKE_CAP, STROKE_POINT_CAP, thinPoints, RIP_BACK_SEED } from './memory.ts';
 import type { ChannelId } from './types.ts';
 
 const MIN = 60_000;
@@ -237,5 +237,27 @@ describe('tear memory (requirement 4)', () => {
     expect(ids({ ...base, room, sessionCount: 2, act: 2 })).toEqual([[2], [1]]);
     expect(ids({ ...base, room, sessionCount: 2, act: 1 })).toEqual([[1, 2], []]);
     expect(ids({ ...base, room, sessionCount: 1, act: 3 })).toEqual([[1, 2], []]);
+  });
+});
+
+describe('it rips back (requirement 6)', () => {
+  const path = [[0.1, 0.1], [0.1, 0.9]] as const;
+
+  it('records the tear once', () => {
+    let m = memoryReducer(createMemory(1), { type: 'ripBack', points: path }, false);
+    m = memoryReducer(m, { type: 'ripBack', points: path }, false);
+    expect(m.room.ripBackDone).toBe(true);
+    expect(m.room.strokes).toHaveLength(1);
+    expect(m.room.strokes[0]?.seed).toBe(RIP_BACK_SEED);
+  });
+
+  it('is never mended, and never falls out at the cap', () => {
+    let m = memoryReducer(createMemory(1), { type: 'ripBack', points: path }, false);
+    for (let seed = 0; seed < STROKE_CAP + 5; seed += 1) m = memoryReducer(m, { type: 'addStroke', seed, points: path }, false);
+    expect(m.room.strokes).toHaveLength(STROKE_CAP);
+    expect(m.room.strokes.some((s) => s.seed === RIP_BACK_SEED)).toBe(true);
+    const { open, mended } = splitTears({ ...m, sessionCount: 2, act: 3 });
+    expect(open.map((s) => s.seed)).toEqual([RIP_BACK_SEED]);
+    expect(mended).toHaveLength(STROKE_CAP - 1);
   });
 });

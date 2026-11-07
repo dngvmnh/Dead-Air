@@ -13,12 +13,15 @@
 import {
   channelSchema,
   horrorEventSchema,
+  roomPathsSchema,
   sceneProgramSchema,
   toChannel,
   type HorrorEventInput,
   type SceneProgramInput,
 } from './schema.ts';
 import type { Channel, ChannelId } from '../core/types.ts';
+
+import rawRoomPaths from './room/paths.json';
 
 // Eagerly import every catalogue and scene JSON file. Vite resolves these at
 // build time; the shapes are validated below.
@@ -82,6 +85,13 @@ export function getScene(sceneId: string): SceneProgramInput | undefined {
 /** All authored channel ids, for diagnostics and tests. */
 export function authoredChannelIds(): ChannelId[] {
   return [...CHANNELS.keys()];
+}
+
+const ROOM_PATHS = roomPathsSchema.parse(rawRoomPaths);
+
+/** A named path across the wall, or null. The validator checks every reference. */
+export function getRoomPath(id: string): Array<[number, number]> | null {
+  return ROOM_PATHS[id] ?? null;
 }
 
 /** The authored horror events (design §9). */

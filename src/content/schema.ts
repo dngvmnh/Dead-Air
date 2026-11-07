@@ -256,6 +256,7 @@ export const sfxCueSchema = z.enum([
   'phoneRing',
   'scrape',
   'drone',
+  'rumble',
 ]);
 
 /**
@@ -357,7 +358,17 @@ export const eventStepSchema = z.discriminatedUnion('do', [
   z.object({ do: z.literal('roomLights'), level: z.number().min(0).max(1), ms: z.number().int().positive() }).strict(),
   // Something pale behind the viewer's own tears. Unseen with no tears.
   z.object({ do: z.literal('roomGlimpse'), ms: z.number().int().positive() }).strict(),
+  // Something pushes the wall from behind, along a path in content/room/paths.json.
+  z.object({ do: z.literal('wallPush'), path: z.string().min(1), ms: z.number().int().positive() }).strict(),
+  // The wall rips from the other side, along a path.
+  z.object({ do: z.literal('wallRip'), path: z.string().min(1), ms: z.number().int().positive() }).strict(),
 ]);
+
+/** Named paths across the wall, normalised 0..1 (design §7). */
+export const roomPathsSchema = z.record(
+  z.string(),
+  z.array(z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)])).min(2).max(32),
+);
 
 export const horrorEventSchema = z
   .object({

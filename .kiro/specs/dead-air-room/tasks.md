@@ -68,10 +68,10 @@ Tick a task only when the behaviour has been seen in a real browser, not because
 
 ## Phase D: The turn
 
-- [ ] 10. E13
-  - [ ] 10.1 Add event steps, schema, validator rules, and paths.
-  - [ ] 10.2 Add E13 and media bible entry. Room-only steps must not replace the picture.
-  - [ ] 10.3 Tests: fires once, chain, cancels on CH and POWER, reduced-motion path, sign-off reachable without it, reload after it.
+- [x] 10. E13
+  - [x] 10.1 Add event steps, schema, validator rules, and paths.
+  - [x] 10.2 Add E13 and media bible entry. Room-only steps must not replace the picture.
+  - [x] 10.3 Tests: fires once, chain, cancels on CH and POWER, reduced-motion path, sign-off reachable without it, reload after it.
   - _Requirements: 6.1–6.5, 8.1, 8.3, 8.4_
 - [ ] 11. **STOP: Scare checkpoint.** Run a real-clock `/?demo=1` session from fresh memory, surfing CH+ every 15 s. Sign-off must begin within 3 min 30 s, with E13 seen on the way. Commit a recording or screenshots of E13. Stop and report.
   - _Requirements: 9.4_

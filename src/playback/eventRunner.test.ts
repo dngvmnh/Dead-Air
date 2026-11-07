@@ -61,6 +61,8 @@ function recorder(fail?: { scene?: boolean; voice?: boolean }): Recorder {
       calls.push(`glimpse:${ms}`);
       return Promise.resolve();
     },
+    wallPush: async () => undefined,
+    wallRip: async () => undefined,
     cancelled: () => false,
   };
 }

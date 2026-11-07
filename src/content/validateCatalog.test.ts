@@ -370,3 +370,34 @@ describe('requirement 4 release depth rules', () => {
     expect(MIN_INTERSTITIALS).toBe(4);
   });
 });
+
+describe('wall rips (requirement 6)', () => {
+  const rip = (over: Record<string, unknown> = {}): unknown => ({
+    id: 'R1',
+    minAct: 3,
+    channels: [2],
+    seams: ['tune-in'],
+    when: { distinctChannelsGte: 0 },
+    limit: { perViewer: 1 },
+    priority: 1,
+    steps: [{ do: 'wallRip', path: 'known', ms: 100 }],
+    ...over,
+  });
+  const check = (event: unknown) =>
+    validateCatalog({ channels: [], scenes: [], events: [event], roomPaths: { known: [[0, 0], [1, 1]] } }).errors;
+
+  it('accepts a good one', () => {
+    expect(check(rip())).toEqual([]);
+  });
+
+  it('refuses an unknown path', () => {
+    expect(check(rip({ steps: [{ do: 'wallRip', path: 'nope', ms: 100 }] })).map((e) => e.rule)).toContain('14.1');
+  });
+
+  it('refuses channel 13, repeats and anything that stops the programme', () => {
+    expect(check(rip({ channels: [13] })).map((e) => e.rule)).toContain('6.2');
+    expect(check(rip({ channels: 'any' })).map((e) => e.rule)).toContain('6.2');
+    expect(check(rip({ limit: { perSession: 1 } })).map((e) => e.rule)).toContain('6.2');
+    expect(check(rip({ steps: [{ do: 'wallRip', path: 'known', ms: 100 }, { do: 'slate', text: 'x', ms: 100 }] })).map((e) => e.rule)).toContain('6.3');
+  });
+});

@@ -59,6 +59,8 @@ export const MEMORY_SCHEMA_VERSION = 2 as const;
 /** The oldest stroke drops first past this (design §6). */
 export const STROKE_CAP = 24;
 export const STROKE_POINT_CAP = 32;
+/** Marks the tear the wall made itself. Nobody mends that one, and it never drops out. */
+export const RIP_BACK_SEED = -1;
 export const VISIT_ORDER_LIMIT = 50;
 /** A gap longer than this since last activity starts a new session (req 7.5). */
 export const NEW_SESSION_GAP_MS = 30 * 60 * 1000;
@@ -117,10 +119,22 @@ export function thinPoints(points: ReadonlyArray<readonly [number, number]>, cap
   return pick.map(([x, y]) => [clamp(x), clamp(y)]);
 }
 
+/** Past the cap the oldest drops first, except the tear the wall made itself. */
+function capStrokes(strokes: StoredStroke[]): StoredStroke[] {
+  const kept = [...strokes];
+  while (kept.length > STROKE_CAP) {
+    const oldest = kept.findIndex((s) => s.seed !== RIP_BACK_SEED);
+    kept.splice(oldest, 1);
+  }
+  return kept;
+}
+
 /** Which tears are still open, and which someone has mended (requirement 4.2). */
 export function splitTears(mem: ViewerMemory): { open: StoredStroke[]; mended: StoredStroke[] } {
   const repairing = mem.sessionCount >= 2 && mem.act >= 2;
-  const mended = repairing ? mem.room.strokes.filter((s) => s.session < mem.sessionCount) : [];
+  const mended = repairing
+    ? mem.room.strokes.filter((s) => s.session < mem.sessionCount && s.seed !== RIP_BACK_SEED)
+    : [];
   return { open: mem.room.strokes.filter((s) => !mended.includes(s)), mended };
 }
 
@@ -188,6 +202,7 @@ export type MemoryAction =
   | { type: 'setSettings'; settings: Partial<ViewerMemory['settings']> }
   | { type: 'addStroke'; seed: number; points: ReadonlyArray<readonly [number, number]> }
   | { type: 'unobserved' }
+  | { type: 'ripBack'; points: ReadonlyArray<readonly [number, number]> }
   | { type: 'ackNotice' };
 
 /**
@@ -253,7 +268,12 @@ function applyAction(mem: ViewerMemory, action: MemoryAction): ViewerMemory {
     case 'addStroke': {
       if (action.points.length < 2) return mem;
       const stroke: StoredStroke = { seed: action.seed, session: mem.sessionCount, points: thinPoints(action.points) };
-      return { ...mem, room: { ...mem.room, strokes: [...mem.room.strokes, stroke].slice(-STROKE_CAP) } };
+      return { ...mem, room: { ...mem.room, strokes: capStrokes([...mem.room.strokes, stroke]) } };
+    }
+    case 'ripBack': {
+      if (mem.room.ripBackDone) return mem;
+      const stroke: StoredStroke = { seed: RIP_BACK_SEED, session: mem.sessionCount, points: thinPoints(action.points) };
+      return { ...mem, room: { ...mem.room, ripBackDone: true, strokes: capStrokes([...mem.room.strokes, stroke]) } };
     }
     case 'unobserved':
       return { ...mem, room: { ...mem.room, ...advanceRoomLook(mem) } };

@@ -60,6 +60,8 @@ export interface CatalogInput {
    * checking (used by tests that only exercise other rules).
    */
   localAssets?: Set<string>;
+  /** `src/content/room/paths.json`. Omit to skip checking wall path references. */
+  roomPaths?: Record<string, unknown>;
 }
 
 export interface ValidateOptions {
@@ -208,6 +210,21 @@ export function validateCatalog(
       }
       if (step.do === 'voice' && step.url && input.localAssets && isLocalRef(step.url) && !input.localAssets.has(step.url)) {
         errors.push({ rule: '14.1', where: `event ${e.id}`, message: `voice step references missing asset "${step.url}"` });
+      }
+      if ((step.do === 'wallPush' || step.do === 'wallRip') && input.roomPaths && !(step.path in input.roomPaths)) {
+        errors.push({ rule: '14.1', where: `event ${e.id}`, message: `step references unknown wall path "${step.path}"` });
+      }
+    }
+    // It rips back once, and channel 13 is where the sign-off has to stay reachable.
+    if (e.steps.some((step) => step.do === 'wallRip')) {
+      if (e.limit.perViewer !== 1) {
+        errors.push({ rule: '6.2', where: `event ${e.id}`, message: 'a wall rip must be limited to once per viewer' });
+      }
+      if (e.channels === 'any' || e.channels.includes(13)) {
+        errors.push({ rule: '6.2', where: `event ${e.id}`, message: 'a wall rip must not fire on channel 13' });
+      }
+      if (!keepsProgramme(e)) {
+        errors.push({ rule: '6.3', where: `event ${e.id}`, message: 'a wall rip must leave the programme running' });
       }
     }
   }

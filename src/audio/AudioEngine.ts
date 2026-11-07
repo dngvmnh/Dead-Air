@@ -468,6 +468,12 @@ export class AudioEngine {
         this.cueNoise('bandpass', 1250, 1.4, 0.5 * g, 0.72, 0.1, 0.8, 300);
         break;
       }
+      case 'rumble': {
+        // Something heavy behind the wall, leaning. Below 100 Hz (design §9).
+        this.cueNoise('lowpass', 70, 0.9, 0.7 * g, 0, 0.5, 2.2, 95);
+        this.cueTone('sine', 38, 33, 0.22 * g, 0, 0.6, 2.2);
+        break;
+      }
       case 'drone': {
         this.cueTone('sine', 49, 47, 0.2 * g, 0, 0.7, 3.4);
         this.cueTone('sine', 52, 50, 0.16 * g, 0, 0.7, 3.4);

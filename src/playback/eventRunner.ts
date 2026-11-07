@@ -48,6 +48,10 @@ export interface EventOps {
   roomLights(level: number, ms: number): Promise<void>;
   /** Something pale behind the viewer's tears for `ms`. */
   roomGlimpse(ms: number): Promise<void>;
+  /** Something pushes the wall from behind along a named path for `ms`. */
+  wallPush(path: string, ms: number): Promise<void>;
+  /** The wall rips from the other side along a named path over `ms`. */
+  wallRip(path: string, ms: number): Promise<void>;
   /** True if the run should abort (e.g. the viewer surfed away). */
   cancelled(): boolean;
 }
@@ -107,6 +111,10 @@ function runStep(step: ResolvedStep, ops: EventOps): Promise<void> {
       return ops.roomLights(step.level, step.ms);
     case 'roomGlimpse':
       return ops.roomGlimpse(step.ms);
+    case 'wallPush':
+      return ops.wallPush(step.path, step.ms);
+    case 'wallRip':
+      return ops.wallRip(step.path, step.ms);
   }
 }
 

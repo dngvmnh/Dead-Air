@@ -11,7 +11,7 @@ import { channelInfo } from '../core/channels.ts';
 import { BOOT_MS, TUNE_MS } from './timing.ts';
 import { AudioEngine } from '../audio/AudioEngine.ts';
 import { broadcastPosition, resolveBroadcast } from '../core/clock.ts';
-import { getChannel, getEvents, getScene } from '../content/catalog.ts';
+import { getChannel, getEvents, getRoomPath, getScene } from '../content/catalog.ts';
 import { SceneAdapter } from '../playback/SceneAdapter.ts';
 import { type PlaybackAdapter, type SceneContext } from '../playback/PlaybackAdapter.ts';
 import { decideEvent } from '../core/director.ts';
@@ -124,6 +124,12 @@ export interface RoomEffects {
   glimpse: (ms: number) => void;
   /** Bring the wall up to date with memory now, rather than on the next tick. */
   syncLook: () => void;
+  /** Press the wall from behind along a path. Nothing to wait for. */
+  wallPush: (points: ReadonlyArray<readonly [number, number]>, ms: number) => void;
+  /** Rip the wall along a path. Settles when the tear is done; `instant` skips the motion. */
+  wallRip: (points: ReadonlyArray<readonly [number, number]>, ms: number, instant: boolean) => Promise<void>;
+  /** Stop any push. A rip already under way finishes at once, so the wall makes sense. */
+  cancelWall: () => void;
 }
 
 
@@ -146,6 +152,11 @@ const TUBE_DARK: Record<ChannelId, readonly [number, number, number]> = {
 };
 /** How long a boundary's burst of static takes to carry off a torn picture. */
 const MEND_STATIC_MS = 180;
+
+/** How dark reduced motion takes the room, to tear the wall out of sight. */
+const REDUCED_BLACKOUT_LEVEL = 0.02;
+/** The path the wall tears along for a viewer who reached after hours without seeing it. */
+const RIP_BACK_PATH = 'left-of-set';
 
 /** A scripted room this dark counts as nobody being able to see it. */
 const BLACKOUT_LEVEL = 0.1;
@@ -312,6 +323,8 @@ export function useTelevision(): TelevisionApi {
   const roomEffectsRef = useRef<RoomEffects | null>(null);
   const roomCancelRef = useRef(false);
   const roomEventRunningRef = useRef(false);
+  const roomRunRef = useRef(0);
+  const runRoomEventRef = useRef<(event: HorrorEventInput, channel: ChannelId) => void>(() => undefined);
   const lastStartleRef = useRef<string | null>(null);
   const fireStartleRef = useRef<(seam: 'startle' | 'tear', forcedId?: string) => string | null>(() => null);
   const tearRandomRef = useRef<() => number>(Math.random);
@@ -527,18 +540,37 @@ export function useTelevision(): TelevisionApi {
           await shown;
         },
         roomLights: async (level, ms) => {
-          roomEffectsRef.current?.setLevel(level, ms);
+          const dark = level <= BLACKOUT_LEVEL;
+          roomEffectsRef.current?.setLevel(dark && prefersReducedMotion() ? REDUCED_BLACKOUT_LEVEL : level, ms);
           await wait(ms);
-          if (level <= BLACKOUT_LEVEL) unobservedMoment(false);
+          if (dark) unobservedMoment(false);
         },
         roomGlimpse: async (ms) => {
           roomEffectsRef.current?.glimpse(ms);
           await wait(ms);
         },
+        wallPush: async (path, ms) => {
+          const points = getRoomPath(path);
+          // Reduced motion gets the dark and the sound, and no motion in it.
+          if (points && !prefersReducedMotion()) roomEffectsRef.current?.wallPush(points, ms);
+          await wait(ms);
+        },
+        wallRip: async (path, ms) => {
+          const points = getRoomPath(path);
+          if (!points) return;
+          const reduced = prefersReducedMotion();
+          await roomEffectsRef.current?.wallRip(points, ms, reduced);
+          // Recorded here, not when the event starts: a viewer who changed channel
+          // before the rip has not seen it, and meets it again on the next tune.
+          dispatchMemory({ type: 'eventFired', eventId: 'E13', atMs: Date.now() });
+          dispatchMemory({ type: 'ripBack', points });
+          getStore().flush(memoryRef.current);
+          if (reduced) await wait(ms);
+        },
         cancelled: () => eventCancelRef.current,
       };
     },
-    [getPresenter, unobservedMoment],
+    [getPresenter, unobservedMoment, dispatchMemory, getStore],
   );
 
   // Resolve an event's step templates against real memory (requirement 9.5),
@@ -933,6 +965,7 @@ export function useTelevision(): TelevisionApi {
   const restoreRoom = useCallback(() => {
     roomEffectsRef.current?.setLevel(1, 600);
     roomEffectsRef.current?.glimpse(0);
+    roomEffectsRef.current?.cancelWall();
   }, []);
 
   /**
@@ -943,10 +976,21 @@ export function useTelevision(): TelevisionApi {
     (event: HorrorEventInput, channel: ChannelId) => {
       roomEventRunningRef.current = true;
       roomCancelRef.current = false;
+      // A cancelled run is still waiting out its current step. If a new one starts
+      // meanwhile, clearing the flag above must not bring the old one back.
+      roomRunRef.current += 1;
+      const run = roomRunRef.current;
       sessionFiredRef.current[event.id] = (sessionFiredRef.current[event.id] ?? 0) + 1;
-      dispatchMemory({ type: 'eventFired', eventId: event.id, atMs: Date.now() });
-      const ops = { ...makeEventOps(() => undefined, channel), cancelled: () => roomCancelRef.current };
+      // A wall rip counts when the rip happens, in its own step.
+      if (!event.steps.some((step) => step.do === 'wallRip')) {
+        dispatchMemory({ type: 'eventFired', eventId: event.id, atMs: Date.now() });
+      }
+      const ops = {
+        ...makeEventOps(() => undefined, channel),
+        cancelled: () => roomCancelRef.current || run !== roomRunRef.current,
+      };
       void runEventSteps(resolveSteps(event, channel), ops).then(() => {
+        if (run !== roomRunRef.current) return;
         roomEventRunningRef.current = false;
         restoreRoom();
       });
@@ -996,7 +1040,8 @@ export function useTelevision(): TelevisionApi {
 
   useEffect(() => {
     fireStartleRef.current = fireStartle;
-  }, [fireStartle]);
+    runRoomEventRef.current = runRoomEvent;
+  }, [fireStartle, runRoomEvent]);
 
   // The startle clock. It only asks; `fireStartle` decides. It starts counting at
   // the first picture, not at page load, and channel-hopping brings it forward,
@@ -1071,7 +1116,8 @@ export function useTelevision(): TelevisionApi {
         const dispatchEnded = (): void => {
           // Item boundary seam: ask the director first (requirement 9.1). An
           // event fires from ON_AIR via EVENT_START; otherwise re-resolve.
-          const boundaryEvent = decideSeamEvent(channel, 'item-boundary');
+          // No story line lands on top of something happening in the room.
+          const boundaryEvent = roomEventRunningRef.current ? null : decideSeamEvent(channel, 'item-boundary');
           if (boundaryEvent) sendRef.current({ type: 'EVENT_START', token, seam: 'item-boundary' });
           else sendRef.current({ type: 'ITEM_ENDED', token });
         };
@@ -1147,7 +1193,7 @@ export function useTelevision(): TelevisionApi {
               // A tune-in seam: ask the director first (requirement 9.1). If an
               // event fires, enter the EVENT phase; otherwise resolve to air.
               const tuneEvent = decideSeamEvent(tuneChannel, 'tune-in');
-              if (tuneEvent) {
+              if (tuneEvent && !keepsProgramme(tuneEvent)) {
                 sendRef.current({ type: 'EVENT_START', token, seam: 'tune-in' });
                 return;
               }
@@ -1156,6 +1202,12 @@ export function useTelevision(): TelevisionApi {
               const resolved = ch ? resolveBroadcast(ch, Date.now(), (item) => !deadItemsRef.current.has(item.id)) : null;
               const playable = resolved !== null && resolved.item.source !== 'youtube';
               sendRef.current({ type: 'TUNE_RESOLVED', token, playable });
+              // Something that stays in the room starts with the picture already up:
+              // the programme carries on as though nothing is happening.
+              if (tuneEvent) {
+                pendingEventRef.current = null;
+                runRoomEventRef.current(tuneEvent, tuneChannel);
+              }
             }, TUNE_MS);
             break;
           }
@@ -1379,6 +1431,12 @@ export function useTelevision(): TelevisionApi {
     // transition so the viewer is never stranded in Act 3. Flush immediately.
     if ((loaded.firedEvents['E10']?.count ?? 0) > 0 && loaded.act < 4) {
       loaded = memoryReducer(loaded, { type: 'signOffComplete' }, demo);
+    }
+    // After hours and it never came for them: the wall is torn anyway, and nothing
+    // stays pending (design §7).
+    if (loaded.act === 4 && !loaded.room.ripBackDone) {
+      const points = getRoomPath(RIP_BACK_PATH);
+      if (points) loaded = memoryReducer(loaded, { type: 'ripBack', points }, demo);
     }
     memoryRef.current = loaded;
     tearsAtLoadRef.current = splitTears(loaded);

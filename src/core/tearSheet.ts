@@ -443,3 +443,41 @@ export function replayStrokes(
   }
   return kept;
 }
+
+/**
+ * Something behind the sheet pressing it towards the viewer around (gx, gy). Lift
+ * eases to a dome inside `radius` and back to flat in the ring outside it, so a
+ * moving push leaves nothing raised behind it, and strength 0 lets the sheet down.
+ * Moves positions and their history together, so it adds no velocity and cannot
+ * tear anything on its own.
+ */
+export function pushSheet(sheet: TearSheet, gx: number, gy: number, radius: number, strength: number): void {
+  const { cols, rows, xs, ys, zs, px, py, pz, pinned } = sheet;
+  const reach = radius * 2;
+  const c0 = Math.max(0, Math.floor(gx - reach));
+  const c1 = Math.min(cols - 1, Math.ceil(gx + reach));
+  const r0 = Math.max(0, Math.floor(gy - reach));
+  const r1 = Math.min(rows - 1, Math.ceil(gy + reach));
+  for (let r = r0; r <= r1; r += 1) {
+    for (let c = c0; c <= c1; c += 1) {
+      const i = r * cols + c;
+      if (pinned[i] === 1) continue;
+      const d = Math.hypot(c - gx, r - gy);
+      if (d > reach) continue;
+      const u = d / radius;
+      const target = u < 1 ? strength * (1 - u * u) ** 2 : 0;
+      const next = zs[i]! + (target - zs[i]!) * 0.35;
+      zs[i] = next;
+      pz[i] = next;
+      if (target > 0 && d > 0) {
+        // The paper bows out around whatever is behind it.
+        const shift = (0.05 * target * (c - gx)) / Math.max(d, 1);
+        const shiftY = (0.05 * target * (r - gy)) / Math.max(d, 1);
+        xs[i] = xs[i]! + shift;
+        px[i] = px[i]! + shift;
+        ys[i] = ys[i]! + shiftY;
+        py[i] = py[i]! + shiftY;
+      }
+    }
+  }
+}

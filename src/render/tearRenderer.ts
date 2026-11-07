@@ -103,6 +103,9 @@ void main() {
   float pool = roomPool(vScreen);
   float lit = roomLit(pool);
   vec3 col = c.rgb * shade * mix(0.72, 1.0, curl) * lit + c.rgb * uLight * (uLightAmount * pool * 0.9 * uLevel);
+  // Paper pressed hard towards the viewer catches what little light is left, so
+  // something pushing the wall shows even with the room down.
+  col += c.rgb * vec3(1.0, 0.96, 0.88) * smoothstep(0.6, 3.0, vZ) * 0.55;
   vec3 fibreCol = vec3(0.78, 0.74, 0.66) * (0.5 + 0.5 * fibre);
   col = mix(col, fibreCol * clamp(lit * 1.1, 0.12 * uLevel, 0.7), band * 0.85);
   frag = vec4(col, 1.0);

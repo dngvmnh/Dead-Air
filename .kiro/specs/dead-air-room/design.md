@@ -164,6 +164,7 @@ Paths live in `src/content/room/paths.json`, and the validator checks references
 {
   "id": "E13",
   "minAct": 3,
+  "maxAct": 3,
   "channels": [2, 4, 7],
   "seams": ["tune-in"],
   "when": { "eventFired": "E07" },
