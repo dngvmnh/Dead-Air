@@ -33,12 +33,11 @@ export function StartNotice({ onAcknowledge }: StartNoticeProps) {
         </p>
         <ul className={styles.list}>
           <li>Flashing lights and sudden visual static</li>
-          <li>Jump scares: sudden loud sounds and a face filling the screen</li>
+          <li>Jump scares: sudden loud sounds and images filling the screen</li>
           <li>Horror themes and a slow, creeping dread</li>
         </ul>
         <p className={styles.body}>
-          Flashing is limited to three flashes per second. You can turn on
-          Reduced Effects on the set&rsquo;s rear panel at any time, and your
+          Flashing is limited to three flashes per second, and your
           system&rsquo;s reduced-motion setting is respected automatically.
           Your viewing history stays in this browser, and this site never
           sends it anywhere. Programmes from YouTube are played by YouTube,

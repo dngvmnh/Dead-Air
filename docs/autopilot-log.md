@@ -1189,3 +1189,17 @@ the unlit plaster was the brightest thing on screen.
 - Reduced motion: 2% light, the tear applied in the dark, no push.
 - Reaching Act 4 without it: the wall is torn on load. `maxAct: 3` so nothing is pending.
 - Story events at an item boundary wait while a room event runs, so no line lands on it.
+
+## Task 11: Scare checkpoint (2026-11-07)
+
+- Real clock, `/?demo=1`, fresh memory, CH+ every 15 s, no test flag, so startles ran.
+  Sign-off began at 172.5 s after 11 surfs (limit 210 s). Timeline as first stored:
+  8s J04, 20s E02 and J01, 31s J08, 35s J10, 53s E05 and J09, 65s S05, 82s J03,
+  102s E04 and J06, 115s E07 and J02, 127s E13, 138s J07. Repeat with `REAL_CLOCK=1`.
+- Screenshots: `docs/screenshots/e13-push.png`, `e13-rip.png`, `e13-after.png`,
+  `demo-signoff.png`.
+- The owner asked to run through to the end, so this did not stop here. Whether it
+  frightens anyone still needs a person, and the sound has not been heard by anyone but
+  the owner.
+- Found on the way: the first-run notice still pointed at the removed Reduced Effects
+  button, and promised only a face. Both fixed.
