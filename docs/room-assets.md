@@ -24,6 +24,7 @@ copied from Tearable UI or any other reference (its licence is unknown).
 | Rows of televisions with the fixed sign-off text (Act 4) | `render/behindRenderer.ts` | Procedural | original |
 | Glimpse behind a tear | `render/behindRenderer.ts` | Procedural | original |
 | Jump art: four faces and ten other scares; the Act 3 figure | `render/faceField.ts`, `render/jumpArt.ts`, `render/wraithField.ts` | Procedural; figures, not people | original |
+| Fixed shape in the viewer's reflection (Act 3) | `render/crtShader.ts` | Shader; painted, detects nothing | original |
 | Haunted cabinet: veneer, rust, cobwebs, pumpkin, candles, fingers | `components/Chassis` | Procedural CSS and SVG | original |
 | Startle sounds: stinger, tape stop, heartbeat, knock, breath, whisper, toy piano, phone, scrape, drone | `audio/AudioEngine.ts` | Synthesised with Web Audio | original |
 

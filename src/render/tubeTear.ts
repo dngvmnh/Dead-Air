@@ -18,13 +18,13 @@ import {
   nodeIndex,
   release,
   stepSheet,
+  TUBE_COLS,
+  TUBE_ROWS,
   type TearSheet,
 } from '../core/tearSheet.ts';
 import { buildSheetMesh, liveTriangles, markStretched, type SheetMesh } from './sheetMesh.ts';
 import { BLUR_FRAG, FULLSCREEN_VERT, MASK_FRAG, MASK_VERT, NOISE } from './tearRenderer.ts';
 
-const TUBE_COLS = 40;
-const TUBE_ROWS = 30;
 const OUT_W = 640;
 const OUT_H = 480;
 const MASK_W = 160;
