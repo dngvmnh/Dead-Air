@@ -65,6 +65,24 @@ describe('FileAdapter', () => {
     expect(video.currentTime).toBeCloseTo(5);
   });
 
+  it('one failed clip counts once, even when a listener swaps itself in reply', async () => {
+    const { video, adapter, ctx } = setup();
+    let failures = 0;
+    const subscribe = (): void => {
+      const off = adapter.on((e) => {
+        if (e.type !== 'error') return;
+        failures += 1;
+        if (failures > 50) throw new Error('error went round and round');
+        off();
+        subscribe();
+      });
+    };
+    subscribe();
+    await adapter.load(item, 0, ctx);
+    video.fire('error');
+    expect(failures).toBe(1);
+  });
+
   it('reports a failed clip as fatal, so the channel can skip it', async () => {
     const { video, adapter, ctx } = setup();
     const events: string[] = [];

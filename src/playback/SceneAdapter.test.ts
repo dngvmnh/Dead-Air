@@ -139,6 +139,27 @@ describe('SceneAdapter', () => {
     expect(h.hasFrame()).toBe(false); // loop stopped
   });
 
+  it('does not hand ended to a listener added while ended is going out', async () => {
+    // The next scene on the same adapter swaps its listener inside `ended`. On a live
+    // Set the new one would get the same event, and the page would hang for good.
+    const a = makeAdapter(h);
+    let calls = 0;
+    const subscribe = (): void => {
+      const off = a.on((e) => {
+        if (e.type !== 'ended') return;
+        calls += 1;
+        if (calls > 50) throw new Error('ended went round and round');
+        off();
+        subscribe();
+      });
+    };
+    subscribe();
+    await a.load(sceneItem, 0, h.makeCtx(scene));
+    await a.play();
+    h.tick(1100);
+    expect(calls).toBe(1);
+  });
+
   it('pause then play resumes from the same position', async () => {
     const a = makeAdapter(h);
     await a.load(sceneItem, 0, h.makeCtx(scene));

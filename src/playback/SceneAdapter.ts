@@ -211,6 +211,8 @@ export class SceneAdapter implements PlaybackAdapter {
   }
 
   private emit(e: AdapterEvent): void {
-    for (const l of this.listeners) l(e);
+    // A copy: a listener replaces itself on `ended`, and a live Set would hand the
+    // new one the same event, forever.
+    for (const l of [...this.listeners]) l(e);
   }
 }

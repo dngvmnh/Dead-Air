@@ -1224,3 +1224,18 @@ the unlit plaster was the brightest thing on screen.
   made the cabinet too tall (Mute and CC now share a row, panel buttons 32px on desktop),
   and at 360x640 the rear panel could not be reached at all because the body never scrolled.
   Small windows now scroll, with a test.
+
+## Found in the release check: a page hang with no films (2026-11-07)
+
+- The clean clone has no films, and the browser suite hung there. A paused debugger put
+  the page inside `emit`. `startResolvedSource` swaps its listener during `ended`. Both
+  adapters emitted over a live `Set`, which visits what is added during the walk, so the
+  new listener got the same `ended`, and swapped, forever. No stack growth, no error, a
+  frozen tab.
+- It needs an item on the scene adapter to end by its own clock with another scene next,
+  so a film that fails to load could cause it on a real host. Whether the adapter or the
+  item timer got there first decided it, so it came at varying times.
+- The same walk let one failed film mark every later film on the channel as dead.
+- Fix: emit over a copy, in both adapters. `tests/e2e/no-films.spec.ts` serves every film
+  as a 404 and asserts the page keeps answering. It failed before the fix with "the page
+  has hung" on the clone at `acf90fd`.
