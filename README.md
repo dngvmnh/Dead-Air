@@ -16,7 +16,7 @@ DEAD AIR resurrects linear analog television in the browser. You sit in front of
 - **It remembers.** Tears come back next visit, badly mended by someone else. A shadow on the wall moves a step closer whenever you are not looking.
 - **Startles answer you.** A jump that comes due waits a few seconds for you to click, change channel or tear something, and lands on that. Keeping still does not help. A pacer keeps them at least 8 seconds apart and at most 4 a minute.
 - **The back of the set** has one optional switch. Its camera image never leaves your device and is never recorded.
-- Fullscreen from the first click, procedural art and sound, public-domain films, no backend.
+- Procedural art and sound, public-domain films, no backend.
 
 ## Why it is not a five-minute horror game
 

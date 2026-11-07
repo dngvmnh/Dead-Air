@@ -29,7 +29,7 @@ three takes and keep the best.
 | Time | On screen | What you do | Why it matters |
 |---|---|---|---|
 | 0:00–0:08 | Title card: **DEAD AIR**, "The haunted television network that never goes off the air." | (added in editing) | Sets the tone. |
-| 0:08–0:15 | The first-run notice in a dark room | Read it for a beat, click **I understand**. The page goes fullscreen. | Shows the jump-scare warning: care for viewers is part of the design. |
+| 0:08–0:15 | The first-run notice in a dark room | Read it for a beat, click **I understand**. | Shows the jump-scare warning: care for viewers is part of the design. |
 | 0:15–0:30 | The set, off. Wallpaper, the note "PLEASE DO NOT PICK AT THE WALLPAPER", a clock showing the real time | Press **POWER**. Warm-up, static, channel 02 news. | Analog TV resurrected: warm-up, tuning, a channel already mid-broadcast. |
 | 0:30–0:55 | Channels 02, 04, 07 | **CH+** every few seconds. Pause on the cartoon and the shopping channel. | Always-on linear TV. Changing channel twice is likely to bring the first startle onto the new picture. |
 | 0:55–1:20 | The wall beside the set | Drag across the wallpaper. It tears, something is behind it. Let go. | The room is physical. The first tear of a session always answers. |

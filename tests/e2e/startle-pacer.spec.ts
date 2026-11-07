@@ -3,7 +3,6 @@ import { expect, test, type Page } from '@playwright/test';
 /**
  * Requirement 11.12: a startle that comes due waits for the viewer, and lands on what
  * they do. The real pacer runs here at its real timings; only the start is a seam.
- * And the set fills the screen from the first click.
  */
 
 interface Tv {
@@ -125,6 +124,10 @@ test.describe('startles land on what the viewer does', () => {
 
   test('the first tear of the session answers as the hand leaves the wall', async ({ page }) => {
     await onAirWithPacer(page);
+    // Wait until a startle is actually DUE, so the tear has one to land on; the
+    // point of the test is that it lands on the viewer's action, not that a
+    // startle exists. (Without this the tear races the pacer and flakes.)
+    await armed(page);
     const chassis = await page.locator('[class*="chassis"]').first().boundingBox();
     const x = Math.round((chassis?.x ?? 200) / 2);
     await page.mouse.move(x, 200);
@@ -135,23 +138,4 @@ test.describe('startles land on what the viewer does', () => {
   });
 });
 
-test.describe('fullscreen', () => {
-  test('the first POWER press fills the screen', async ({ page }) => {
-    await seed(page, { __FULLSCREEN_TEST__: true });
-    await page.goto('/');
-    await page.waitForFunction(() => (window as unknown as { __tv?: unknown }).__tv);
-    expect(await page.evaluate(() => document.fullscreenElement === null)).toBe(true);
-    await page.getByRole('button', { name: /^power$/i }).click();
-    await expect.poll(() => page.evaluate(() => document.fullscreenElement === document.documentElement)).toBe(true);
-  });
 
-  test('the first-run notice fills the screen when acknowledged', async ({ page }) => {
-    await page.addInitScript(() => {
-      (window as unknown as Record<string, unknown>).__CRT_PRESERVE_DRAWING_BUFFER__ = true;
-      (window as unknown as Record<string, unknown>).__FULLSCREEN_TEST__ = true;
-    });
-    await page.goto('/');
-    await page.getByRole('button', { name: /i understand/i }).click();
-    await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(true);
-  });
-});

@@ -4,7 +4,6 @@ import { useKeyboardControls } from './useKeyboardControls.ts';
 import { Room } from '../components/Room/Room.tsx';
 import { RoomCanvas } from '../components/Room/RoomCanvas.tsx';
 import { Chassis } from '../components/Chassis/Chassis.tsx';
-import { enterFullscreen } from './fullscreen.ts';
 import { StartNotice } from '../components/StartNotice/StartNotice.tsx';
 
 /**
@@ -48,12 +47,7 @@ export function App() {
         </Room>
       </div>
       {noticeSeen ? null : (
-        <StartNotice
-          onAcknowledge={() => {
-            enterFullscreen();
-            tv.acknowledgeNotice();
-          }}
-        />
+        <StartNotice onAcknowledge={tv.acknowledgeNotice} />
       )}
     </>
   );

@@ -248,8 +248,3 @@ Balance: never two within 8 s (6 s demo), at most 4 a minute (5 demo), and after
 a row set off by the viewer the next comes on the clock. A story event or hidden tab
 cancels the wait; it re-arms 1.5 s after the programme is back. The director can still
 refuse; the pacer then tries again in 1.5 s.
-
-## Fullscreen (owner request 2026-11-07)
-
-`app/fullscreen.ts`. The first click (the notice's "I understand", or POWER from off)
-asks for fullscreen on the document. A refusal is ignored; Escape leaves as usual.

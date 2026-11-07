@@ -7,7 +7,6 @@ import { HauntedDecor } from './HauntedDecor.tsx';
 import { channelLabel } from '../../core/channels.ts';
 import { type TelevisionApi } from '../../app/useTelevision.ts';
 import { useReflection } from '../../app/useReflection.ts';
-import { enterFullscreen } from '../../app/fullscreen.ts';
 
 /**
  * The television cabinet: bezel + tube opening, the control panel, and the rear
@@ -50,10 +49,7 @@ export function Chassis({ tv, powerRef }: ChassisProps) {
         settings={tv.settings}
         channelLabel={label}
         powerRef={powerRef}
-        onPower={() => {
-          if (tv.state.phase === 'OFF') enterFullscreen();
-          tv.power();
-        }}
+        onPower={tv.power}
         onChannelUp={tv.channelUp}
         onChannelDown={tv.channelDown}
         onVolume={tv.setVolume}

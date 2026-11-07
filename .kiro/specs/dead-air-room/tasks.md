@@ -100,5 +100,5 @@ Tick a task only when the behaviour has been seen in a real browser, not because
   - [x] 14.2 Wire it in, with a seam to run it under the test flag, and browser tests at real timings.
   - _Requirements: 11.12_
 - [x] 15. Rear-panel words that do not give the reflection away, still naming the camera. _Requirements: 7.2_
-- [x] 16. Fullscreen on the first click. _Requirements: 12.1_
+- [x] 16. ~~Fullscreen on the first click.~~ Removed 2026-11-08: forcing `requestFullscreen` on the first click caused a laggy screen freeze. The set no longer goes fullscreen; the window is left as it is. _(Requirement 12 withdrawn.)_
 - [x] 17. Deploy, now that the owner has asked for it. Check the live site.
