@@ -1,7 +1,17 @@
 # Hosting DEAD AIR
 
-Nothing is deployed yet. A person sets this up. The app is a static site: `npm ci`, then
-`npm run build`, then serve `dist/` from any static host.
+Live at https://dngvmnh.github.io/Kiroween/ (GitHub Pages, deployed 2026-11-07 at the
+owner's request). Every push to `main` runs `.github/workflows/pages.yml`: it installs
+ffmpeg, fetches and cuts the films, runs the catalogue check and unit tests, and builds
+with `DEADAIR_BASE=/Kiroween/`. Film URLs resolve against that base.
+
+GitHub Pages cannot set response headers, so `Permissions-Policy` below is not sent
+there. Browsers default the camera to the page's own origin anyway, and the app never asks
+for the microphone or location. `Referrer-Policy` is set by a meta tag in `index.html`.
+Pages does serve byte ranges.
+
+The app is a static site anywhere else too: `npm ci`, then `npm run build`, then serve
+`dist/`.
 
 ## Before the build
 

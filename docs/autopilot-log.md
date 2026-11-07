@@ -1286,3 +1286,15 @@ Measured on this machine: Intel UHD Graphics (integrated), Chromium with ANGLE D
   ignored. Tests check both.
 - The mended-tear patch is now cut from plain wallpaper, so it can no longer carry a
   scrap of the note or a frame.
+
+## Task 17: Deployed (2026-11-07)
+
+- The owner asked to deploy. Only `gh` is signed in on this machine, and the repo is
+  public, so GitHub Pages: https://dngvmnh.github.io/Kiroween/. The workflow fetches the
+  films on the runner, so they stay out of git as the rights rules require.
+- The site lives under `/Kiroween/`, so the Vite base comes from `DEADAIR_BASE` and film
+  URLs resolve against it (`mediaUrl`, unit-tested). Checked first by serving a local
+  build under `/Kiroween/` with byte ranges.
+- Live check in Chromium: page 200, a film range request 206, films play, fullscreen on
+  the first click, the camera switch lights `CAM` with the fake camera, no page errors.
+- Not possible on Pages: the `Permissions-Policy` header. Recorded in `docs/hosting.md`.

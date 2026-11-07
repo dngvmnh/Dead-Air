@@ -4,9 +4,19 @@
 
 DEAD AIR resurrects linear analog television in the browser. You sit in front of a CRT, press POWER, and surf four always-running channels. There is no search, no feed, no pause-and-pick: you tune in to whatever is on, exactly as people did for fifty years. Then, slowly, the network starts responding to what you watched.
 
+**Play it:** https://dngvmnh.github.io/Kiroween/ (desktop Chrome or Edge, sound on). Add `?demo=1` to reach the ending in about three minutes.
+
 - **Kiroween category:** Resurrection (primary).
 - **Interaction:** POWER, CH+, CH-, volume. Understood in three seconds.
 - **Backend:** none. Static site, deterministic broadcast clock, local memory.
+
+## What happens around the set
+
+- **The room is part of it.** The wallpaper tears under your pointer, and something is behind it. So is the picture: drag across the tube and it rips.
+- **It remembers.** Tears come back next visit, badly mended by someone else. A shadow on the wall moves a step closer whenever you are not looking.
+- **Startles answer you.** A jump that comes due waits a few seconds for you to click, change channel or tear something, and lands on that. Keeping still does not help. A pacer keeps them at least 8 seconds apart and at most 4 a minute.
+- **The back of the set** has one optional switch. Its camera image never leaves your device and is never recorded.
+- Fullscreen from the first click, procedural art and sound, public-domain films, no backend.
 
 ## Why it is not a five-minute horror game
 
@@ -38,8 +48,19 @@ DEAD AIR resurrects linear analog television in the browser. You sit in front of
 | [.kiro/specs/dead-air-tv/requirements.md](.kiro/specs/dead-air-tv/requirements.md) | EARS requirements |
 | [.kiro/specs/dead-air-tv/design.md](.kiro/specs/dead-air-tv/design.md) | System design |
 | [.kiro/specs/dead-air-tv/tasks.md](.kiro/specs/dead-air-tv/tasks.md) | Ordered implementation plan |
+| [.kiro/specs/dead-air-room/requirements.md](.kiro/specs/dead-air-room/requirements.md) | The room, tears, startles, reflection (second spec) |
 | [docs/media-bible.md](docs/media-bible.md) | Scripts, event copy, asset list, generation prompts |
 | [docs/research-notes.md](docs/research-notes.md) | What was verified, with sources, and what still needs checking |
+
+## Run it
+
+```bash
+npm ci
+npm run fetch:media   # public-domain films from archive.org; needs ffmpeg
+npm run dev
+```
+
+Checks: `npx tsc --noEmit -p .`, `npx vitest run`, `npm run lint`, `npm run validate:catalog`, `npm run build`, and `npx playwright test --project=chromium` (browser tests on real WebGL). Pushing to `main` deploys to GitHub Pages through `.github/workflows/pages.yml`. Hosting notes: [docs/hosting.md](docs/hosting.md). Build log: [docs/autopilot-log.md](docs/autopilot-log.md).
 
 ## Implementing with Kiro
 

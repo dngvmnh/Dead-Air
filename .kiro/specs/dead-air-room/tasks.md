@@ -101,4 +101,4 @@ Tick a task only when the behaviour has been seen in a real browser, not because
   - _Requirements: 11.12_
 - [x] 15. Rear-panel words that do not give the reflection away, still naming the camera. _Requirements: 7.2_
 - [x] 16. Fullscreen on the first click. _Requirements: 12.1_
-- [ ] 17. Deploy, now that the owner has asked for it. Check the live site.
+- [x] 17. Deploy, now that the owner has asked for it. Check the live site.
