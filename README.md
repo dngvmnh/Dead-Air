@@ -4,7 +4,7 @@
 
 DEAD AIR resurrects linear analog television in the browser. You sit in front of a CRT, press POWER, and surf four always-running channels. There is no search, no feed, no pause-and-pick: you tune in to whatever is on, exactly as people did for fifty years. Then, slowly, the network starts responding to what you watched.
 
-**Play it:** https://dngvmnh.github.io/Kiroween/ (desktop Chrome or Edge, sound on). Add `?demo=1` to reach the ending in about three minutes.
+**Play it:** https://dngvmnh.github.io/Dead-Air/ (desktop Chrome or Edge, sound on). Add `?demo=1` to reach the ending in about three minutes.
 
 - **Kiroween category:** Resurrection (primary).
 - **Interaction:** POWER, CH+, CH-, volume. Understood in three seconds.

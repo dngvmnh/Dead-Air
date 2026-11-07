@@ -46,8 +46,8 @@ function setup() {
 describe('mediaUrl', () => {
   it('leaves a root URL alone at the root, and puts it under a sub-path', () => {
     expect(mediaUrl('/film/a.mp4', '/')).toBe('/film/a.mp4');
-    expect(mediaUrl('/film/a.mp4', '/Kiroween/')).toBe('/Kiroween/film/a.mp4');
-    expect(mediaUrl('https://x.test/a.mp4', '/Kiroween/')).toBe('https://x.test/a.mp4');
+    expect(mediaUrl('/film/a.mp4', '/Dead-Air/')).toBe('/Dead-Air/film/a.mp4');
+    expect(mediaUrl('https://x.test/a.mp4', '/Dead-Air/')).toBe('https://x.test/a.mp4');
   });
 });
 

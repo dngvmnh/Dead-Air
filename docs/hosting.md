@@ -1,9 +1,9 @@
 # Hosting DEAD AIR
 
-Live at https://dngvmnh.github.io/Kiroween/ (GitHub Pages, deployed 2026-11-07 at the
-owner's request). Every push to `main` runs `.github/workflows/pages.yml`: it installs
+Live at https://dngvmnh.github.io/Dead-Air/ (GitHub Pages, deployed 2026-11-07 at the
+owner's request; the repo was renamed from `Kiroween` to `Dead-Air` on 2026-11-08). Every push to `main` runs `.github/workflows/pages.yml`: it installs
 ffmpeg, fetches and cuts the films, runs the catalogue check and unit tests, and builds
-with `DEADAIR_BASE=/Kiroween/`. Film URLs resolve against that base.
+with `DEADAIR_BASE=/Dead-Air/`. Film URLs resolve against that base.
 
 GitHub Pages cannot set response headers, so `Permissions-Policy` below is not sent
 there. Browsers default the camera to the page's own origin anyway, and the app never asks

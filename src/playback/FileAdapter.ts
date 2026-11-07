@@ -10,7 +10,7 @@ import type { AdapterEvent, PlaybackAdapter, SceneContext } from './PlaybackAdap
 
 /**
  * Catalogue URLs start at the site root. On a host that serves the site from a
- * sub-path (GitHub Pages: `/Kiroween/`) they are put under that path.
+ * sub-path (GitHub Pages: `/Dead-Air/`) they are put under that path.
  */
 export function mediaUrl(url: string, base: string = import.meta.env.BASE_URL): string {
   if (!url.startsWith('/') || url.startsWith('//')) return url;

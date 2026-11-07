@@ -21,7 +21,7 @@ set, not like a feature tour. Let the scares land without commentary over them.
 
 ## The run
 
-Open `https://dngvmnh.github.io/Kiroween/?demo=1`. Demo mode compresses the story so the
+Open `https://dngvmnh.github.io/Dead-Air/?demo=1`. Demo mode compresses the story so the
 sign-off arrives in about three minutes. Startles come on their own timer and also answer
 clicks, channel changes and tears, so the exact moments vary between takes. Record two or
 three takes and keep the best.
@@ -53,7 +53,7 @@ end on the title card.
 
 ## Editing checklist
 
-- [ ] Title card at the start, URL card at the end: `dngvmnh.github.io/Kiroween`.
+- [ ] Title card at the start, URL card at the end: `dngvmnh.github.io/Dead-Air`.
 - [ ] Keep the jumps at full volume: no ducking or music over them.
 - [ ] No flashes added in editing. The site keeps to the three-flashes-a-second limit; the
       edit must too.

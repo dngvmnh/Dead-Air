@@ -70,19 +70,17 @@ location. A host that can set headers (or a small proxy) would send it.
 
 Needed: nothing blocking. If the team moves off Pages, set the header there.
 
-## 7. Repo rename follow-ups
+## 7. Repo rename (done 2026-11-08)
 
-The GitHub repository was renamed, but these still name the old `Kiroween`:
+The GitHub repository was renamed from `Kiroween` to `Dead-Air`. Updated: the git
+remote, the Pages base in `.github/workflows/pages.yml` (`/Dead-Air/`), the
+comments in `vite.config.ts` and `FileAdapter.ts`, the `mediaUrl` test, the links
+in `README.md`, `docs/devpost.md`, `docs/hosting.md`, `docs/video-plan.md`, and
+the remote line in `.kiro/steering/tech.md`. The live site is now
+https://dngvmnh.github.io/Dead-Air/. `docs/autopilot-log.md` keeps the old name in
+its history on purpose.
 
-- the git remote URL (`git remote -v`),
-- the Pages base in `.github/workflows/pages.yml` (`DEADAIR_BASE: /Kiroween/`),
-- the comment in `vite.config.ts`,
-- the live URL and code link in `README.md`, `docs/devpost.md`,
-  `docs/hosting.md`,
-- the remote line in `.kiro/steering/tech.md`.
-
-Needed: the new repository name, then update all of the above and the live
-Pages URL. (Tracked separately; fixed once the new name is known.)
+Needed: check the first deploy under the new base (see the report).
 
 ## 8. Removed: forced fullscreen
 

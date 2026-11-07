@@ -32,7 +32,7 @@ inclusion: always
 - Comments explain why, not what.
 - Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`).
 - **Commit messages and pull requests must not contain any AI co-author trailer, "generated with" footer, or AI attribution.**
-- Remote: `https://github.com/dngvmnh/Kiroween`. Keep `.kiro/` committed. Never commit media binaries; see `safety-and-rights.md`.
+- Remote: `https://github.com/dngvmnh/Dead-Air`. Keep `.kiro/` committed. Never commit media binaries; see `safety-and-rights.md`.
 
 ## Environment
 

@@ -19,9 +19,9 @@ Resurrection: analog broadcast television, brought back as behaviour, not just a
 
 ## Links
 
-- Live: https://dngvmnh.github.io/Kiroween/ (desktop Chrome or Edge, sound on; `?demo=1` for
+- Live: https://dngvmnh.github.io/Dead-Air/ (desktop Chrome or Edge, sound on; `?demo=1` for
   a three-minute run)
-- Code: https://github.com/dngvmnh/Kiroween
+- Code: https://github.com/dngvmnh/Dead-Air
 - Video: **[Team]** link once uploaded
 
 ## Inspiration
