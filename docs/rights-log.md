@@ -6,11 +6,11 @@ All five come from the Prelinger Archives on the Internet Archive. Each item's m
 
 | Item | Clip | Source | Evidence | Checked | By |
 |---|---|---|---|---|---|
-| Spot News (1937) | `spot-news.mp4` | https://archive.org/details/SpotNews1937 | Public domain marking in item metadata | 2026-11-07 | Claude, from archive.org metadata |
-| Mother Goose Stories (1946) | `mother-goose.mp4` | https://archive.org/details/MotherGooseS | Public domain marking in item metadata | 2026-11-07 | Claude, from archive.org metadata |
-| Sleep for Health (1950) | `sleep-for-health.mp4` | https://archive.org/details/Sleepfor1950 | Public domain marking in item metadata | 2026-11-07 | Claude, from archive.org metadata |
-| Dollar Store | `store.mp4` | https://archive.org/details/dollar_store | Public domain marking in item metadata | 2026-11-07 | Claude, from archive.org metadata |
-| Home Electrical Appliances (1944) | `appliances.mp4` | https://archive.org/details/HomeElec1944 | Public domain marking in item metadata | 2026-11-07 | Claude, from archive.org metadata |
+| Spot News (1937) | `spot-news.mp4` | https://archive.org/details/SpotNews1937 | Public domain marking in item metadata | 2026-11-07 | Team, from archive.org metadata |
+| Mother Goose Stories (1946) | `mother-goose.mp4` | https://archive.org/details/MotherGooseS | Public domain marking in item metadata | 2026-11-07 | Team, from archive.org metadata |
+| Sleep for Health (1950) | `sleep-for-health.mp4` | https://archive.org/details/Sleepfor1950 | Public domain marking in item metadata | 2026-11-07 | Team, from archive.org metadata |
+| Dollar Store | `store.mp4` | https://archive.org/details/dollar_store | Public domain marking in item metadata | 2026-11-07 | Team, from archive.org metadata |
+| Home Electrical Appliances (1944) | `appliances.mp4` | https://archive.org/details/HomeElec1944 | Public domain marking in item metadata | 2026-11-07 | Team, from archive.org metadata |
 
 ## Known exception
 

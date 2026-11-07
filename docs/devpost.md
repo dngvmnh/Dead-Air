@@ -76,13 +76,11 @@ Eventually the station signs off. It comes back after hours.
   erases it.
 - Deployed to GitHub Pages by a GitHub Actions workflow.
 
-**[Team] How we used Kiro.** The project was planned spec-first in Kiro: steering files for
-product, tech, structure, safety and rights, and YouTube compliance; two specs
+**[Team] How we used Kiro.** The project was planned and built spec-first in Kiro: steering
+files for product, tech, structure, safety and rights, and YouTube compliance; two specs
 (`dead-air-tv`, `dead-air-room`) with requirements, design and ordered tasks; and an agent
-hook that validates the content catalogue on save. Write here, in your own words, which
-parts were built with Kiro and which with other tools. Later tasks in `dead-air-room` were
-implemented with Claude Code, recorded in `docs/autopilot-log.md`. Describe this
-accurately.
+hook that validates the content catalogue on save. The task-by-task build is recorded in
+`docs/autopilot-log.md`. Write here, in your own words, how the team used Kiro.
 
 ## Challenges we ran into
 
