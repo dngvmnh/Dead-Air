@@ -410,3 +410,36 @@ export function attachedToPinned(sheet: TearSheet): Uint8Array {
   }
   return attached;
 }
+
+/** How long rebuilding a wall may hold up a load (design §6). */
+export const REPLAY_BUDGET_MS = 100;
+const REPLAY_SETTLE_STEPS = 24;
+
+/**
+ * Cut stored strokes (normalised points) into `sheet` and let the flaps settle,
+ * newest first, so anything past the budget costs the oldest. Rebuilt damage only
+ * has to look like the same damage. Returns how many strokes went in.
+ */
+export function replayStrokes(
+  sheet: TearSheet,
+  strokes: ReadonlyArray<{ points: ReadonlyArray<readonly [number, number]> }>,
+  now: () => number,
+  budgetMs = REPLAY_BUDGET_MS,
+): number {
+  const start = now();
+  let kept = 0;
+  for (let i = strokes.length - 1; i >= 0; i -= 1) {
+    if (now() - start >= budgetMs) break;
+    const { points } = strokes[i]!;
+    for (let p = 1; p < points.length; p += 1) {
+      const [ax, ay] = points[p - 1]!;
+      const [bx, by] = points[p]!;
+      cutPath(sheet, ax * (sheet.cols - 1), ay * (sheet.rows - 1), bx * (sheet.cols - 1), by * (sheet.rows - 1));
+    }
+    kept += 1;
+  }
+  if (kept > 0) {
+    for (let s = 0; s < REPLAY_SETTLE_STEPS && now() - start < budgetMs; s += 1) stepSheet(sheet, 16.67);
+  }
+  return kept;
+}

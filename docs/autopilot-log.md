@@ -1136,3 +1136,15 @@ the unlit plaster was the brightest thing on screen.
 - Cabinet rebuilt: rotted veneer, tar, gouges, rusted bezel, worn buttons, taped labels,
   cobwebs, candles, pumpkin, bent aerials, fingers over the top. Nothing paints on the tube.
 - The Act 3 shape behind the wall is now a shaded wraith that twitches.
+
+## Task 7: Memory v2 (2026-11-07)
+
+- Memory is schema version 2 under the same key. A version 1 memory is migrated with
+  every field kept. A stored stroke out of range still means starting fresh.
+- Tears are stored in normalised points, 24 strokes at 32 points each, oldest dropped
+  first, and flushed at stroke end. Each also records its session.
+- On load the wall is rebuilt from them, within 100 ms, dropping the oldest past that.
+- From Act 2, a tear from an earlier session comes back mended: paper whole, rough seam,
+  yellowed tape, one piece of wallpaper in the wrong place. Which are mended is settled
+  once at load, so nothing heals in front of the viewer. This session's tears stay open.
+- Forget me now mends the wall on the spot as well as erasing the memory.

@@ -134,7 +134,7 @@ export function deriveRoom(input: RoomInput): RoomState;
 export interface ViewerMemoryV2 extends Omit<ViewerMemory, 'schemaVersion'> {
   schemaVersion: 2;
   room: {
-    strokes: Array<{ seed: number; points: Array<[number, number]> }>; // normalised 0..1; 24 strokes max, 32 points each
+    strokes: Array<{ seed: number; session: number; points: Array<[number, number]> }>; // normalised 0..1; 24 strokes max, 32 points each
     figureStep: number;
     objectVariant: number;
     ripBackDone: boolean;

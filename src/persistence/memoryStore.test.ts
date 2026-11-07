@@ -30,7 +30,7 @@ describe('MemoryStore', () => {
   it('loads a fresh memory when nothing is stored', () => {
     const store = new MemoryStore({ storage, now });
     const m = store.load();
-    expect(m.schemaVersion).toBe(1);
+    expect(m.schemaVersion).toBe(2);
     expect(m.totalWatchMs).toBe(0);
   });
 
@@ -51,8 +51,31 @@ describe('MemoryStore', () => {
   it('starts fresh on a schema mismatch / wrong version', () => {
     storage.map.set(MEMORY_KEY, JSON.stringify({ schemaVersion: 2, foo: 1 }));
     const m = new MemoryStore({ storage, now }).load();
-    expect(m.schemaVersion).toBe(1);
+    expect(m.schemaVersion).toBe(2);
     expect(m.totalWatchMs).toBe(0);
+  });
+
+  it('migrates version 1 to version 2 without losing a field (requirement 4.3)', () => {
+    const current = { ...createMemory(now()), totalWatchMs: 77, act: 2 as const, firedEvents: { E01: { count: 2, lastAt: 9 } }, lastChannel: 7 as const };
+    const { room, ...rest } = current;
+    expect(room.strokes).toEqual([]);
+    storage.map.set(MEMORY_KEY, JSON.stringify({ ...rest, schemaVersion: 1 }));
+    const loaded = new MemoryStore({ storage, now }).load();
+    expect(loaded).toEqual({ ...rest, schemaVersion: 2, room: { strokes: [], figureStep: 0, objectVariant: 0, ripBackDone: false } });
+  });
+
+  it('round-trips strokes', () => {
+    const store = new MemoryStore({ storage, now });
+    const stroke = { seed: 3, session: 1, points: [[0.1, 0.2], [0.3, 0.4]] as Array<[number, number]> };
+    const m = createMemory(now());
+    store.save({ ...m, room: { ...m.room, strokes: [stroke] } });
+    expect(new MemoryStore({ storage, now }).load().room.strokes).toEqual([stroke]);
+  });
+
+  it('starts fresh when a stored stroke is out of range', () => {
+    const m = createMemory(now());
+    storage.map.set(MEMORY_KEY, JSON.stringify({ ...m, totalWatchMs: 9, room: { ...m.room, strokes: [{ seed: 1, session: 1, points: [[5, 0], [0, 0]] }] } }));
+    expect(new MemoryStore({ storage, now }).load().totalWatchMs).toBe(0);
   });
 
   it('throttles writes to once per 5s and flush bypasses it', () => {
@@ -82,7 +105,7 @@ describe('MemoryStore', () => {
   it('never throws when storage is unavailable', () => {
     const store = new MemoryStore({ storage: null, now });
     expect(() => store.save(createMemory(now()))).not.toThrow();
-    expect(store.load().schemaVersion).toBe(1);
+    expect(store.load().schemaVersion).toBe(2);
     expect(() => store.erase()).not.toThrow();
   });
 

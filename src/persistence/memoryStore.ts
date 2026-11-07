@@ -9,8 +9,8 @@
  * never transmitted anywhere (requirement 7.7) — this is the only persistence.
  */
 
-import { viewerMemorySchema } from '../content/schema.ts';
-import { createMemory, type ViewerMemory } from '../core/memory.ts';
+import { viewerMemorySchema, viewerMemoryV1Schema } from '../content/schema.ts';
+import { createMemory, migrateMemory, type ViewerMemory, type ViewerMemoryV1 } from '../core/memory.ts';
 
 export const MEMORY_KEY = 'deadair.memory.v1';
 export const PERSIST_THROTTLE_MS = 5000;
@@ -62,11 +62,13 @@ export class MemoryStore {
     }
     if (raw === null) return fallback();
     try {
-      const parsed = viewerMemorySchema.safeParse(JSON.parse(raw));
-      if (!parsed.success) return fallback();
+      const value: unknown = JSON.parse(raw);
+      const parsed = viewerMemorySchema.safeParse(value);
       // The schema is structurally the core ViewerMemory; the literal/union
       // fields line up, so this is a safe widening.
-      return parsed.data as ViewerMemory;
+      if (parsed.success) return parsed.data as ViewerMemory;
+      const old = viewerMemoryV1Schema.safeParse(value);
+      return old.success ? migrateMemory(old.data as ViewerMemoryV1) : fallback();
     } catch {
       return fallback();
     }

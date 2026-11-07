@@ -10,8 +10,7 @@ import {
   NEW_SESSION_GAP_MS,
   previousDifferentChannel,
   VISIT_ORDER_LIMIT,
-  type ViewerMemory,
-} from './memory.ts';
+  type ViewerMemory, splitTears, STROKE_CAP, STROKE_POINT_CAP, thinPoints } from './memory.ts';
 import type { ChannelId } from './types.ts';
 
 const MIN = 60_000;
@@ -198,5 +197,45 @@ describe('beginSession (requirement 7.5)', () => {
     let m = memoryReducer(createMemory(0), { type: 'touch', atMs: 1000 }, false);
     m = beginSession(m, 1000 + 60_000, false);
     expect(m.sessionCount).toBe(1);
+  });
+});
+
+describe('tear memory (requirement 4)', () => {
+  const line = [[0.1, 0.1], [0.2, 0.2]] as const;
+
+  it('stores a stroke with its session, and ignores a click with no path', () => {
+    let m = createMemory(1);
+    m = memoryReducer(m, { type: 'addStroke', seed: 4, points: [[0.1, 0.1]] }, false);
+    expect(m.room.strokes).toHaveLength(0);
+    m = memoryReducer({ ...m, sessionCount: 3 }, { type: 'addStroke', seed: 4, points: line }, false);
+    expect(m.room.strokes[0]).toEqual({ seed: 4, session: 3, points: [[0.1, 0.1], [0.2, 0.2]] });
+  });
+
+  it('drops the oldest stroke at the cap', () => {
+    let m = createMemory(1);
+    for (let seed = 0; seed < STROKE_CAP + 3; seed += 1) m = memoryReducer(m, { type: 'addStroke', seed, points: line }, false);
+    expect(m.room.strokes).toHaveLength(STROKE_CAP);
+    expect(m.room.strokes[0]?.seed).toBe(3);
+  });
+
+  it('thins a long path to the cap, keeping both ends, and clamps it into range', () => {
+    const long = Array.from({ length: 200 }, (_, i) => [i / 199, 1.5] as const);
+    const thin = thinPoints(long);
+    expect(thin).toHaveLength(STROKE_POINT_CAP);
+    expect(thin[0]).toEqual([0, 1]);
+    expect(thin.at(-1)).toEqual([1, 1]);
+  });
+
+  it('mends only earlier tears, and only in a later session from Act 2', () => {
+    const base = createMemory(1);
+    const strokes = [{ seed: 1, session: 1, points: [[0, 0], [1, 1]] as Array<[number, number]> }, { seed: 2, session: 2, points: [[0, 0], [1, 1]] as Array<[number, number]> }];
+    const room = { ...base.room, strokes };
+    const ids = (m: ViewerMemory) => {
+      const { open, mended } = splitTears(m);
+      return [open.map((s) => s.seed), mended.map((s) => s.seed)];
+    };
+    expect(ids({ ...base, room, sessionCount: 2, act: 2 })).toEqual([[2], [1]]);
+    expect(ids({ ...base, room, sessionCount: 2, act: 1 })).toEqual([[1, 2], []]);
+    expect(ids({ ...base, room, sessionCount: 1, act: 3 })).toEqual([[1, 2], []]);
   });
 });

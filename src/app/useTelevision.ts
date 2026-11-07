@@ -37,6 +37,8 @@ import {
   createMemory,
   demoActive,
   memoryReducer,
+  splitTears,
+  type StoredStroke,
   type MemoryAction,
   type ViewerMemory,
 } from '../core/memory.ts';
@@ -90,6 +92,10 @@ export interface TelevisionApi {
   getRoomState: (reduced: boolean, localHour: number, localMinute: number) => RoomState;
   /** What a tear reveals for this viewer now (design §4). Memory stays in here. */
   getBehindView: (localHour: number, localMinute: number) => BehindView;
+  /** The tears to put back on the wall, or null until memory has loaded. */
+  getTears: () => WallTears | null;
+  /** The viewer finished a tear with this path. */
+  onStroke: (points: ReadonlyArray<readonly [number, number]>) => void;
   /** The room hands over its lights and glimpse for startles to use. */
   registerRoom: (handle: RoomEffects | null) => void;
   /** The viewer just finished a tear. */
@@ -100,6 +106,13 @@ export interface TelevisionApi {
 const CHANNEL_BED: Record<ChannelId, ProgrammeBed> = { 2: 'news', 4: 'kids', 7: 'shop', 13: 'deadair' };
 /** A film with no sound of its own, which would otherwise leave the channel mute. */
 const SILENT_FILMS: ReadonlySet<string> = new Set(['/film/store.mp4']);
+
+/** What the wall should look like. A new `epoch` means rebuild it from these. */
+export interface WallTears {
+  epoch: number;
+  open: StoredStroke[];
+  mended: StoredStroke[];
+}
 
 /** What a startle can do to the room. */
 export interface RoomEffects {
@@ -747,6 +760,25 @@ export function useTelevision(): TelevisionApi {
     [getRoomPicture],
   );
 
+  // Bumped when the wall must be rebuilt rather than added to: only Forget me.
+  const tearEpochRef = useRef(0);
+  // Which tears are mended is settled once per session, when memory loads, so a
+  // tear never heals in front of the viewer when the act changes.
+  const tearsAtLoadRef = useRef<{ open: StoredStroke[]; mended: StoredStroke[] }>({ open: [], mended: [] });
+  const getTears = useCallback(
+    (): WallTears | null => (memoryReadyRef.current ? { epoch: tearEpochRef.current, ...tearsAtLoadRef.current } : null),
+    [],
+  );
+  const onStroke = useCallback(
+    (points: ReadonlyArray<readonly [number, number]>) => {
+      dispatchMemory({ type: 'addStroke', seed: Math.floor(Math.random() * 0x7fffffff), points });
+      // Design §6: a tear is not left to the throttle, because closing the tab
+      // straight after making one is exactly what a viewer might do.
+      getStore().flush(memoryRef.current);
+    },
+    [dispatchMemory, getStore],
+  );
+
   const getBehindView = useCallback((localHour: number, localMinute: number): BehindView => {
     const first = new Date(memoryRef.current.firstSeenAt);
     return deriveBehind(memoryRef.current, {
@@ -1238,6 +1270,7 @@ export function useTelevision(): TelevisionApi {
       loaded = memoryReducer(loaded, { type: 'signOffComplete' }, demo);
     }
     memoryRef.current = loaded;
+    tearsAtLoadRef.current = splitTears(loaded);
     store.save(loaded);
     // Restore persisted settings, but keep reduced-effects honouring the OS
     // setting if either asks for it.
@@ -1323,6 +1356,8 @@ const forgetMe = useCallback(() => {
     skipSettingsPersistRef.current = true;
     getStore().erase();
     memoryRef.current = createMemory(Date.now());
+    tearsAtLoadRef.current = { open: [], mended: [] };
+    tearEpochRef.current += 1;
     setSettings({ ...DEFAULT_SETTINGS, reducedEffects: prefersReducedMotion() });
     setAnnouncement('Memory erased');
   }, [getStore]);
@@ -1345,6 +1380,8 @@ const forgetMe = useCallback(() => {
       getAudio,
       getRoomState,
       getBehindView,
+      getTears,
+      onStroke,
       registerRoom,
       onTearEnd,
     }),
@@ -1365,6 +1402,8 @@ const forgetMe = useCallback(() => {
       getAudio,
       getRoomState,
       getBehindView,
+      getTears,
+      onStroke,
       registerRoom,
       onTearEnd,
     ],

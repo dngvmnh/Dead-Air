@@ -9,8 +9,7 @@ import {
   stepSheet,
   nodeIndex,
   countBroken,
-  type TearSheet,
-} from './tearSheet.ts';
+  type TearSheet, replayStrokes, WALL_COLS, WALL_ROWS } from './tearSheet.ts';
 
 /**
  * The tear simulation is pure core logic (design §2): no DOM, no Date.now, no
@@ -254,5 +253,32 @@ describe('fast-check properties (design §2)', () => {
     expect(Array.from(a.xs)).toEqual(Array.from(b.xs));
     expect(Array.from(a.ys)).toEqual(Array.from(b.ys));
     expect(Array.from(a.broken)).toEqual(Array.from(b.broken));
+  });
+});
+
+describe('replayStrokes', () => {
+  const stroke = { points: [[0.2, 0.2], [0.2, 0.5], [0.2, 0.8]] as const };
+
+  it('cuts stored strokes back into a fresh sheet', () => {
+    const sheet = createSheet(WALL_COLS, WALL_ROWS, 1);
+    expect(replayStrokes(sheet, [stroke], () => 0)).toBe(1);
+    expect(countBroken(sheet)).toBeGreaterThan(10);
+  });
+
+  it('drops the oldest strokes when it runs out of budget', () => {
+    const sheet = createSheet(WALL_COLS, WALL_ROWS, 1);
+    let t = 0;
+    const kept = replayStrokes(sheet, [{ points: [[0.8, 0.2], [0.8, 0.8]] }, stroke], () => (t += 60));
+    expect(kept).toBe(1);
+    // Only the newest went in: nothing is cut along the older stroke's column.
+    const fresh = createSheet(WALL_COLS, WALL_ROWS, 1);
+    replayStrokes(fresh, [stroke], () => 0);
+    expect(countBroken(sheet)).toBe(countBroken(fresh));
+  });
+
+  it('does nothing for no strokes', () => {
+    const sheet = createSheet(WALL_COLS, WALL_ROWS, 1);
+    expect(replayStrokes(sheet, [], () => 0)).toBe(0);
+    expect(countBroken(sheet)).toBe(0);
   });
 });

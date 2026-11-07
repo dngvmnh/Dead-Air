@@ -19,8 +19,23 @@ export interface ChannelMemory {
   lastVisitedAt: number | null;
 }
 
+/** One tear, in normalised wall coordinates (requirement 4.1). */
+export interface StoredStroke {
+  seed: number;
+  /** The session it was made in, so a later one can find it mended. */
+  session: number;
+  points: Array<[number, number]>;
+}
+
+export interface RoomMemory {
+  strokes: StoredStroke[];
+  figureStep: number;
+  objectVariant: number;
+  ripBackDone: boolean;
+}
+
 export interface ViewerMemory {
-  schemaVersion: 1;
+  schemaVersion: 2;
   firstSeenAt: number;
   lastSeenAt: number;
   sessionCount: number;
@@ -33,9 +48,16 @@ export interface ViewerMemory {
   act: Act;
   noticeSeen: boolean;
   settings: { volume: number; muted: boolean; captions: boolean; reducedEffects: boolean };
+  room: RoomMemory;
 }
 
-export const MEMORY_SCHEMA_VERSION = 1 as const;
+/** What version 1 stored: everything except the room. */
+export type ViewerMemoryV1 = Omit<ViewerMemory, 'schemaVersion' | 'room'> & { schemaVersion: 1 };
+
+export const MEMORY_SCHEMA_VERSION = 2 as const;
+/** The oldest stroke drops first past this (design §6). */
+export const STROKE_CAP = 24;
+export const STROKE_POINT_CAP = 32;
 export const VISIT_ORDER_LIMIT = 50;
 /** A gap longer than this since last activity starts a new session (req 7.5). */
 export const NEW_SESSION_GAP_MS = 30 * 60 * 1000;
@@ -71,7 +93,34 @@ export function createMemory(nowMs: number): ViewerMemory {
     // voice lines have no audio yet, so their caption is their only output
     // (requirement 13.3). The viewer can turn CC off.
     settings: { volume: 1, muted: false, captions: true, reducedEffects: false },
+    room: emptyRoom(),
   };
+}
+
+function emptyRoom(): RoomMemory {
+  return { strokes: [], figureStep: 0, objectVariant: 0, ripBackDone: false };
+}
+
+/** Version 1 to 2 (requirement 4.3): every field kept, and an empty room added. */
+export function migrateMemory(old: ViewerMemoryV1): ViewerMemory {
+  return { ...old, schemaVersion: MEMORY_SCHEMA_VERSION, room: emptyRoom() };
+}
+
+/** Thin a path to the cap, keeping both ends, and round it so it stores small. */
+export function thinPoints(points: ReadonlyArray<readonly [number, number]>, cap = STROKE_POINT_CAP): Array<[number, number]> {
+  const clamp = (v: number): number => Math.round(Math.min(1, Math.max(0, v)) * 10000) / 10000;
+  const pick =
+    points.length <= cap
+      ? points
+      : Array.from({ length: cap }, (_, i) => points[Math.round((i * (points.length - 1)) / (cap - 1))]!);
+  return pick.map(([x, y]) => [clamp(x), clamp(y)]);
+}
+
+/** Which tears are still open, and which someone has mended (requirement 4.2). */
+export function splitTears(mem: ViewerMemory): { open: StoredStroke[]; mended: StoredStroke[] } {
+  const repairing = mem.sessionCount >= 2 && mem.act >= 2;
+  const mended = repairing ? mem.room.strokes.filter((s) => s.session < mem.sessionCount) : [];
+  return { open: mem.room.strokes.filter((s) => !mended.includes(s)), mended };
 }
 
 // --- Act computation (design §8) -------------------------------------------
@@ -136,6 +185,7 @@ export type MemoryAction =
   | { type: 'signOffComplete' }
   | { type: 'touch'; atMs: number }
   | { type: 'setSettings'; settings: Partial<ViewerMemory['settings']> }
+  | { type: 'addStroke'; seed: number; points: ReadonlyArray<readonly [number, number]> }
   | { type: 'ackNotice' };
 
 /**
@@ -198,6 +248,11 @@ function applyAction(mem: ViewerMemory, action: MemoryAction): ViewerMemory {
       return { ...mem, settings: { ...mem.settings, ...action.settings } };
     case 'ackNotice':
       return { ...mem, noticeSeen: true };
+    case 'addStroke': {
+      if (action.points.length < 2) return mem;
+      const stroke: StoredStroke = { seed: action.seed, session: mem.sessionCount, points: thinPoints(action.points) };
+      return { ...mem, room: { ...mem.room, strokes: [...mem.room.strokes, stroke].slice(-STROKE_CAP) } };
+    }
   }
 }
 

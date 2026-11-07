@@ -396,37 +396,66 @@ const channelMemorySchema = z
   })
   .strict();
 
+/** What every memory version has. */
+const memoryFields = {
+  firstSeenAt: z.number(),
+  lastSeenAt: z.number(),
+  sessionCount: z.number().int().positive(),
+  totalWatchMs: z.number().nonnegative(),
+  channels: z.object({
+    2: channelMemorySchema,
+    4: channelMemorySchema,
+    7: channelMemorySchema,
+    13: channelMemorySchema,
+  }).strict(),
+  visitOrder: z.array(channelIdSchema),
+  lastChannel: channelIdSchema.nullable(),
+  firedEvents: z.record(
+    z.string(),
+    z.object({ count: z.number().int().nonnegative(), lastAt: z.number() }).strict(),
+  ),
+  act: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+  noticeSeen: z.boolean(),
+  settings: z
+    .object({
+      volume: z.number().min(0).max(1),
+      muted: z.boolean(),
+      captions: z.boolean(),
+      reducedEffects: z.boolean(),
+    })
+    .strict(),
+};
+
+/** What came before the room was remembered. Read only to migrate it. */
+export const viewerMemoryV1Schema = z.object({ schemaVersion: z.literal(1), ...memoryFields }).strict();
+
+const unit = z.number().min(0).max(1);
+
 /**
- * Schema for `deadair.memory.v1`. Reads go through this; on any failure the
- * store starts fresh (requirement 7.4), so the shape is validated strictly.
+ * Schema for `deadair.memory.v1` (the key outlives its version, and `schemaVersion`
+ * says what is inside). Reads go through this; on any failure the store starts
+ * fresh (requirement 7.4), so the shape is validated strictly.
  */
 export const viewerMemorySchema = z
   .object({
-    schemaVersion: z.literal(1),
-    firstSeenAt: z.number(),
-    lastSeenAt: z.number(),
-    sessionCount: z.number().int().positive(),
-    totalWatchMs: z.number().nonnegative(),
-    channels: z.object({
-      2: channelMemorySchema,
-      4: channelMemorySchema,
-      7: channelMemorySchema,
-      13: channelMemorySchema,
-    }).strict(),
-    visitOrder: z.array(channelIdSchema),
-    lastChannel: channelIdSchema.nullable(),
-    firedEvents: z.record(
-      z.string(),
-      z.object({ count: z.number().int().nonnegative(), lastAt: z.number() }).strict(),
-    ),
-    act: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
-    noticeSeen: z.boolean(),
-    settings: z
+    schemaVersion: z.literal(2),
+    ...memoryFields,
+    room: z
       .object({
-        volume: z.number().min(0).max(1),
-        muted: z.boolean(),
-        captions: z.boolean(),
-        reducedEffects: z.boolean(),
+        strokes: z
+          .array(
+            z
+              .object({
+                seed: z.number().int(),
+                session: z.number().int().positive(),
+                points: z.array(z.tuple([unit, unit])).min(2).max(32),
+              })
+              .strict(),
+          )
+          .max(24),
+        figureStep: z.number().int().nonnegative(),
+        objectVariant: z.number().int().nonnegative(),
+        ripBackDone: z.boolean(),
       })
       .strict(),
   })

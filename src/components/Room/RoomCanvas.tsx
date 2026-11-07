@@ -6,6 +6,7 @@ import {
   moveGrab,
   release,
   cutPath,
+  replayStrokes,
   stepSheet,
   nodeIndex,
   countBroken,
@@ -17,10 +18,11 @@ import { TearGLRenderer } from '../../render/tearRenderer.ts';
 import { bakeRoom } from '../../render/roomWallpaper.ts';
 import { bakeBehindLayer, bakeGlimpse } from '../../render/behindRenderer.ts';
 import { wraithImage } from '../../render/wraithField.ts';
+import { paintRepairs } from '../../render/repairPainter.ts';
 import type { AudioEngine } from '../../audio/AudioEngine.ts';
 import type { RoomState } from '../../core/roomState.ts';
 import type { BehindView } from '../../core/behindState.ts';
-import type { RoomEffects } from '../../app/useTelevision.ts';
+import type { RoomEffects, WallTears } from '../../app/useTelevision.ts';
 
 /**
  * The tearable wall behind the set (design §1, §3). A full-viewport canvas at
@@ -42,6 +44,10 @@ export interface RoomCanvasProps {
   getRoomState: (reduced: boolean, localHour: number, localMinute: number) => RoomState;
   /** What a tear reveals for this viewer now (design §4). */
   getBehindView: (localHour: number, localMinute: number) => BehindView;
+  /** The tears to put back on the wall, or null until memory has loaded. */
+  getTears?: () => WallTears | null;
+  /** The viewer finished a tear with this path (normalised). */
+  onStroke?: (points: ReadonlyArray<readonly [number, number]>) => void;
   /** Hands the room's lights and glimpse to the startles, and takes them back. */
   registerRoom?: (handle: RoomEffects | null) => void;
   /** The viewer just finished a tear. */
@@ -53,6 +59,8 @@ export interface RoomCanvasProps {
 interface RoomSeam {
   strokes: () => number;
   broken: () => number;
+  /** Earlier tears painted back up on the wall. */
+  repaired: () => number;
   ripSeeded: () => void;
   /** Paint everything behind the paper solid magenta, so a test can measure holes. */
   showHoleMask: (on: boolean) => void;
@@ -70,6 +78,8 @@ export function RoomCanvas({
   getAudio,
   getRoomState,
   getBehindView,
+  getTears,
+  onStroke,
   registerRoom,
   onTearEnd,
   reduced,
@@ -78,6 +88,8 @@ export function RoomCanvas({
   const interactiveRef = useRef(interactive);
   const getRoomStateRef = useRef(getRoomState);
   const getBehindViewRef = useRef(getBehindView);
+  const getTearsRef = useRef(getTears);
+  const onStrokeRef = useRef(onStroke);
   const registerRoomRef = useRef(registerRoom);
   const onTearEndRef = useRef(onTearEnd);
   const reducedRef = useRef(reduced);
@@ -87,10 +99,12 @@ export function RoomCanvas({
     interactiveRef.current = interactive;
     getRoomStateRef.current = getRoomState;
     getBehindViewRef.current = getBehindView;
+    getTearsRef.current = getTears;
+    onStrokeRef.current = onStroke;
     registerRoomRef.current = registerRoom;
     onTearEndRef.current = onTearEnd;
     reducedRef.current = reduced;
-  }, [interactive, getRoomState, getBehindView, registerRoom, onTearEnd, reduced]);
+  }, [interactive, getRoomState, getBehindView, getTears, onStroke, registerRoom, onTearEnd, reduced]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -101,13 +115,15 @@ export function RoomCanvas({
     const forceFallback = (window as unknown as { __CRT_FORCE_FALLBACK__?: boolean }).__CRT_FORCE_FALLBACK__ === true;
 
     const seed = 0x5eed;
-    const sheet: TearSheet = createSheet(WALL_COLS, WALL_ROWS, seed);
+    let sheet: TearSheet = createSheet(WALL_COLS, WALL_ROWS, seed);
 
     // Baking and renderer creation need a real canvas context. Under jsdom
     // (unit tests) getContext returns null and the bake throws; in that case
     // the room simply does not render and the rest of the app is unaffected.
     const now0 = new Date();
     let front: { canvas: HTMLCanvasElement };
+    // The wall as drawn: the baked room, plus any repairs painted on it.
+    let wallCanvas: HTMLCanvasElement;
     let behindCanvas: TexImageSource;
     let behindView: BehindView;
     let behindLayer: ReturnType<typeof bakeBehindLayer>;
@@ -117,6 +133,7 @@ export function RoomCanvas({
       // state (task 8 moves it during unobserved moments).
       const variant = getRoomStateRef.current(reducedRef.current, now0.getHours(), now0.getMinutes()).objectVariant;
       front = bakeRoom(now0.getHours(), now0.getMinutes(), variant);
+      wallCanvas = front.canvas;
       behindView = getBehindViewRef.current(now0.getHours(), now0.getMinutes());
       behindLayer = bakeBehindLayer(behindView, reducedRef.current);
       behindCanvas = behindLayer.albedo;
@@ -137,6 +154,8 @@ export function RoomCanvas({
     const fallbackCtx = gl ? null : canvas.getContext('2d');
     if (!gl && !fallbackCtx) return; // no renderer available at all.
     let strokeCount = 0;
+    let repairedCount = 0;
+    let appliedEpoch = -1;
 
     // Active-frame counter: the loop steps/renders only while > 0 or a drag is
     // live; otherwise it idles cheaply. `wake` re-arms it after any interaction.
@@ -298,6 +317,35 @@ export function RoomCanvas({
       { node: number; lastX: number; lastY: number; lastT: number; lastGx: number; lastGy: number; points: Array<[number, number]> }
     >();
 
+    // Put the remembered damage back (requirement 4). Memory loads after this effect,
+    // so this waits on the idle tick for it. Open tears are cut back in; mended ones
+    // leave the paper whole, with the repair painted on it.
+    const syncTears = (): boolean => {
+      const tears = getTearsRef.current?.();
+      if (!tears || tears.epoch === appliedEpoch) return false;
+      const first = appliedEpoch === -1;
+      appliedEpoch = tears.epoch;
+      if (first && tears.open.length === 0 && tears.mended.length === 0) return false;
+      for (const d of drags.values()) release(sheet, d.node);
+      drags.clear();
+      sheet = createSheet(WALL_COLS, WALL_ROWS, seed);
+      replayStrokes(sheet, tears.open, () => performance.now());
+      strokeCount = tears.open.length;
+      repairedCount = tears.mended.length;
+      const latest = tears.open.at(-1);
+      if (latest) {
+        strokeMid.x = latest.points.reduce((sum, p) => sum + p[0], 0) / latest.points.length;
+        strokeMid.y = latest.points.reduce((sum, p) => sum + p[1], 0) / latest.points.length;
+        shape.x = strokeMid.x;
+        shape.y = strokeMid.y;
+      }
+      wallCanvas = tears.mended.length > 0 ? paintRepairs(front.canvas, tears.mended) : front.canvas;
+      gl?.setSheet(sheet);
+      gl?.setFrontTexture(wallCanvas);
+      wake();
+      return true;
+    };
+
     const onDown = (e: PointerEvent): void => {
       if (!interactiveRef.current) return;
       if (drags.size >= 2) return; // two independent touch points max
@@ -381,11 +429,15 @@ export function RoomCanvas({
       const d = drags.get(e.pointerId);
       if (!d) return;
       release(sheet, d.node);
+      // The last stretch of a drag is usually shorter than the sampling distance.
+      const end = toGrid(e.clientX, e.clientY);
+      d.points.push([Math.min(1, Math.max(0, end.gx / (WALL_COLS - 1))), Math.min(1, Math.max(0, end.gy / (WALL_ROWS - 1)))]);
       if (d.points.length > 1) {
         strokeMid.x = d.points.reduce((sum, p) => sum + p[0], 0) / d.points.length;
         strokeMid.y = d.points.reduce((sum, p) => sum + p[1], 0) / d.points.length;
       }
       drags.delete(e.pointerId);
+      onStrokeRef.current?.(d.points);
       onTearEndRef.current?.();
       try {
         canvas.releasePointerCapture?.(e.pointerId);
@@ -417,7 +469,7 @@ export function RoomCanvas({
       // Don't hijack typing in an input/iframe.
       const el = document.activeElement;
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'IFRAME')) return;
-      ripSeededPath(sheet);
+      onStrokeRef.current?.(ripSeededPath(sheet));
       strokeCount += 1;
     };
 
@@ -488,7 +540,7 @@ export function RoomCanvas({
     };
     const draw = (now: number): void => {
       if (gl) gl.render(now);
-      else if (fallbackCtx) drawFallback(fallbackCtx, canvas, front.canvas, behindCanvas);
+      else if (fallbackCtx) drawFallback(fallbackCtx, canvas, wallCanvas, behindCanvas);
     };
     const loop = (now: number): void => {
       const dt = now - last;
@@ -502,6 +554,7 @@ export function RoomCanvas({
       if (now - lastBehindAt >= LIGHT_INTERVAL_MS) {
         lastBehindAt = now;
         changedBehind = syncBehind();
+        syncTears();
       }
       if (busy) {
         if (activeFrames > 0) activeFrames -= 1;
@@ -534,8 +587,9 @@ export function RoomCanvas({
       (window as unknown as { __room?: RoomSeam }).__room = {
         strokes: () => strokeCount,
         broken: () => countBroken(sheet),
+        repaired: () => repairedCount,
         ripSeeded: () => {
-          ripSeededPath(sheet);
+          onStrokeRef.current?.(ripSeededPath(sheet));
           strokeCount += 1;
         },
         showHoleMask: (on) => {
@@ -588,7 +642,7 @@ function isNearTornEdge(sheet: TearSheet, gx: number, gy: number): boolean {
  * arc through the interior — away from the pinned edges — so it opens a clear,
  * visible gash rather than a nick in the corner.
  */
-function ripSeededPath(sheet: TearSheet): void {
+function ripSeededPath(sheet: TearSheet): Array<[number, number]> {
   // Tear down the LEFT margin of the wall (columns ~8-18% in), which is the
   // part NOT covered by the centred chassis, so a keyboard user sees the gash
   // (requirement 8.2). A gentle arc keeps it from being a straight slit.
@@ -601,16 +655,19 @@ function ripSeededPath(sheet: TearSheet): void {
   let prevX = c0 + (c1 - c0) * Math.sin(0);
   let prevY = r0;
   const STEPS = 16;
+  const path: Array<[number, number]> = [[prevX / (sheet.cols - 1), prevY / (sheet.rows - 1)]];
   for (let s = 1; s <= STEPS; s += 1) {
     const t = s / STEPS;
     const x = c0 + (c1 - c0) * Math.sin(t * Math.PI);
     const y = r0 + (r1 - r0) * t;
     cutPath(sheet, prevX, prevY, x, y);
+    path.push([x / (sheet.cols - 1), y / (sheet.rows - 1)]);
     prevX = x;
     prevY = y;
   }
   // Settle so the flaps peel open.
   for (let s = 0; s < 24; s += 1) stepSheet(sheet, 16.67);
+  return path;
 }
 
 /** 2D fallback: a static pre-torn room with the behind layer showing (req 8.5). */
