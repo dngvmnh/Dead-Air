@@ -87,8 +87,8 @@ Tick a task only when the behaviour has been seen in a real browser, not because
 
 ## Phase F: Ready to deploy
 
-- [ ] 13. Release check
-  - [ ] 13.1 Check budgets: bundle, measured frame time on this machine.
-  - [ ] 13.2 Confirm full gate from a clean clone: `npm ci`, then all commands.
-  - [ ] 13.3 Do not deploy. Report final hash, results, and everything unverified. Hosting is set up by a person.
+- [x] 13. Release check
+  - [x] 13.1 Check budgets: bundle, measured frame time on this machine.
+  - [x] 13.2 Confirm full gate from a clean clone: `npm ci`, then all commands.
+  - [x] 13.3 Do not deploy. Report final hash, results, and everything unverified. Hosting is set up by a person.
   - _Requirements: 10.1–10.4_

@@ -1239,3 +1239,29 @@ the unlit plaster was the brightest thing on screen.
 - Fix: emit over a copy, in both adapters. `tests/e2e/no-films.spec.ts` serves every film
   as a 404 and asserts the page keeps answering. It failed before the fix with "the page
   has hung" on the clone at `acf90fd`.
+
+## Task 13: Release check (2026-11-07)
+
+Measured on this machine: Intel UHD Graphics (integrated), Chromium with ANGLE D3D11.
+
+- Bundle: 169 KB gzipped for all JS and CSS (main JS 158.5 KB, worker 5.8 KB, CSS
+  4.8 KB), under 300 KB. No three.js or physics library. Vite still warns that the main
+  chunk is over 500 KB before gzip; that is its own default, not our budget.
+- Tear simulation, step plus cut per frame, 900 frames under `tsx`: wall 48x30 mean
+  2.2 ms, p95 2.4 ms. The tube kept a private 40x30 grid at mean 2.8 ms, p95 3.4 ms,
+  so it now uses the shared 36x28: mean 2.5 ms, p95 2.9 ms. Single frames still reach
+  about 3.9 ms on either sheet (garbage collection or JIT), so the 3 ms is a typical
+  frame, not every frame.
+- Frame rate at 1440x900 with both canvases drawing: 60.0 fps on air, p95 16.9 ms,
+  holding a wall tear and holding a tube tear, no frame over 25 ms.
+- Art: all procedural, nothing over 5 MB apart from the films, authorship in
+  `docs/room-assets.md`, including the reflection's shape.
+- Gate from a fresh clone of `origin/main` at `a899bec`: `npm ci` (0 vulnerabilities),
+  tsc, 417 unit tests, lint, catalogue, build, and 96 browser tests (95 passed, the
+  real-clock run skipped as designed). A fresh clone has no films, so this is also the
+  no-film run.
+- The fresh clone found a real hang (logged above) and two test flakes, both from item
+  boundaries: a tube tear is mended at a boundary by design, and a forced surface was
+  reset there. The tube tests now wait for 4 s of item left, and a forced surface holds.
+  The earlier `room-screenshots` timeout did not come back in 36 repeated runs.
+- Not deployed. Hosting notes for the person who sets it up: `docs/hosting.md`.
