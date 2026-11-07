@@ -56,10 +56,37 @@ test.describe('startles', () => {
   test('a picture startle shows, then returns to the programme', async ({ page }) => {
     await seed(page, 1);
     await onAir(page);
-    await page.evaluate(() => (window as unknown as { __tv: Tv }).__tv.forceStartle('S01'));
+    await page.evaluate(() => (window as unknown as { __tv: Tv }).__tv.forceStartle('S08'));
     await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 3000 }).toBe('EVENT');
     await expect.poll(() => tv(page, (t) => t.lastEventText()), { timeout: 4000 }).toBe('ALDER RD');
     await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 7000 }).toBe('ON_AIR');
+  });
+
+  test('a jump arrives cold: nothing on the tube first, face already painted', async ({ page }) => {
+    await seed(page, 0);
+    await onAir(page);
+    await page.evaluate(() => {
+      const w = window as unknown as { __firstBright: number; __tv: Tv };
+      w.__firstBright = -1;
+      new MutationObserver((records) => {
+        for (const r of records) {
+          for (const n of r.addedNodes) {
+            if (!(n instanceof HTMLCanvasElement) || n.dataset.testid !== 'jump-scare') continue;
+            const { data } = n.getContext('2d')!.getImageData(0, 0, n.width, n.height);
+            let sum = 0;
+            for (let i = 0; i < data.length; i += 4) sum += data[i]!;
+            w.__firstBright = sum / (data.length / 4);
+          }
+        }
+      }).observe(document.body, { childList: true });
+      w.__tv.forceStartle('S01');
+    });
+    // The picture never leaves the programme, so nothing on the tube can warn of it.
+    expect(await tv(page, (t) => t.phase())).toBe('ON_AIR');
+    expect(await tv(page, (t) => t.lastEventText())).not.toBe('ALDER RD');
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __firstBright: number }).__firstBright), { timeout: 3000 })
+      .toBeGreaterThan(20);
   });
 
   test('a jump fills the window, takes no clicks, and goes away', async ({ page }) => {
@@ -85,8 +112,8 @@ test.describe('startles', () => {
       }).observe(document.body, { childList: true });
       (window as unknown as { __tv: Tv }).__tv.forceStartle('S01');
     });
-    await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 3000 }).toBe('EVENT');
-    await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 8000 }).toBe('ON_AIR');
+    await expect.poll(() => tv(page, (t) => t.roomEventRunning()), { timeout: 3000 }).toBe(true);
+    await expect.poll(() => tv(page, (t) => t.roomEventRunning()), { timeout: 5000 }).toBe(false);
     expect(await page.evaluate(() => (window as unknown as { __sawJump: boolean }).__sawJump)).toBe(false);
   });
 
@@ -108,7 +135,7 @@ test.describe('startles', () => {
   test('changing channel cuts a startle short', async ({ page }) => {
     await seed(page, 1);
     await onAir(page);
-    await page.evaluate(() => (window as unknown as { __tv: Tv }).__tv.forceStartle('S01'));
+    await page.evaluate(() => (window as unknown as { __tv: Tv }).__tv.forceStartle('S08'));
     await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 3000 }).toBe('EVENT');
     await page.getByRole('button', { name: /channel up|^\+$/i }).click();
     await expect.poll(() => tv(page, (t) => t.channel()), { timeout: 3000 }).toBe(4);
@@ -144,7 +171,7 @@ test.describe('startles', () => {
   test('a startle still shows under reduced effects', async ({ page }) => {
     await seed(page, 1, true);
     await onAir(page);
-    await page.evaluate(() => (window as unknown as { __tv: Tv }).__tv.forceStartle('S01'));
+    await page.evaluate(() => (window as unknown as { __tv: Tv }).__tv.forceStartle('S08'));
     await expect.poll(() => tv(page, (t) => t.lastEventText()), { timeout: 4000 }).toBe('ALDER RD');
     await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 7000 }).toBe('ON_AIR');
   });

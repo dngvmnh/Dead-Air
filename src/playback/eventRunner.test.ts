@@ -53,8 +53,8 @@ function recorder(fail?: { scene?: boolean; voice?: boolean }): Recorder {
       calls.push(`apparition:${kind}:${text ?? ''}:${ms}`);
       return Promise.resolve();
     },
-    jump: (kind, ms, from) => {
-      calls.push(`jump:${kind}:${ms}:${from}`);
+    jump: (kind, ms) => {
+      calls.push(`jump:${kind}:${ms}`);
       return Promise.resolve();
     },
     roomLights: (level, ms) => {
@@ -134,7 +134,7 @@ describe('runEventSteps', () => {
     expect(ops.calls).toEqual([
       'sfx:stinger:1:0',
       'apparition:gourd:JUST ONE.:1800',
-      'jump:gourd:600:tube',
+      'jump:gourd:600',
       'lights:0.4:300',
       'glimpse:900',
       'sfx:knock:0.5:200',

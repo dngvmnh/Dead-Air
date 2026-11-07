@@ -140,7 +140,7 @@ describe('act computation (design §8)', () => {
   it('demo divides time thresholds by DEMO_DIVISOR (requirement 8.2 / room 9.3)', () => {
     // The single constant is 8 (dead-air-room requirement 9.3).
     expect(DEMO_DIVISOR).toBe(8);
-    const almost = withWatch((3 * MIN) / DEMO_DIVISOR);
+    const almost = withWatch(MIN / DEMO_DIVISOR);
     expect(naturalAct(almost, false)).toBe(0);
     expect(naturalAct(almost, true)).toBe(1);
   });

@@ -130,7 +130,7 @@ DEAD AIR is a static web application that simulates a four-channel analog televi
 4. WHEN an event completes or fails THE SYSTEM SHALL re-resolve the broadcast clock and resume the current programme.
 5. WHEN an event references template variables THE SYSTEM SHALL fill them only from real viewer memory, and SHALL use its fallback line if a value is missing.
 6. WHEN an event's media cannot load THE SYSTEM SHALL present its captions over static and SHALL NOT crash.
-7. THE SYSTEM SHALL enforce a global minimum gap of 45 seconds between events, except events marked `chain`.
+7. THE SYSTEM SHALL enforce a global minimum gap of 20 seconds between events, except events marked `chain`.
 
 ## Requirement 10: Channel 13
 

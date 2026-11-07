@@ -1,50 +1,55 @@
 /**
- * The jump itself: a figure comes out of the picture and fills the whole window
- * for under a second, then it is gone (requirement 11). It is the one thing that
- * draws in front of the set, so it exists only while it runs, and it takes no
- * clicks. The caller must not start one over a YouTube item, which may never have
- * anything in front of it.
+ * The jump itself: no warning and no approach. On one frame there is a programme,
+ * and on the next a face is already filling the whole window. Seeing it coming
+ * would spend the only thing a jump has, so nothing appears on the tube first.
+ * It is the one thing that draws in front of the set, so it exists only while it
+ * runs, and it takes no clicks. The caller must not start one over a YouTube item,
+ * which may never have anything in front of it.
  *
- * One lunge, not a strobe: brightness rises once and cuts to black once, and
- * startles are many seconds apart, well inside the flash limit. It stays grey and
- * never full-field white or saturated red.
+ * Not a strobe: brightness rises once and cuts to black once, the shots between
+ * are all of the same dim face, and startles are many seconds apart, well inside
+ * the flash limit. It stays grey and never full-field white or saturated red.
  */
 
 import type { ApparitionKind } from './apparition.ts';
 import { faceImage } from './faceField.ts';
 
-/** How long the figure takes to cross the room. Fast enough to beat a flinch. */
-const LUNGE_MS = 170;
 /** The black it leaves behind, so the eye has nothing to hold on to. */
-export const JUMP_CUT_MS = 180;
+export const JUMP_CUT_MS = 450;
 
-/**
- * Where the figure is at `tMs`: 0 at its origin, 1 filling the window. It holds
- * at 1 and keeps creeping, so it never seems to have finished arriving.
- */
-export function lungeProgress(tMs: number): number {
-  if (tMs <= 0) return 0;
-  if (tMs >= LUNGE_MS) return 1 + (tMs - LUNGE_MS) * 0.00022;
-  const u = tMs / LUNGE_MS;
-  return u * u * u;
+/** One shot of the jump: how close the face is, and where it is framed. */
+export interface JumpShot {
+  /** Multiple of the size that already fills the window. */
+  scale: number;
+  /** Shifts the framing up the face, as a fraction of its size. */
+  lift: number;
+  screaming: boolean;
+}
+
+/** Hard cuts, nothing between them. Each is closer, none lets the eye settle. */
+const SHOTS: ReadonlyArray<JumpShot & { atMs: number }> = [
+  { atMs: 0, scale: 1.08, lift: 0, screaming: false },
+  { atMs: 250, scale: 1.3, lift: -0.06, screaming: true },
+  { atMs: 520, scale: 1.95, lift: 0.1, screaming: true },
+];
+
+/** The shot on screen at `tMs`. It is at full size from the first frame. */
+export function jumpShotAt(tMs: number): JumpShot {
+  let shot = SHOTS[0] as JumpShot;
+  for (const candidate of SHOTS) if (tMs >= candidate.atMs) shot = candidate;
+  return shot;
 }
 
 export interface JumpOptions {
   kind: ApparitionKind;
   ms: number;
-  /** Where it comes from, as viewport fractions. */
-  originX: number;
-  originY: number;
 }
 
-/** Quantised like film, so the arrival is a few hard frames and not a smooth zoom. */
+/** Quantised like film, so the shake is a few hard frames and not smooth. */
 const FILM_FRAME_MS = 1000 / 24;
-/** It has landed, you have seen it, and then it comes closer again. */
-const LURCH_AT_MS = 340;
-const LURCH_SCALE = 1.2;
 
 /** Run one jump. Resolves when the overlay has gone, even with rAF throttled. */
-export function playJump({ kind, ms, originX, originY }: JumpOptions): Promise<void> {
+export function playJump({ kind, ms }: JumpOptions): Promise<void> {
   const canvas = document.createElement('canvas');
   canvas.setAttribute('aria-hidden', 'true');
   canvas.dataset.testid = 'jump-scare';
@@ -53,9 +58,9 @@ export function playJump({ kind, ms, originX, originY }: JumpOptions): Promise<v
   const H = (canvas.height = Math.round((W * window.innerHeight) / Math.max(1, window.innerWidth)));
   const ctx = canvas.getContext('2d');
   if (!ctx) return Promise.resolve();
-  document.body.append(canvas);
 
-  const face = faceImage(kind);
+  const closed = faceImage(kind);
+  const open = faceImage(kind, true);
   // Chin and forehead run off the window: too close to be seen whole.
   const full = Math.max(W, H * 1.55);
   const start = performance.now();
@@ -68,12 +73,11 @@ export function playJump({ kind, ms, originX, originY }: JumpOptions): Promise<v
       return;
     }
     const t = Math.floor(real / FILM_FRAME_MS) * FILM_FRAME_MS;
-    const p = lungeProgress(t);
-    const size = full * (0.1 + 0.9 * p) * (t >= LURCH_AT_MS ? LURCH_SCALE : 1);
-    const shake = Math.max(0.15, 1 - t / 600) * 18;
-    const towards = Math.min(1, p);
-    const cx = W * (originX + (0.5 - originX) * towards) + Math.sin(t * 0.09) * shake;
-    const cy = H * (originY + (0.5 - originY) * towards) + Math.cos(t * 0.13) * shake;
+    const shot = jumpShotAt(t);
+    const size = full * shot.scale;
+    const cx = W / 2 + Math.sin(t * 0.09) * 16;
+    const cy = H / 2 + shot.lift * size + Math.cos(t * 0.13) * 16;
+    const face = shot.screaming ? open : closed;
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, W, H);
     if (face) ctx.drawImage(face, cx - size / 2, cy - size / 2, size, size);
@@ -81,7 +85,9 @@ export function playJump({ kind, ms, originX, originY }: JumpOptions): Promise<v
     grain(ctx, W, H, t);
     raf = requestAnimationFrame(frame);
   };
+  // Painted before it joins the page: its first visible frame is already the face.
   frame();
+  document.body.append(canvas);
 
   return new Promise((resolve) => {
     // Real timers, because a hidden tab stops rAF and the overlay must still go.

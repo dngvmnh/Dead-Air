@@ -415,29 +415,10 @@
         "startle"
       ],
       "limit": {
-        "perSession": 3
+        "perSession": 10
       },
       "priority": 2,
       "steps": [
-        {
-          "do": "sfx",
-          "cue": "tapeStop"
-        },
-        {
-          "do": "static",
-          "ms": 300
-        },
-        {
-          "do": "sfx",
-          "cue": "drone",
-          "gain": 0.8
-        },
-        {
-          "do": "apparition",
-          "kind": "anchor",
-          "ms": 1500,
-          "text": "ALDER RD"
-        },
         {
           "do": "sfx",
           "cue": "jumpHit"
@@ -445,14 +426,14 @@
         {
           "do": "jump",
           "kind": "anchor",
-          "ms": 750
+          "ms": 800
         }
       ],
       "when": {
         "distinctChannelsGte": 0
       },
       "chain": true,
-      "cooldownMs": 70000
+      "cooldownMs": 20000
     },
     {
       "id": "S02",
@@ -464,21 +445,10 @@
         "startle"
       ],
       "limit": {
-        "perSession": 3
+        "perSession": 10
       },
       "priority": 2,
       "steps": [
-        {
-          "do": "sfx",
-          "cue": "toyPiano",
-          "ms": 1300
-        },
-        {
-          "do": "apparition",
-          "kind": "gourd",
-          "ms": 1100,
-          "text": "JUST ONE."
-        },
         {
           "do": "sfx",
           "cue": "jumpHit"
@@ -486,14 +456,14 @@
         {
           "do": "jump",
           "kind": "gourd",
-          "ms": 750
+          "ms": 800
         }
       ],
       "when": {
         "distinctChannelsGte": 0
       },
       "chain": true,
-      "cooldownMs": 70000
+      "cooldownMs": 20000
     },
     {
       "id": "S03",
@@ -505,25 +475,10 @@
         "startle"
       ],
       "limit": {
-        "perSession": 3
+        "perSession": 10
       },
       "priority": 2,
       "steps": [
-        {
-          "do": "sfx",
-          "cue": "phoneRing",
-          "ms": 1000
-        },
-        {
-          "do": "sfx",
-          "cue": "breath"
-        },
-        {
-          "do": "apparition",
-          "kind": "operator",
-          "ms": 1500,
-          "text": "OUR OPERATORS ARE WATCHING."
-        },
         {
           "do": "sfx",
           "cue": "jumpHit"
@@ -531,14 +486,14 @@
         {
           "do": "jump",
           "kind": "operator",
-          "ms": 750
+          "ms": 800
         }
       ],
       "when": {
         "distinctChannelsGte": 0
       },
       "chain": true,
-      "cooldownMs": 70000
+      "cooldownMs": 20000
     },
     {
       "id": "S04",
@@ -550,23 +505,10 @@
         "startle"
       ],
       "limit": {
-        "perSession": 3
+        "perSession": 10
       },
       "priority": 2,
       "steps": [
-        {
-          "do": "static",
-          "ms": 350
-        },
-        {
-          "do": "sfx",
-          "cue": "whisper"
-        },
-        {
-          "do": "apparition",
-          "kind": "deadair",
-          "ms": 1500
-        },
         {
           "do": "sfx",
           "cue": "jumpHit"
@@ -574,14 +516,14 @@
         {
           "do": "jump",
           "kind": "deadair",
-          "ms": 750
+          "ms": 800
         }
       ],
       "when": {
         "distinctChannelsGte": 0
       },
       "chain": true,
-      "cooldownMs": 70000
+      "cooldownMs": 20000
     },
     {
       "id": "S05",
@@ -591,7 +533,7 @@
         "startle"
       ],
       "limit": {
-        "perSession": 4
+        "perSession": 6
       },
       "priority": 1,
       "steps": [
@@ -614,7 +556,7 @@
         "distinctChannelsGte": 0
       },
       "chain": true,
-      "cooldownMs": 40000
+      "cooldownMs": 18000
     },
     {
       "id": "S06",
@@ -624,7 +566,7 @@
         "startle"
       ],
       "limit": {
-        "perSession": 3
+        "perSession": 6
       },
       "priority": 1,
       "steps": [
@@ -651,7 +593,7 @@
         "distinctChannelsGte": 0
       },
       "chain": true,
-      "cooldownMs": 40000
+      "cooldownMs": 18000
     },
     {
       "id": "S07",
@@ -661,7 +603,7 @@
         "startle"
       ],
       "limit": {
-        "perSession": 3
+        "perSession": 6
       },
       "priority": 1,
       "steps": [
@@ -685,7 +627,149 @@
         "distinctChannelsGte": 0
       },
       "chain": true,
-      "cooldownMs": 40000
+      "cooldownMs": 18000
+    },
+    {
+      "id": "S08",
+      "channels": [
+        2
+      ],
+      "minAct": 0,
+      "seams": [
+        "startle"
+      ],
+      "when": {
+        "distinctChannelsGte": 0
+      },
+      "chain": true,
+      "limit": {
+        "perSession": 5
+      },
+      "priority": 1,
+      "steps": [
+        {
+          "do": "sfx",
+          "cue": "tapeStop"
+        },
+        {
+          "do": "static",
+          "ms": 300
+        },
+        {
+          "do": "sfx",
+          "cue": "drone",
+          "gain": 0.8
+        },
+        {
+          "do": "apparition",
+          "kind": "anchor",
+          "ms": 1500,
+          "text": "ALDER RD"
+        }
+      ],
+      "cooldownMs": 25000
+    },
+    {
+      "id": "S09",
+      "channels": [
+        4
+      ],
+      "minAct": 0,
+      "seams": [
+        "startle"
+      ],
+      "when": {
+        "distinctChannelsGte": 0
+      },
+      "chain": true,
+      "limit": {
+        "perSession": 5
+      },
+      "priority": 1,
+      "steps": [
+        {
+          "do": "sfx",
+          "cue": "toyPiano",
+          "ms": 1300
+        },
+        {
+          "do": "apparition",
+          "kind": "gourd",
+          "ms": 1100,
+          "text": "JUST ONE."
+        }
+      ],
+      "cooldownMs": 25000
+    },
+    {
+      "id": "S10",
+      "channels": [
+        7
+      ],
+      "minAct": 0,
+      "seams": [
+        "startle"
+      ],
+      "when": {
+        "distinctChannelsGte": 0
+      },
+      "chain": true,
+      "limit": {
+        "perSession": 5
+      },
+      "priority": 1,
+      "steps": [
+        {
+          "do": "sfx",
+          "cue": "phoneRing",
+          "ms": 1000
+        },
+        {
+          "do": "sfx",
+          "cue": "breath"
+        },
+        {
+          "do": "apparition",
+          "kind": "operator",
+          "ms": 1500,
+          "text": "OUR OPERATORS ARE WATCHING."
+        }
+      ],
+      "cooldownMs": 25000
+    },
+    {
+      "id": "S11",
+      "channels": [
+        13
+      ],
+      "minAct": 0,
+      "seams": [
+        "startle"
+      ],
+      "when": {
+        "distinctChannelsGte": 0
+      },
+      "chain": true,
+      "limit": {
+        "perSession": 5
+      },
+      "priority": 1,
+      "steps": [
+        {
+          "do": "static",
+          "ms": 350
+        },
+        {
+          "do": "sfx",
+          "cue": "whisper"
+        },
+        {
+          "do": "apparition",
+          "kind": "deadair",
+          "ms": 1500
+        }
+      ],
+      "cooldownMs": 25000
     },
     {
       "id": "T03",
@@ -706,8 +790,7 @@
         {
           "do": "jump",
           "kind": "anchor",
-          "ms": 650,
-          "from": "tear"
+          "ms": 800
         }
       ],
       "when": {

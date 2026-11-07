@@ -26,8 +26,9 @@ import { EventPresenter } from '../playback/EventPresenter.ts';
 import { channelInfo as channelInfoLookup } from '../core/channels.ts';
 import { deriveRoom, type RoomState } from '../core/roomState.ts';
 import { deriveBehind, type BehindView } from '../core/behindState.ts';
-import { keepsProgramme, nextStartleDelay, SURF_SETTLE_MS, SURF_TRIGGER, TEAR_ANSWER_CHANCE } from '../core/startle.ts';
+import { keepsProgramme, nextStartleDelay, SURF_MIN_GAP_MS, SURF_SETTLE_MS, SURF_TRIGGER, TEAR_ANSWER_CHANCE } from '../core/startle.ts';
 import { playJump } from '../render/jumpScare.ts';
+import { preloadFaces } from '../render/faceField.ts';
 import { FileAdapter } from '../playback/FileAdapter.ts';
 import { hush, say, spokenMs } from '../audio/speech.ts';
 import type { ProgrammeBed } from '../audio/AudioEngine.ts';
@@ -98,13 +99,14 @@ export interface TelevisionApi {
 
 /** The sound under each channel's original programmes. Films bring their own. */
 const CHANNEL_BED: Record<ChannelId, ProgrammeBed> = { 2: 'news', 4: 'kids', 7: 'shop', 13: 'deadair' };
+/** A film with no sound of its own, which would otherwise leave the channel mute. */
+const SILENT_FILMS: ReadonlySet<string> = new Set(['/film/store.mp4']);
 
 /** What a startle can do to the room. */
 export interface RoomEffects {
   setLevel: (level: number, ms: number) => void;
   glimpse: (ms: number) => void;
   /** Where the viewer last tore, as viewport fractions. */
-  lastTear: () => { x: number; y: number };
 }
 
 
@@ -444,23 +446,16 @@ export function useTelevision(): TelevisionApi {
             () => eventCancelRef.current,
           );
         },
-        jump: async (kind, ms, from) => {
+        jump: async (kind, ms) => {
+          hush();
           const reduced = memoryRef.current.settings.reducedEffects || prefersReducedMotion();
-          // Reduced effects keeps the sound and drops the lunge: no full-window
-          // motion for a viewer who asked for none.
+          // Reduced effects keeps the sound and drops the picture: no full-window
+          // cut for a viewer who asked for none.
           if (reduced) {
             await wait(ms);
             return;
           }
-          const tube = document.querySelector('[data-testid="tube-opening"]')?.getBoundingClientRect();
-          const tear = roomEffectsRef.current?.lastTear();
-          const origin =
-            from === 'tear' && tear
-              ? { x: tear.x, y: tear.y }
-              : tube
-                ? { x: (tube.left + tube.width / 2) / window.innerWidth, y: (tube.top + tube.height / 2) / window.innerHeight }
-                : { x: 0.5, y: 0.5 };
-          await playJump({ kind, ms, originX: origin.x, originY: origin.y });
+          await playJump({ kind, ms });
         },
         roomLights: async (level, ms) => {
           roomEffectsRef.current?.setLevel(level, ms);
@@ -670,12 +665,13 @@ export function useTelevision(): TelevisionApi {
       if (resolved.item.source === 'youtube') return null;
       const itemId = resolved.item.id;
       const isFilm = resolved.item.source === 'file';
+      const hasOwnSound = resolved.item.source === 'file' && !SILENT_FILMS.has(resolved.item.url);
       const adapter: PlaybackAdapter = isFilm ? getFileAdapter() : getSceneAdapter();
       // One source at a time: leave the other adapter with nothing to publish.
       if (isFilm) sceneAdapterRef.current?.stop();
       else fileAdapterRef.current?.stop();
       hush();
-      audioRef.current?.setBed(isFilm ? null : CHANNEL_BED[channel], memoryRef.current.act / 4);
+      audioRef.current?.setBed(hasOwnSound ? null : CHANNEL_BED[channel], memoryRef.current.act / 4);
       // Swap the event listener to this play session.
       adapterOffRef.current?.();
       adapterOffRef.current = adapter.on((e) => {
@@ -894,8 +890,11 @@ export function useTelevision(): TelevisionApi {
       tearRandomRef.current = () => 1;
       return undefined;
     }
+    // Baked ahead, so the first frame of a jump lands on the same beat as the hit.
+    const bake = setTimeout(preloadFaces, 1000);
     let dueAt: number | null = null;
     let surfs = 0;
+    let lastAskedAt = 0;
     let lastChannel: ChannelId | null = null;
     const timer = setInterval(() => {
       const { phase, channel } = stateRef.current;
@@ -906,7 +905,7 @@ export function useTelevision(): TelevisionApi {
       const now = Date.now();
       if (lastChannel !== null && channel !== lastChannel) {
         surfs += 1;
-        if (surfs >= SURF_TRIGGER) {
+        if (surfs >= SURF_TRIGGER && now - lastAskedAt >= SURF_MIN_GAP_MS) {
           surfs = 0;
           dueAt = now + SURF_SETTLE_MS;
         }
@@ -918,10 +917,14 @@ export function useTelevision(): TelevisionApi {
       }
       if (now >= dueAt) {
         fireStartle('startle');
+        lastAskedAt = now;
         dueAt = now + nextStartleDelay(Math.random, demo, false);
       }
     }, 500);
-    return () => clearInterval(timer);
+    return () => {
+      clearTimeout(bake);
+      clearInterval(timer);
+    };
   }, [demo, fireStartle]);
 
   const registerRoom = useCallback((handle: RoomEffects | null) => {

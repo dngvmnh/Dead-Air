@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AudioEngine } from './AudioEngine.ts';
+import { AudioEngine, SFX_LEVEL } from './AudioEngine.ts';
 
 /**
  * A tiny fake Web Audio graph. Each node records what it connects to, so tests
@@ -92,6 +92,9 @@ class FakeAudioContext {
   }
   createWaveShaper() {
     return this.track(new FakeNode('waveshaper'));
+  }
+  createConvolver() {
+    return this.track(new FakeNode('convolver'));
   }
   createBuffer(_channels: number, length: number) {
     const data = new Float32Array(length);
@@ -245,6 +248,59 @@ describe('AudioEngine static and analog chain', () => {
     expect(biquads.length).toBe(2); // highpass + lowpass
     expect(shaper).toBeDefined();
     expect(shaper!.curve).not.toBeNull();
+  });
+});
+
+describe('AudioEngine mix', () => {
+  const buses = (ctx: FakeAudioContext) => {
+    const master = ctx.created.find((n) => n.kind === 'gain' && n.connectedTo.some((t) => t.kind === 'compressor'))!;
+    const intoMaster = ctx.created.filter((n) => n.kind === 'gain' && n.connectedTo.includes(master));
+    return { sfx: intoMaster[0]!, programme: intoMaster[1]! };
+  };
+
+  it('keeps the effects well under the programme', async () => {
+    const { engine, ctx } = newEngine();
+    await engine.unlock();
+    const { sfx, programme } = buses(ctx);
+    expect(sfx.gain.value).toBe(SFX_LEVEL);
+    expect(programme.gain.value).toBe(1);
+    expect(SFX_LEVEL).toBeLessThan(0.5);
+  });
+
+  it('sends a film through the programme bus, not the effects', async () => {
+    const { engine, ctx } = newEngine();
+    await engine.unlock();
+    const { programme } = buses(ctx);
+    engine.createAnalogChain();
+    const shaper = ctx.created.filter((n) => n.kind === 'waveshaper').at(-1)!;
+    expect(shaper.connectedTo).toContain(programme);
+  });
+
+  it('a jump skips the programme limiter and cuts everything else', async () => {
+    const { engine, ctx } = newEngine();
+    await engine.unlock();
+    const compressors = ctx.created.filter((n) => n.kind === 'compressor');
+    expect(compressors).toHaveLength(2);
+    expect(compressors[1]!.connectedTo).toContain(ctx.destination);
+    expect(compressors[1]!.threshold.value).toBeGreaterThan(compressors[0]!.threshold.value);
+
+    const { sfx, programme } = buses(ctx);
+    const seen: number[] = [];
+    programme.gain.setValueAtTime = (v) => void seen.push(v);
+    sfx.gain.setValueAtTime = (v) => void seen.push(v);
+    engine.playCue('jumpHit');
+    expect(seen).toEqual([0.0001, 0.0001]);
+  });
+
+  it('a jump obeys mute', async () => {
+    const { engine, ctx } = newEngine();
+    await engine.unlock();
+    const limiter = ctx.created.filter((n) => n.kind === 'compressor')[1]!;
+    const level = ctx.created.find((n) => n.kind === 'gain' && n.connectedTo.includes(limiter))!;
+    engine.setVolume(0.25);
+    expect(level.gain.value).toBeCloseTo(0.5, 5);
+    engine.setMuted(true);
+    expect(level.gain.value).toBe(0);
   });
 });
 

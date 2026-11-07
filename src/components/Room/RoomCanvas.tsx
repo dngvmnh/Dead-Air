@@ -220,7 +220,6 @@ export function RoomCanvas({
         gl?.setGlimpse(bakeGlimpse(strokeMid.x, strokeMid.y));
         glimpseUntil = performance.now() + ms;
       },
-      lastTear: () => ({ x: strokeMid.x, y: strokeMid.y }),
     };
     registerRoomRef.current?.(effects);
     const stepEffects = (now: number, dt: number): boolean => {

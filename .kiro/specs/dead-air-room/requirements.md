@@ -148,11 +148,13 @@ The goal for a judge: within 30 seconds they have discovered the tear without be
 Short, frequent scares that keep the viewer on edge and then return to normal. The owner asked for this after finding the first version too rare and not frightening (2026-11-07).
 
 1. A startle SHALL last no more than 6 seconds and SHALL return to the programme at its clock position. The catalogue validator enforces the length.
-2. The first startle SHALL come 12 to 25 seconds after the first picture, and later checks SHALL be 25 to 60 seconds apart (8 to 15, then 15 to 30, under demo mode). Three channel changes SHALL bring the next one forward to about 1.5 seconds after landing. Every startle SHALL still have a per-session or per-viewer limit.
+2. The first startle SHALL come 6 to 12 seconds after the first picture, and later checks SHALL be 10 to 22 seconds apart (4 to 8, then 6 to 14, under demo mode). Two channel changes SHALL bring the next one forward to about 0.7 seconds after landing, but no sooner than 8 seconds after the last. The same jump SHALL NOT repeat within 20 seconds. Every startle SHALL still have a per-session or per-viewer limit.
 3. A startle SHALL NOT fire on a YouTube item, and nothing SHALL draw in front of a YouTube item. A tear MAY answer over YouTube only by staying in the room.
 4. Startles SHALL NOT use or reset the story events' global gap, so they cannot delay the sign-off path.
 5. The first tear of a session SHALL answer. About 60 percent of later tears MAY answer, subject to the same limits.
 6. Channel change and power off SHALL stop a running startle, cut its sounds and restore the room's lights.
-7. A jump SHALL rise in brightness once and cut to black once. It SHALL NOT strobe, go full-field white or use saturated red, and startles stay within the three-flashes-per-second limit. All cues SHALL pass through the master limiter, and none imitates a real alert tone. Apparitions imply and SHALL NOT show gore or real people.
-8. Reduced effects SHALL halve startle sound levels, hold figures still and remove the full-window lunge. The first-run notice SHALL warn of jump scares.
+7. A jump SHALL rise in brightness once and cut to black once. It SHALL NOT strobe, go full-field white or use saturated red, and startles stay within the three-flashes-per-second limit. Every cue SHALL pass through a limiter, and none imitates a real alert tone. Apparitions imply and SHALL NOT show gore or real people.
+10. A jump SHALL arrive with no warning: nothing on the tube leads into it, and its face SHALL fill the window from its first visible frame, with hard cuts and no zoom. Tube apparitions SHALL be events of their own.
+11. The programme SHALL be louder than the set's own noises and cues. A jump SHALL be louder than the programme, SHALL cut the programme and those noises while it sounds, and SHALL still obey mute and the volume control.
+8. Reduced effects SHALL halve startle sound levels, hold figures still and remove the full-window picture. The first-run notice SHALL warn of jump scares.
 9. The room SHALL carry an in-world hint that the wall can be torn. It SHALL NOT become a tutorial or an objective.

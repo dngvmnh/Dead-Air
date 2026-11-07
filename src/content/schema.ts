@@ -332,7 +332,6 @@ export const eventStepSchema = z.discriminatedUnion('do', [
       do: z.literal('jump'),
       kind: z.enum(['anchor', 'gourd', 'operator', 'deadair']),
       ms: z.number().int().positive().max(1200),
-      from: z.enum(['tube', 'tear']).optional(),
     })
     .strict(),
   // The room's lights sink to `level` over `ms`.

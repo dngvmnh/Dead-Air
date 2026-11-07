@@ -62,7 +62,7 @@ function fbm(x: number, y: number): number {
 function eye(l: number, dx: number, dy: number, rx: number, ry: number): number {
   const r = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry);
   const socket = Math.exp(-(r ** 1.5));
-  const open = 0.62 * bump(dx, dy, rx * 0.42, ry * 0.36);
+  const open = 0.95 * bump(dx, dy, rx * 0.42, ry * 0.36);
   const pupil = bump(dx, dy, rx * 0.14, rx * 0.14);
   return (l * (1 - 0.97 * socket) + open) * (1 - 0.96 * pupil);
 }
@@ -71,7 +71,7 @@ function eye(l: number, dx: number, dy: number, rx: number, ry: number): number 
  * Luminance of the face at (x, y), both -1..1 with y down. 0 is off the head. Pure,
  * so the shape can be tested and baked once per kind.
  */
-export function faceLuminance(kind: ApparitionKind, x: number, y: number): number {
+export function faceLuminance(kind: ApparitionKind, x: number, y: number, screaming = false): number {
   const style = STYLES[kind];
   const d = Math.hypot(x / 0.8, (y - 0.02) / 1);
   if (d >= 1) return 0;
@@ -94,7 +94,10 @@ export function faceLuminance(kind: ApparitionKind, x: number, y: number): numbe
   if (style.ribs) l *= 0.55 + 0.45 * Math.abs(Math.cos(x * 7.5)) ** 0.5;
 
   // The mouth is too long or too wide. It has teeth and nothing behind them.
-  const { y: my, rx, ry } = style.mouth;
+  // Screaming, the jaw has come down further than a jaw goes.
+  const { y: my0, rx, ry: ry0 } = style.mouth;
+  const ry = screaming ? Math.max(ry0 * 1.5, 0.34) : ry0;
+  const my = screaming ? my0 + (ry - ry0) * 0.55 : my0;
   const mx = x - 0.012;
   const m = Math.hypot(mx / rx, (y - my) / ry);
   l += 0.16 * bump(m - 1.1, 0, 0.14, 1);
@@ -108,19 +111,21 @@ export function faceLuminance(kind: ApparitionKind, x: number, y: number): numbe
   }
 
   // Eyes go last so the texture never dirties them: they are the first thing seen.
-  l = eye(l, x + 0.33, y + 0.2, 0.21, 0.15);
-  l = eye(l, x - 0.33, y + 0.15, 0.18, 0.18);
+  const wide = screaming ? 1.25 : 1;
+  l = eye(l, x + 0.33, y + 0.2, 0.21 * wide, 0.15 * wide);
+  l = eye(l, x - 0.33, y + 0.15, 0.18 * wide, 0.18 * wide);
 
-  const out = Math.max(0, l * style.gain) ** 1.2;
+  const out = Math.max(0, l * style.gain * 1.12) ** 1.7;
   return Math.min(FACE_MAX_LUMINANCE, out);
 }
 
-const BAKE_SIZE = 340;
-const baked = new Map<ApparitionKind, HTMLCanvasElement>();
+const BAKE_SIZE = 420;
+const baked = new Map<string, HTMLCanvasElement>();
 
 /** The baked face, transparent off the head. Null where there is no canvas. */
-export function faceImage(kind: ApparitionKind): HTMLCanvasElement | null {
-  const existing = baked.get(kind);
+export function faceImage(kind: ApparitionKind, screaming = false): HTMLCanvasElement | null {
+  const key = `${kind}:${screaming}`;
+  const existing = baked.get(key);
   if (existing) return existing;
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
@@ -134,7 +139,7 @@ export function faceImage(kind: ApparitionKind): HTMLCanvasElement | null {
     for (let px = 0; px < BAKE_SIZE; px += 1) {
       const x = (px / (BAKE_SIZE - 1)) * 2 - 1;
       const y = (py / (BAKE_SIZE - 1)) * 2 - 1;
-      const l = faceLuminance(kind, x, y) * 255;
+      const l = faceLuminance(kind, x, y, screaming) * 255;
       const i = (py * BAKE_SIZE + px) * 4;
       image.data[i] = l * tr;
       image.data[i + 1] = l * tg;
@@ -144,6 +149,17 @@ export function faceImage(kind: ApparitionKind): HTMLCanvasElement | null {
     }
   }
   ctx.putImageData(image, 0, 0);
-  baked.set(kind, canvas);
+  baked.set(key, canvas);
   return canvas;
+}
+
+/** Bake every face a jump can use, one per tick, so none is baked on the beat. */
+export function preloadFaces(): void {
+  const kinds: ApparitionKind[] = ['anchor', 'gourd', 'operator', 'deadair'];
+  const queue = kinds.flatMap((kind) => [() => faceImage(kind), () => faceImage(kind, true)]);
+  const next = (): void => {
+    queue.shift()?.();
+    if (queue.length > 0) setTimeout(next, 60);
+  };
+  next();
 }

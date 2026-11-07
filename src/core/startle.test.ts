@@ -3,15 +3,15 @@ import { eventLengthMs, isRoomOnly, keepsProgramme, nextStartleDelay } from './s
 
 describe('nextStartleDelay', () => {
   it('brings the first startle on quickly, then keeps them coming unevenly', () => {
-    expect(nextStartleDelay(() => 0, false, true)).toBe(12_000);
-    expect(nextStartleDelay(() => 1, false, true)).toBe(25_000);
-    expect(nextStartleDelay(() => 0, false, false)).toBe(25_000);
-    expect(nextStartleDelay(() => 1, false, false)).toBe(60_000);
+    expect(nextStartleDelay(() => 0, false, true)).toBe(6_000);
+    expect(nextStartleDelay(() => 1, false, true)).toBe(12_000);
+    expect(nextStartleDelay(() => 0, false, false)).toBe(10_000);
+    expect(nextStartleDelay(() => 1, false, false)).toBe(22_000);
   });
 
   it('runs faster still under demo mode', () => {
-    expect(nextStartleDelay(() => 0, true, true)).toBe(8_000);
-    expect(nextStartleDelay(() => 1, true, false)).toBe(30_000);
+    expect(nextStartleDelay(() => 0, true, true)).toBe(4_000);
+    expect(nextStartleDelay(() => 1, true, false)).toBe(14_000);
   });
 });
 

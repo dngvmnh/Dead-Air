@@ -1108,3 +1108,19 @@ the unlit plaster was the brightest thing on screen.
   second with a much harder hit. The one thing allowed in front of the set; it
   exists only while running and is never used over YouTube.
 - Hint: a note on the wall asks the viewer not to pick at the wallpaper.
+
+## Owner feedback: film too quiet, still too slow, jump gives itself away (2026-11-07)
+
+- Measured the clips: they ran from -19 dB to -33 dB, and the store film is silent
+  at source (-70 dB). All are now levelled to -18 LUFS when cut. The silent film
+  plays over the channel's bed instead.
+- Mix: effects sit at 0.4 under a new programme bus. Film and beds use that bus.
+- Jump picture: no tube apparition first and no zoom. The face is at full size on
+  its first frame, then two hard cuts closer with the mouth opening. Tube
+  apparitions became their own events (S08 to S11).
+- Jump sound: its own path past the programme limiter. Everything else cuts out
+  under it. A blow, a crack, a dissonant cluster and formant screams, driven hard
+  into a long reverb, then a low moan after the cut to black.
+- Pacing: first startle 6 to 12 s, later checks 10 to 22 s, jumps may repeat after
+  20 s, two channel changes bring one on, acts at 20 s, 1 min and 2 min, story gap
+  20 s.

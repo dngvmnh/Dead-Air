@@ -44,8 +44,8 @@ export interface EventOps {
   sfx(cue: SfxCue, gain: number, ms?: number): Promise<void>;
   /** Show a wrong picture on the tube for `ms`. */
   apparition(kind: 'anchor' | 'gourd' | 'operator' | 'deadair', text: string | undefined, ms: number): Promise<void>;
-  /** The figure fills the whole window for `ms`, from the tube or the last tear. */
-  jump(kind: 'anchor' | 'gourd' | 'operator' | 'deadair', ms: number, from: 'tube' | 'tear'): Promise<void>;
+  /** The figure is suddenly filling the whole window, for `ms`. */
+  jump(kind: 'anchor' | 'gourd' | 'operator' | 'deadair', ms: number): Promise<void>;
   /** Sink or restore the room's lights over `ms`. */
   roomLights(level: number, ms: number): Promise<void>;
   /** Something pale behind the viewer's tears for `ms`. */
@@ -106,7 +106,7 @@ function runStep(step: ResolvedStep, ops: EventOps): Promise<void> {
     case 'apparition':
       return ops.apparition(step.kind, step.text, step.ms);
     case 'jump':
-      return ops.jump(step.kind, step.ms, step.from ?? 'tube');
+      return ops.jump(step.kind, step.ms);
     case 'roomLights':
       return ops.roomLights(step.level, step.ms);
     case 'roomGlimpse':

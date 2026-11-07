@@ -7,17 +7,20 @@
 
 import type { EventStepInput, HorrorEventInput } from '../content/schema.ts';
 
-/** The first comes soon: long enough to settle, not long enough to wander off. */
-const FIRST_MS: readonly [number, number] = [12_000, 25_000];
+/** The first comes almost at once: the viewer has barely found the picture. */
+const FIRST_MS: readonly [number, number] = [6_000, 12_000];
 /** Near enough to keep the viewer on edge, uneven enough not to be predictable. */
-const LATER_MS: readonly [number, number] = [25_000, 60_000];
-const DEMO_FIRST_MS: readonly [number, number] = [8_000, 15_000];
-const DEMO_LATER_MS: readonly [number, number] = [15_000, 30_000];
+const LATER_MS: readonly [number, number] = [10_000, 22_000];
+const DEMO_FIRST_MS: readonly [number, number] = [4_000, 8_000];
+const DEMO_LATER_MS: readonly [number, number] = [6_000, 14_000];
 
 /** Channel-hopping this many times brings a startle forward. */
-export const SURF_TRIGGER = 3;
+export const SURF_TRIGGER = 2;
 /** A surfer's startle waits this long after landing, so it hits the new picture. */
-export const SURF_SETTLE_MS = 1500;
+export const SURF_SETTLE_MS = 700;
+
+/** A surfer cannot bring one on sooner than this after the last: two together spend each other. */
+export const SURF_MIN_GAP_MS = 8000;
 
 /** How long until the next startle check. */
 export function nextStartleDelay(random: () => number, demo: boolean, first: boolean): number {

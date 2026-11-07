@@ -18,7 +18,7 @@ import { DEMO_DIVISOR, effectiveAct, type ViewerMemory } from './memory.ts';
 import type { ChannelId, Item, Seam } from './types.ts';
 
 /** The global minimum gap between events (requirement 9.7), `chain` exempt. */
-export const GLOBAL_GAP_MS = 45_000;
+export const GLOBAL_GAP_MS = 20_000;
 
 export interface DecideInput {
   memory: ViewerMemory;

@@ -5,15 +5,16 @@
  * synthesised with the Web Audio API; no audio files are needed for them. The
  * graph is:
  *
- *   noise ─┐
- *   tuning ┼─► sfx bus ─┐
- *          │            ├─► master gain ─► limiter ─► destination
- *   (file/voice later) ─┘
+ *   noise, cues ─► sfx bus (well under the programme) ─┐
+ *   film, beds ──► programme bus ──────────────────────┴► master ─► limiter ─► out
+ *   jump hit ─► drive ─┬───────────► scare level ─► scare limiter ─► out
+ *                      └► reverb ──┘
  *
  * The AudioContext is created and resumed on the POWER gesture (browsers block
  * audio before a user gesture). Volume is a single 0..1 applied to the master
- * gain; mute forces it to zero. A limiter on the master bus keeps peaks in
- * check so stingers never exceed a safe level (safety-and-rights.md).
+ * gain; mute forces it to zero. The programme is the loudest thing on the set
+ * until a jump, which has its own path so it can be louder still: everything else
+ * cuts out under it, and its own limiter holds the peaks.
  *
  * This is the audio layer, not core, so it may use Web Audio. The AudioContext
  * is injectable so the graph wiring and gain/mute math can be unit-tested with
@@ -39,6 +40,14 @@ const LIMITER = {
   release: 0.12,
 };
 
+/** The television's own noises and cues, relative to the programme at 1. */
+export const SFX_LEVEL = 0.4;
+/** How long the programme takes to come back after a jump cuts it. */
+const DUCK_HOLD_S = 1.1;
+const DUCK_RELEASE_S = 0.7;
+/** How long a jump's room rings on for. */
+const REVERB_S = 3.5;
+
 export type ProgrammeBed = 'news' | 'kids' | 'shop' | 'deadair';
 
 interface BedPattern {
@@ -52,12 +61,12 @@ interface BedPattern {
   tick?: number;
 }
 
-/** Original, simple patterns. Quiet enough to sit under a voice. */
+/** Original, simple patterns. They are the programme here, so they sit above the effects. */
 const BEDS: Record<ProgrammeBed, BedPattern> = {
-  news: { stepMs: 260, wave: 'sine', notes: [147, 0, 0, 0, 175, 0, 0, 0], noteLevel: 0.05, pad: [73, 110], padEvery: 16, padLevel: 0.035, tick: 0.022 },
-  kids: { stepMs: 340, wave: 'triangle', notes: [523, 659, 784, 659, 587, 698, 880, 698], noteLevel: 0.065, padEvery: 8, padLevel: 0 },
-  shop: { stepMs: 420, wave: 'sine', notes: [392, 494, 587, 740, 659, 523, 440, 494], noteLevel: 0.06, pad: [98, 147], padEvery: 16, padLevel: 0.03 },
-  deadair: { stepMs: 1400, wave: 'sine', notes: [55, 0, 0, 52], noteLevel: 0.06, pad: [50], padEvery: 4, padLevel: 0.04 },
+  news: { stepMs: 260, wave: 'sine', notes: [147, 0, 0, 0, 175, 0, 0, 0], noteLevel: 0.24, pad: [73, 110], padEvery: 16, padLevel: 0.17, tick: 0.08 },
+  kids: { stepMs: 340, wave: 'triangle', notes: [523, 659, 784, 659, 587, 698, 880, 698], noteLevel: 0.3, padEvery: 8, padLevel: 0 },
+  shop: { stepMs: 420, wave: 'sine', notes: [392, 494, 587, 740, 659, 523, 440, 494], noteLevel: 0.28, pad: [98, 147], padEvery: 16, padLevel: 0.15 },
+  deadair: { stepMs: 1400, wave: 'sine', notes: [55, 0, 0, 52], noteLevel: 0.28, pad: [50], padEvery: 4, padLevel: 0.18 },
 };
 
 /** No single cue voice goes above this, whatever gain it is given. */
@@ -81,6 +90,9 @@ export class AudioEngine {
   // Persistent graph nodes (created on first unlock).
   private masterGain: GainNode | null = null;
   private sfxBus: GainNode | null = null;
+  private programmeBus: GainNode | null = null;
+  private scareBus: GainNode | null = null;
+  private scareLevel: GainNode | null = null;
   private staticGain: GainNode | null = null;
   private staticSource: AudioBufferSourceNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
@@ -140,16 +152,54 @@ export class AudioEngine {
     master.connect(limiter);
     limiter.connect(ctx.destination);
     // sfx ─► master ; static ─► sfx
+    sfx.gain.value = SFX_LEVEL;
     sfx.connect(master);
     staticGain.connect(sfx);
 
+    const programme = ctx.createGain();
+    programme.connect(master);
+
     this.masterGain = master;
     this.sfxBus = sfx;
+    this.programmeBus = programme;
     this.staticGain = staticGain;
     this.noiseBuffer = this.makeNoiseBuffer(ctx);
+    this.buildScarePath(ctx);
 
     this.applyMasterGain();
     this.startStaticSource(ctx);
+  }
+
+  /**
+   * A jump's own path. Drive pushes it far louder for the same peak, and a long
+   * dark room lets it ring on after the picture has gone.
+   */
+  private buildScarePath(ctx: AudioContext): void {
+    const bus = ctx.createGain();
+    const drive = ctx.createWaveShaper();
+    drive.curve = saturationCurve(10);
+    const reverb = ctx.createConvolver();
+    reverb.buffer = makeRoomImpulse(ctx);
+    const wet = ctx.createGain();
+    wet.gain.value = 0.55;
+    const level = ctx.createGain();
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -1;
+    limiter.knee.value = 0;
+    limiter.ratio.value = 20;
+    limiter.attack.value = 0.001;
+    limiter.release.value = 0.2;
+
+    bus.connect(drive);
+    drive.connect(level);
+    drive.connect(reverb);
+    reverb.connect(wet);
+    wet.connect(level);
+    level.connect(limiter);
+    limiter.connect(ctx.destination);
+
+    this.scareBus = bus;
+    this.scareLevel = level;
   }
 
   /** One second of looping white noise, reused for static and hiss. */
@@ -199,6 +249,11 @@ export class AudioEngine {
     const now = this.ctx.currentTime;
     g.cancelScheduledValues(now);
     g.setTargetAtTime(target, now, 0.02);
+    // A jump still answers to mute and the volume knob, but it stays loud at the
+    // quieter settings where a viewer has let their guard down.
+    const scare = this.scareLevel?.gain;
+    scare?.cancelScheduledValues(now);
+    scare?.setTargetAtTime(Math.sqrt(target), now, 0.02);
   }
 
   // --- Static (tuning snow / dead-air hiss) --------------------------------
@@ -323,13 +378,7 @@ export class AudioEngine {
         break;
       }
       case 'jumpHit': {
-        // The lunge: a body blow under a shriek that climbs. Through the limiter,
-        // which is what holds it at a level that startles rather than hurts.
-        this.cueTone('sine', 86, 30, 0.6 * g, 0, 0.004, 0.5);
-        for (const [from, to] of [[196, 760], [233, 905], [311, 1210], [415, 1620]] as const) {
-          this.cueTone('sawtooth', from, to, 0.17 * g, 0, 0.006, 0.8);
-        }
-        this.cueNoise('highpass', 1500, 0.6, 0.4 * g, 0, 0.004, 0.55);
+        this.playJumpHit(g);
         break;
       }
       case 'tapeStop': {
@@ -352,15 +401,15 @@ export class AudioEngine {
         break;
       }
       case 'breath': {
-        this.cueNoise('bandpass', 1050, 0.8, 0.1 * g, 0, 0.75, 1.1);
-        this.cueNoise('bandpass', 720, 0.9, 0.07 * g, 1.12, 0.5, 1.5);
+        this.cueNoise('bandpass', 1050, 0.8, 0.42 * g, 0, 0.75, 1.1);
+        this.cueNoise('bandpass', 720, 0.9, 0.3 * g, 1.12, 0.5, 1.5);
         break;
       }
       case 'whisper': {
         // Consonant-like bursts with no words in them: the listener supplies those.
         let t = 0;
         for (const [f, d] of [[3400, 0.11], [5200, 0.07], [2600, 0.14], [4700, 0.09], [3100, 0.17], [5600, 0.06], [2900, 0.2]] as const) {
-          this.cueNoise('bandpass', f, 5, 0.13 * g, t, 0.02, d);
+          this.cueNoise('bandpass', f, 5, 0.6 * g, t, 0.02, d);
           t += d + 0.05;
         }
         break;
@@ -386,8 +435,8 @@ export class AudioEngine {
         break;
       }
       case 'scrape': {
-        this.cueNoise('bandpass', 340, 1.4, 0.26 * g, 0, 0.2, 0.75, 1250);
-        this.cueNoise('bandpass', 1250, 1.4, 0.2 * g, 0.72, 0.1, 0.8, 300);
+        this.cueNoise('bandpass', 340, 1.4, 0.6 * g, 0, 0.2, 0.75, 1250);
+        this.cueNoise('bandpass', 1250, 1.4, 0.5 * g, 0.72, 0.1, 0.8, 300);
         break;
       }
       case 'drone': {
@@ -400,6 +449,90 @@ export class AudioEngine {
   }
 
   /**
+   * The jump: the whole set drops out, a body blow lands with a crack on top, and
+   * several throats scream over a cluster that has no chord in it. Then, once the
+   * picture has gone, something low moans on in the dark room.
+   */
+  private playJumpHit(g: number): void {
+    const out = this.scareBus;
+    if (!out) return;
+    this.duckEverythingElse();
+
+    this.cueTone('sine', 120, 26, 0.6 * g, 0, 0.002, 0.7, out);
+    this.cueNoise('highpass', 1100, 0.6, 0.6 * g, 0, 0.001, 0.3, undefined, out);
+    this.cueNoise('lowpass', 500, 0.7, 0.5 * g, 0, 0.002, 0.5, undefined, out);
+
+    // Semitone clashes, sagging together: nothing to resolve to.
+    for (const f of [185, 196, 277, 294, 415, 440, 622, 659]) {
+      this.cueTone('sawtooth', f, f * 0.94, 0.15 * g, 0, 0.003, 1.3, out);
+    }
+
+    // Vowels, not sirens: voices rise, crack and fall at slightly different times.
+    this.scream(520, 1180, 760, 0, 1.1, 0.45 * g, out);
+    this.scream(690, 1490, 900, 0.02, 1.25, 0.38 * g, out);
+    this.scream(410, 930, 470, 0.05, 1.5, 0.4 * g, out);
+
+    // After the cut to black, in the room that is left.
+    this.scream(165, 196, 92, 0.95, 3, 0.16 * g, out);
+    this.scream(174, 208, 98, 1.15, 2.8, 0.12 * g, out);
+    this.cueNoise('bandpass', 720, 0.9, 0.09 * g, 1.3, 0.5, 2.2, 240, out);
+  }
+
+  /** One throat: a saw with a shaking pitch, through vowel formants. */
+  private scream(fromHz: number, peakHz: number, toHz: number, start: number, dur: number, peak: number, out: AudioNode): void {
+    const ctx = this.ctx;
+    if (!ctx || peak <= 0) return;
+    const t = ctx.currentTime + start;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(fromHz, t);
+    osc.frequency.exponentialRampToValueAtTime(peakHz, t + dur * 0.22);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, toHz), t + dur);
+
+    const shake = ctx.createOscillator();
+    shake.frequency.value = 6.7;
+    const depth = ctx.createGain();
+    depth.gain.value = peakHz * 0.045;
+    shake.connect(depth);
+    depth.connect(osc.frequency);
+
+    const gain = ctx.createGain();
+    this.envelope(gain, peak, t, 0.012, dur);
+    for (const [hz, q, level] of [[800, 6, 1], [1250, 7, 0.75], [2800, 8, 0.4]] as const) {
+      const formant = ctx.createBiquadFilter();
+      formant.type = 'bandpass';
+      formant.frequency.value = hz;
+      formant.Q.value = q;
+      const amount = ctx.createGain();
+      amount.gain.value = level * 2.6;
+      osc.connect(formant);
+      formant.connect(amount);
+      amount.connect(gain);
+    }
+    gain.connect(out);
+    osc.start(t);
+    shake.start(t);
+    osc.stop(t + dur + 0.02);
+    shake.stop(t + dur + 0.02);
+    this.cues.push({ node: osc, until: t + dur + 0.02 }, { node: shake, until: t + dur + 0.02 });
+  }
+
+  /** Cut the programme and the set's noises dead, then let them creep back. */
+  private duckEverythingElse(): void {
+    const now = this.ctx?.currentTime ?? 0;
+    const buses: ReadonlyArray<readonly [GainNode | null, number]> = [
+      [this.programmeBus, 1],
+      [this.sfxBus, SFX_LEVEL],
+    ];
+    for (const [bus, level] of buses) {
+      if (!bus) continue;
+      bus.gain.cancelScheduledValues(now);
+      bus.gain.setValueAtTime(0.0001, now);
+      bus.gain.setTargetAtTime(level, now + DUCK_HOLD_S, DUCK_RELEASE_S / 3);
+    }
+  }
+
+  /**
    * The sound under a programme, so a channel is never dead air until it means to
    * be. `unease` (0..1) slowly detunes the bed as the story goes on.
    */
@@ -408,7 +541,8 @@ export class AudioEngine {
       clearInterval(this.bedTimer);
       this.bedTimer = null;
     }
-    if (!bed || !this.ctx || !this.sfxBus) return;
+    const out = this.programmeBus;
+    if (!bed || !this.ctx || !out) return;
     const pattern = BEDS[bed];
     const flat = 1 - Math.min(1, Math.max(0, unease)) * 0.05;
     let step = 0;
@@ -417,11 +551,11 @@ export class AudioEngine {
       const stepSeconds = pattern.stepMs / 1000;
       if (pattern.pad && step % pattern.padEvery === 0) {
         const hold = (pattern.padEvery * pattern.stepMs) / 1000 + 0.6;
-        for (const f of pattern.pad) this.cueTone('sine', f * flat, f * flat, pattern.padLevel, 0, 0.5, hold);
+        for (const f of pattern.pad) this.cueTone('sine', f * flat, f * flat, pattern.padLevel, 0, 0.5, hold, out);
       }
       const note = pattern.notes[step % pattern.notes.length];
-      if (note) this.cueTone(pattern.wave, note * flat, note * flat * 0.995, pattern.noteLevel, 0, 0.006, stepSeconds * 1.5);
-      if (pattern.tick && step % 2 === 0) this.cueNoise('highpass', 3800, 0.7, pattern.tick, 0, 0.002, 0.03);
+      if (note) this.cueTone(pattern.wave, note * flat, note * flat * 0.995, pattern.noteLevel, 0, 0.006, stepSeconds * 1.5, out);
+      if (pattern.tick && step % 2 === 0) this.cueNoise('highpass', 3800, 0.7, pattern.tick, 0, 0.002, 0.03, undefined, out);
       step += 1;
     };
     tick();
@@ -471,9 +605,10 @@ export class AudioEngine {
     start: number,
     attack: number,
     dur: number,
+    out: AudioNode | null = this.sfxBus,
   ): void {
     const ctx = this.ctx;
-    if (!ctx || !this.sfxBus || peak <= 0) return;
+    if (!ctx || !out || peak <= 0) return;
     const t = ctx.currentTime + start;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -482,7 +617,7 @@ export class AudioEngine {
     osc.frequency.exponentialRampToValueAtTime(Math.max(1, toHz), t + dur);
     this.envelope(gain, peak, t, attack, dur);
     osc.connect(gain);
-    gain.connect(this.sfxBus);
+    gain.connect(out);
     osc.start(t);
     osc.stop(t + dur + 0.02);
     this.cues.push({ node: osc, until: t + dur + 0.02 });
@@ -498,9 +633,10 @@ export class AudioEngine {
     attack: number,
     dur: number,
     toHz?: number,
+    out: AudioNode | null = this.sfxBus,
   ): void {
     const ctx = this.ctx;
-    if (!ctx || !this.sfxBus || !this.noiseBuffer || peak <= 0) return;
+    if (!ctx || !out || !this.noiseBuffer || peak <= 0) return;
     const t = ctx.currentTime + start;
     const src = ctx.createBufferSource();
     src.buffer = this.noiseBuffer;
@@ -514,7 +650,7 @@ export class AudioEngine {
     this.envelope(gain, peak, t, attack, dur);
     src.connect(filter);
     filter.connect(gain);
-    gain.connect(this.sfxBus);
+    gain.connect(out);
     src.start(t);
     src.stop(t + dur + 0.02);
     this.cues.push({ node: src, until: t + dur + 0.02 });
@@ -549,13 +685,13 @@ export class AudioEngine {
 
   /**
    * Build the analog filter chain for an owned file/voice source: a band-pass
-   * (roughly 200 Hz–8 kHz) with a little saturation, feeding the master bus
+   * (roughly 200 Hz–8 kHz) with a little saturation, feeding the programme bus
    * (design §11). Returns the input node callers connect their source to. The
    * chain itself is created here so Milestone-4 file playback can reuse it.
    */
   createAnalogChain(): AudioNode | null {
     const ctx = this.ctx;
-    if (!ctx || !this.masterGain) return null;
+    if (!ctx || !this.programmeBus) return null;
     const hp = ctx.createBiquadFilter();
     hp.type = 'highpass';
     hp.frequency.value = ANALOG_BAND.lowHz;
@@ -563,10 +699,10 @@ export class AudioEngine {
     lp.type = 'lowpass';
     lp.frequency.value = ANALOG_BAND.highHz;
     const shaper = ctx.createWaveShaper();
-    shaper.curve = saturationCurve();
+    shaper.curve = saturationCurve(1);
     hp.connect(lp);
     lp.connect(shaper);
-    shaper.connect(this.masterGain);
+    shaper.connect(this.programmeBus);
     return hp;
   }
 
@@ -591,6 +727,9 @@ export class AudioEngine {
     }
     this.masterGain = null;
     this.sfxBus = null;
+    this.programmeBus = null;
+    this.scareBus = null;
+    this.scareLevel = null;
     this.staticGain = null;
     this.noiseBuffer = null;
   }
@@ -601,11 +740,28 @@ function clamp01(x: number): number {
   return x < 0 ? 0 : x > 1 ? 1 : x;
 }
 
-/** A gentle odd saturation curve for the analog chain. */
-function saturationCurve(): Float32Array<ArrayBuffer> {
+/** A large dark room: decaying noise with its highs dying first. */
+function makeRoomImpulse(ctx: AudioContext): AudioBuffer {
+  const length = Math.max(1, Math.floor(ctx.sampleRate * REVERB_S));
+  const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
+  for (const channel of [0, 1]) {
+    const data = buffer.getChannelData(channel);
+    let low = 0;
+    for (let i = 0; i < length; i += 1) {
+      const age = i / length;
+      const raw = (Math.random() * 2 - 1) * (1 - age) ** 2.6;
+      // A one-pole low-pass that closes as the tail ages.
+      low += (raw - low) * (0.5 - 0.44 * age);
+      data[i] = low;
+    }
+  }
+  return buffer;
+}
+
+/** An odd saturation curve: `k` sets how hard, with small-signal gain 1 + k. */
+function saturationCurve(k: number): Float32Array<ArrayBuffer> {
   const n = 1024;
   const curve = new Float32Array(new ArrayBuffer(n * Float32Array.BYTES_PER_ELEMENT));
-  const k = 2;
   for (let i = 0; i < n; i += 1) {
     const x = (i / (n - 1)) * 2 - 1;
     curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
