@@ -12,6 +12,8 @@ copied from Tearable UI or any other reference (its licence is unknown).
 | Paper garland | `bakeRoom` | Procedural | original |
 | Candy bowl + candy (empties at objectVariant ≥ 2) | `bakeRoom` | Procedural | original |
 | Framed picture (tilts at objectVariant ≥ 1) | `bakeRoom` | Procedural | original |
+| Garland (comes down at objectVariant ≥ 3) | `bakeRoom` | Procedural | original |
+| Shadow figure on the wall, five steps | `figureShadow.ts` | Procedural | original |
 | Window onto darkness + faint moon | `bakeRoom` | Procedural | original |
 | Wall clock showing the viewer's real local time | `bakeRoom` | Procedural; hands from injected local hour/minute | original |
 | Plaster, lath, cracks and damp | `bakeBehindPlaster` | Procedural | original |

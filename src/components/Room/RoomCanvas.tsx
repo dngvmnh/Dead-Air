@@ -19,6 +19,8 @@ import { bakeRoom } from '../../render/roomWallpaper.ts';
 import { bakeBehindLayer, bakeGlimpse } from '../../render/behindRenderer.ts';
 import { wraithImage } from '../../render/wraithField.ts';
 import { paintRepairs } from '../../render/repairPainter.ts';
+import { paintFigure } from '../../render/figureShadow.ts';
+import type { StoredStroke } from '../../core/memory.ts';
 import type { AudioEngine } from '../../audio/AudioEngine.ts';
 import type { RoomState } from '../../core/roomState.ts';
 import type { BehindView } from '../../core/behindState.ts';
@@ -69,6 +71,8 @@ interface RoomSeam {
   /** The room's scripted light level and how visible the glimpse is, 0..1. */
   level: () => number;
   glimpseAmount: () => number;
+  figureStep: () => number;
+  objectVariant: () => number;
 }
 
 const IDLE_CORNER_RADIUS = 0.12; // fraction of the sheet near the top-right corner
@@ -129,10 +133,9 @@ export function RoomCanvas({
     let behindLayer: ReturnType<typeof bakeBehindLayer>;
     try {
       // Bake the full room (wallpaper + objects + wall clock at the real local
-      // time) and the plaster behind. objectVariant comes from the derived room
-      // state (task 8 moves it during unobserved moments).
-      const variant = getRoomStateRef.current(reducedRef.current, now0.getHours(), now0.getMinutes()).objectVariant;
-      front = bakeRoom(now0.getHours(), now0.getMinutes(), variant);
+      // time) and the plaster behind. Memory has not loaded yet, so `syncLook`
+      // settles the objects and figure on the first frame.
+      front = bakeRoom(now0.getHours(), now0.getMinutes(), 0);
       wallCanvas = front.canvas;
       behindView = getBehindViewRef.current(now0.getHours(), now0.getMinutes());
       behindLayer = bakeBehindLayer(behindView, reducedRef.current);
@@ -156,6 +159,40 @@ export function RoomCanvas({
     let strokeCount = 0;
     let repairedCount = 0;
     let appliedEpoch = -1;
+    let mended: StoredStroke[] = [];
+    // What is painted on the wall right now.
+    let figureStep = 0;
+    let objectVariant = 0;
+    let clockMinute = now0.getHours() * 60 + now0.getMinutes();
+
+    // The wall as drawn: the baked room, then mended tears, then the figure's
+    // shadow, because a shadow falls on the repairs as well.
+    const composeWall = (): void => {
+      const repaired = mended.length > 0 ? paintRepairs(front.canvas, mended) : front.canvas;
+      wallCanvas = paintFigure(repaired, figureStep);
+      gl?.setFrontTexture(wallCanvas);
+    };
+
+    // Catch the wall up with memory, and keep the clock on it telling the real time
+    // (requirement 5.1). The objects and figure only ever differ here because the
+    // orchestrator moved them during an unobserved moment.
+    const syncLook = (): boolean => {
+      const d = new Date();
+      const rs = getRoomStateRef.current(reducedRef.current, d.getHours(), d.getMinutes());
+      const minute = d.getHours() * 60 + d.getMinutes();
+      const rebake = rs.objectVariant !== objectVariant || minute !== clockMinute;
+      if (!rebake && rs.figureStep === figureStep) return false;
+      figureStep = rs.figureStep;
+      objectVariant = rs.objectVariant;
+      clockMinute = minute;
+      try {
+        if (rebake) front = bakeRoom(d.getHours(), d.getMinutes(), objectVariant);
+        composeWall();
+      } catch {
+        return false;
+      }
+      return true;
+    };
 
     // Active-frame counter: the loop steps/renders only while > 0 or a drag is
     // live; otherwise it idles cheaply. `wake` re-arms it after any interaction.
@@ -254,6 +291,9 @@ export function RoomCanvas({
         gl?.setGlimpse(bakeGlimpse(strokeMid.x, strokeMid.y));
         glimpseUntil = performance.now() + ms;
       },
+      syncLook: () => {
+        if (syncLook()) draw(performance.now());
+      },
     };
     registerRoomRef.current?.(effects);
     const stepEffects = (now: number, dt: number): boolean => {
@@ -339,9 +379,9 @@ export function RoomCanvas({
         shape.x = strokeMid.x;
         shape.y = strokeMid.y;
       }
-      wallCanvas = tears.mended.length > 0 ? paintRepairs(front.canvas, tears.mended) : front.canvas;
+      mended = tears.mended;
+      composeWall();
       gl?.setSheet(sheet);
-      gl?.setFrontTexture(wallCanvas);
       wake();
       return true;
     };
@@ -555,6 +595,7 @@ export function RoomCanvas({
         lastBehindAt = now;
         changedBehind = syncBehind();
         syncTears();
+        if (syncLook()) changedBehind = true;
       }
       if (busy) {
         if (activeFrames > 0) activeFrames -= 1;
@@ -599,6 +640,8 @@ export function RoomCanvas({
         behind: () => ({ act: behindView.act, tally: behindView.tally, lines: behindView.lines }),
         level: () => levelNow,
         glimpseAmount: () => glimpseNow,
+        figureStep: () => figureStep,
+        objectVariant: () => objectVariant,
       };
     }
 

@@ -1148,3 +1148,16 @@ the unlit plaster was the brightest thing on screen.
   yellowed tape, one piece of wallpaper in the wrong place. Which are mended is settled
   once at load, so nothing heals in front of the viewer. This session's tears stay open.
 - Forget me now mends the wall on the spot as well as erasing the memory.
+
+## Task 8: Figure and objects (2026-11-07)
+
+- A soft shadow figure on the wall, five steps, each taller and nearer the set. It is
+  painted onto a copy of the wall, so it falls on the objects and tears with the paper.
+- Memory stores the step and object variant. They follow act and session count one step
+  per unobserved moment: a tune (the lights dip over the change, unless reduced motion is
+  on), power off, coming back to a hidden tab, a jump scare, a scripted blackout.
+- A reload moves nothing. Hidden-tab moves happen on the way back, because a reload hides
+  the tab too; a test caught that.
+- Objects: frame tilts, bowl empties, garland comes down.
+- Found while here: the wall clock was baked once at load and then stayed wrong. The wall
+  now rebakes when the minute changes (requirement 5.1).

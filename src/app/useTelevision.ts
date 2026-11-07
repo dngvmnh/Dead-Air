@@ -118,7 +118,8 @@ export interface WallTears {
 export interface RoomEffects {
   setLevel: (level: number, ms: number) => void;
   glimpse: (ms: number) => void;
-  /** Where the viewer last tore, as viewport fractions. */
+  /** Bring the wall up to date with memory now, rather than on the next tick. */
+  syncLook: () => void;
 }
 
 
@@ -131,6 +132,13 @@ const DEFAULT_SETTINGS: UiSettings = {
   muted: false,
   reducedEffects: false,
 };
+
+/** A scripted room this dark counts as nobody being able to see it. */
+const BLACKOUT_LEVEL = 0.1;
+/** How far the lights sink, and how fast, to cover something moving during a tune. */
+const UNOBSERVED_DIP_LEVEL = 0.2;
+const UNOBSERVED_DIP_MS = 120;
+const UNOBSERVED_RESTORE_MS = 500;
 
 /** The faint resting snow level on air, restored after every event step (Fix 1). */
 const RESTING_STATIC = 0.08;
@@ -291,6 +299,45 @@ export function useTelevision(): TelevisionApi {
   const fireStartleRef = useRef<(seam: 'startle' | 'tear', forcedId?: string) => string | null>(() => null);
   const tearRandomRef = useRef<() => number>(Math.random);
   const tearsRef = useRef(0);
+  const dipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /**
+   * Nobody is looking (requirements 5.5, 5.6), so the figure and objects may come
+   * one step nearer, if they have anywhere to go. Stored at once, so a reload
+   * cannot move them again. Dark moments move them on the spot; a tune still shows
+   * the room, so `dip` sinks the lights over the change. A viewer who asked for less
+   * motion gets no flicker, and the change just happens during the static.
+   */
+  const unobservedMoment = useCallback(
+    (dip: boolean) => {
+      if (dipTimerRef.current !== null) return;
+      const before = memoryRef.current;
+      const after = memoryReducer(before, { type: 'unobserved' }, demo);
+      if (
+        after.room.figureStep === before.room.figureStep &&
+        after.room.objectVariant === before.room.objectVariant
+      ) {
+        return;
+      }
+      const move = (): void => {
+        const next = memoryReducer(memoryRef.current, { type: 'unobserved' }, demo);
+        memoryRef.current = next;
+        getStore().flush(next);
+        roomEffectsRef.current?.syncLook();
+      };
+      if (!dip || prefersReducedMotion() || !roomEffectsRef.current) {
+        move();
+        return;
+      }
+      roomEffectsRef.current.setLevel(UNOBSERVED_DIP_LEVEL, UNOBSERVED_DIP_MS);
+      dipTimerRef.current = setTimeout(() => {
+        dipTimerRef.current = null;
+        move();
+        roomEffectsRef.current?.setLevel(1, UNOBSERVED_RESTORE_MS);
+      }, UNOBSERVED_DIP_MS + 20);
+    },
+    [demo, getStore],
+  );
 
   /**
    * Ask the director whether an event fires at `seam` on the current channel.
@@ -456,11 +503,16 @@ export function useTelevision(): TelevisionApi {
             await wait(ms);
             return;
           }
-          await playJump({ kind, ms });
+          // The whole window is covered, so this is as unobserved as it gets. The
+          // viewer looks back at a room that is not quite the same.
+          const shown = playJump({ kind, ms });
+          unobservedMoment(false);
+          await shown;
         },
         roomLights: async (level, ms) => {
           roomEffectsRef.current?.setLevel(level, ms);
           await wait(ms);
+          if (level <= BLACKOUT_LEVEL) unobservedMoment(false);
         },
         roomGlimpse: async (ms) => {
           roomEffectsRef.current?.glimpse(ms);
@@ -469,7 +521,7 @@ export function useTelevision(): TelevisionApi {
         cancelled: () => eventCancelRef.current,
       };
     },
-    [getPresenter],
+    [getPresenter, unobservedMoment],
   );
 
   // Resolve an event's step templates against real memory (requirement 9.5),
@@ -1033,6 +1085,7 @@ export function useTelevision(): TelevisionApi {
             // Tuning click + full static snow while acquiring the station.
             audioRef.current?.playTuningClick();
             audioRef.current?.setStatic(1);
+            unobservedMoment(true);
             const token = effect.token;
             const tuneChannel = effect.channel;
             tuneTimer.current = setTimeout(() => {
@@ -1097,6 +1150,7 @@ export function useTelevision(): TelevisionApi {
             audioRef.current?.playPowerOff();
             void audioRef.current?.suspend();
             setAnnouncement('Television off');
+            unobservedMoment(false);
             break;
           }
           case 'stopAll': {
@@ -1213,6 +1267,7 @@ export function useTelevision(): TelevisionApi {
       resolveSteps,
       flushWatch,
       restoreRoom,
+      unobservedMoment,
     ],
   );
 
@@ -1243,6 +1298,7 @@ export function useTelevision(): TelevisionApi {
   useEffect(() => {
     return () => {
       stopPlayback();
+      if (dipTimerRef.current !== null) clearTimeout(dipTimerRef.current);
       if (signOffTimerRef.current !== null) {
         clearTimeout(signOffTimerRef.current);
         signOffTimerRef.current = null;
@@ -1310,9 +1366,17 @@ export function useTelevision(): TelevisionApi {
     const TICK_MS = 1000;
     watchTimer.current = setInterval(() => flushWatch(), TICK_MS);
 
+    let tabWasHidden = false;
     const onVisibility = (): void => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      if (typeof document === 'undefined') return;
+      if (document.visibilityState === 'hidden') {
         store.flush(memoryRef.current);
+        tabWasHidden = true;
+      } else if (tabWasHidden) {
+        // On the way back, not on the way out: a reload hides the tab too, and a
+        // reload must not move anything.
+        tabWasHidden = false;
+        unobservedMoment(false);
       }
     };
     if (typeof document !== 'undefined') {
@@ -1326,7 +1390,7 @@ export function useTelevision(): TelevisionApi {
       }
       store.flush(memoryRef.current);
     };
-  }, [demo, getStore, flushWatch]);
+  }, [demo, getStore, flushWatch, unobservedMoment]);
 
   const power = useCallback(() => send({ type: 'POWER' }), [send]);
   const channelUp = useCallback(() => send({ type: 'CHANNEL_UP' }), [send]);

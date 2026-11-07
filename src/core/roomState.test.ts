@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deriveRoom, type RoomInput } from './roomState.ts';
-import { createMemory, type ViewerMemory } from './memory.ts';
+import { advanceRoomLook, deriveRoom, figureStepFor, objectVariantFor, type RoomInput } from './roomState.ts';
+import { createMemory, memoryReducer, type ViewerMemory } from './memory.ts';
 import type { TvPhase } from './tvMachine.ts';
 
 /**
@@ -75,5 +75,44 @@ describe('deriveRoom', () => {
   it('is pure: same input gives the same state', () => {
     const i = input({ memory: atAct(2) });
     expect(deriveRoom(i)).toEqual(deriveRoom(i));
+  });
+});
+
+describe('the figure and the objects (requirements 5.5, 5.6)', () => {
+  const at = (act: number, sessionCount: number, figureStep = 0, objectVariant = 0): ViewerMemory => {
+    const m = createMemory(0);
+    return { ...m, act: act as ViewerMemory['act'], sessionCount, room: { ...m.room, figureStep, objectVariant } };
+  };
+
+  it('shows what is stored, not where it is heading', () => {
+    const s = deriveRoom(input({ memory: at(3, 2, 1, 1) }));
+    expect(s.figureStep).toBe(1);
+    expect(s.objectVariant).toBe(1);
+  });
+
+  it('is absent in Act 0, appears from Act 1, and comes closer by act and session', () => {
+    expect(figureStepFor(at(0, 1))).toBe(0);
+    expect(figureStepFor(at(1, 1))).toBe(1);
+    expect(figureStepFor(at(2, 1))).toBeLessThan(figureStepFor(at(2, 2)));
+    expect(figureStepFor(at(4, 3))).toBe(5);
+  });
+
+  it('heads for more objects moved as the story goes on', () => {
+    expect([at(0, 1), at(1, 1), at(2, 2), at(3, 2)].map(objectVariantFor)).toEqual([0, 1, 2, 3]);
+  });
+
+  it('moves one step per unobserved moment, and stops where it is heading', () => {
+    let m = at(2, 2);
+    const seen: number[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      m = memoryReducer(m, { type: 'unobserved' }, false);
+      seen.push(m.room.figureStep);
+    }
+    expect(seen).toEqual([1, 2, 3, 3, 3]);
+    expect(m.room.objectVariant).toBe(2);
+  });
+
+  it('never goes back', () => {
+    expect(advanceRoomLook(at(1, 1, 4, 3))).toEqual({ figureStep: 4, objectVariant: 3 });
   });
 });

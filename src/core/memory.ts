@@ -9,6 +9,7 @@
  * (requirement 8.1).
  */
 
+import { advanceRoomLook } from './roomState.ts';
 import { CHANNEL_CYCLE, type ChannelId } from './types.ts';
 
 export type Act = 0 | 1 | 2 | 3 | 4;
@@ -186,6 +187,7 @@ export type MemoryAction =
   | { type: 'touch'; atMs: number }
   | { type: 'setSettings'; settings: Partial<ViewerMemory['settings']> }
   | { type: 'addStroke'; seed: number; points: ReadonlyArray<readonly [number, number]> }
+  | { type: 'unobserved' }
   | { type: 'ackNotice' };
 
 /**
@@ -253,6 +255,8 @@ function applyAction(mem: ViewerMemory, action: MemoryAction): ViewerMemory {
       const stroke: StoredStroke = { seed: action.seed, session: mem.sessionCount, points: thinPoints(action.points) };
       return { ...mem, room: { ...mem.room, strokes: [...mem.room.strokes, stroke].slice(-STROKE_CAP) } };
     }
+    case 'unobserved':
+      return { ...mem, room: { ...mem.room, ...advanceRoomLook(mem) } };
   }
 }
 

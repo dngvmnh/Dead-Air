@@ -129,7 +129,7 @@ export function bakeWallpaper(w = 1024, h = 768): BakedTexture {
  * real local time. Original procedural art. These are baked onto the tearable
  * paper so the whole room rips as one sheet (the world is paper, design/product
  * principle 7). `objectVariant` moves one object (design §5): 1 tilts the frame,
- * 2 empties the bowl.
+ * 2 empties the bowl, 3 brings the garland down on the right.
  */
 export function bakeRoom(
   localHour: number,
@@ -190,11 +190,29 @@ export function bakeRoom(
   ctx.strokeStyle = 'rgba(0,0,0,0.4)';
   ctx.lineWidth = 2;
   const gy = h * 0.06;
+  // Down at variant 3: from here on the string has come away and hangs off the wall.
+  const garlandEnd = objectVariant >= 3 ? w * 0.68 : w;
   ctx.beginPath();
   ctx.moveTo(0, gy);
-  for (let x = 0; x <= w; x += 60) ctx.quadraticCurveTo(x + 30, gy + 22, x + 60, gy);
+  for (let x = 0; x < garlandEnd; x += 60) ctx.quadraticCurveTo(x + 30, gy + 22, x + 60, gy);
   ctx.stroke();
-  for (let x = 20; x < w; x += 60) {
+  if (objectVariant >= 3) {
+    const flags = [[0.86, 0.3], [0.885, 0.41], [0.872, 0.53], [0.9, 0.6]] as const;
+    ctx.beginPath();
+    ctx.moveTo(garlandEnd, gy);
+    ctx.bezierCurveTo(w * 0.82, h * 0.1, w * 0.9, h * 0.34, w * 0.88, h * 0.62);
+    ctx.stroke();
+    flags.forEach(([fx, fy], i) => {
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(255,123,0,0.5)' : 'rgba(106,13,173,0.5)';
+      ctx.beginPath();
+      ctx.moveTo(w * fx - 8, h * fy);
+      ctx.lineTo(w * fx + 8, h * fy + 3);
+      ctx.lineTo(w * fx + 3, h * fy + 23);
+      ctx.closePath();
+      ctx.fill();
+    });
+  }
+  for (let x = 20; x < garlandEnd; x += 60) {
     ctx.fillStyle = (x / 60) % 2 === 0 ? 'rgba(255,123,0,0.5)' : 'rgba(106,13,173,0.5)';
     ctx.beginPath();
     ctx.moveTo(x, gy + 12);

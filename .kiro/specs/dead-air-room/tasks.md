@@ -58,7 +58,7 @@ Tick a task only when the behaviour has been seen in a real browser, not because
   - [x] 7.1 Add schema version 2 and migration, with tests.
   - [x] 7.2 Store and rebuild strokes. Show repaired tears. Forget me erases everything.
   - _Requirements: 4.1–4.4_
-- [ ] 8. Figure and objects, moving only in unobserved moments, with tests.
+- [x] 8. Figure and objects, moving only in unobserved moments, with tests.
   - _Requirements: 5.5, 5.6_
 - [ ] 9. Tube tear
   - [ ] 9.1 Add the tear pass to `CrtRenderer`, and Renderer API with no-op fallback.

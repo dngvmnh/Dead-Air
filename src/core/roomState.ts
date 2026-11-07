@@ -4,9 +4,9 @@
  * local time are passed in. The renderer turns this into light and objects.
  *
  * Only the DERIVATION lives here. Sampling the picture colour (≤ 8 Hz) and
- * smoothing it over ~400 ms, and gating figure/object moves to unobserved
- * moments, are the renderer/orchestrator's job (tasks 4.2 wiring and 8); this
- * function is a pure function of the smoothed colour it is handed.
+ * smoothing it over ~400 ms are the renderer's job. The figure and objects shown
+ * are the ones stored in memory, which only move when the orchestrator reports an
+ * unobserved moment ({@link advanceRoomLook}).
  */
 
 import type { ViewerMemory } from './memory.ts';
@@ -46,9 +46,9 @@ function clampAct(act: number): number {
 }
 
 /**
- * The shadow-figure step implied by act and session count (design §5). Derived
- * here so the room has a figure now; task 8 stores the applied step in memory
- * and only advances it during an unobserved moment, so a reload cannot move it.
+ * The step the shadow figure is heading for, given act and session count (design
+ * §5). What the viewer sees is the step stored in memory, which follows this one
+ * step at a time during unobserved moments, so a reload cannot move it.
  */
 export function figureStepFor(memory: ViewerMemory): number {
   const act = clampAct(memory.act);
@@ -60,15 +60,28 @@ export function figureStepFor(memory: ViewerMemory): number {
 }
 
 /**
- * Which room object has moved (design §5): one variant, derived and stable
- * within a visit. Task 8 advances it only during an unobserved moment.
+ * How far the room's objects are heading (design §5): 1 tilts the frame, 2 empties
+ * the bowl, 3 brings the garland down. Stored and advanced like the figure.
  */
 export function objectVariantFor(memory: ViewerMemory): number {
   const act = clampAct(memory.act);
-  // One object moves from Act 1 onward; a second from Act 3.
-  if (act >= 3) return 2;
+  const returning = memory.sessionCount >= 2;
+  if (act >= 4 || (act >= 3 && returning)) return 3;
+  if (act >= 3 || (act >= 2 && returning)) return 2;
   if (act >= 1) return 1;
   return 0;
+}
+
+/**
+ * One unobserved moment: the figure and the objects each come one step nearer to
+ * where they are heading. Never backwards, because what has moved stays moved.
+ */
+export function advanceRoomLook(memory: ViewerMemory): { figureStep: number; objectVariant: number } {
+  const { figureStep, objectVariant } = memory.room;
+  return {
+    figureStep: figureStepFor(memory) > figureStep ? figureStep + 1 : figureStep,
+    objectVariant: objectVariantFor(memory) > objectVariant ? objectVariant + 1 : objectVariant,
+  };
 }
 
 export function deriveRoom(input: RoomInput): RoomState {
@@ -99,8 +112,8 @@ export function deriveRoom(input: RoomInput): RoomState {
   return {
     ambient,
     tvLight,
-    figureStep: figureStepFor(memory),
-    objectVariant: objectVariantFor(memory),
+    figureStep: memory.room.figureStep,
+    objectVariant: memory.room.objectVariant,
     repairVisible,
   };
 }
