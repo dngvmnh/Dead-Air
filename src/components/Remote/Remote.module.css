@@ -4,9 +4,14 @@
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-4) var(--space-6);
-  background: var(--chassis-plastic-dark);
-  border-radius: var(--radius-panel);
-  border: 1px solid var(--chassis-seam);
+  /* A dented iron plate. */
+  background:
+    radial-gradient(ellipse 50% 30% at 90% 96%, rgba(120, 58, 18, 0.34), transparent),
+    radial-gradient(ellipse 34% 22% at 4% 8%, rgba(120, 58, 18, 0.26), transparent),
+    linear-gradient(172deg, #16110c, #0d0a06);
+  border-radius: 3px 8px 4px 9px;
+  border: 1px solid #060403;
+  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.85);
 }
 
 .group {
@@ -20,9 +25,14 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
-  background: #0c0b0a;
-  border-radius: 4px;
-  border: 1px solid var(--chassis-seam);
+  /* Cracked display glass. */
+  background:
+    linear-gradient(118deg, transparent 47%, rgba(190, 190, 170, 0.2) 47.6%, transparent 48.4%),
+    linear-gradient(64deg, transparent 71%, rgba(190, 190, 170, 0.14) 71.5%, transparent 72.2%),
+    #060504;
+  border-radius: 2px;
+  border: 1px solid #000;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.95);
 }
 
 .powerLed {
@@ -69,10 +79,17 @@
   font-family: var(--font-chassis);
   font-size: 0.8rem;
   letter-spacing: 0.08em;
-  color: var(--chassis-text);
-  background: var(--chassis-plastic-light);
-  border: 1px solid var(--chassis-seam);
-  border-radius: 6px;
+  color: #e0d3b8;
+  /* Bakelite with the shine worn off, grubby where it has been pressed. */
+  background:
+    radial-gradient(ellipse 58% 48% at 48% 58%, rgba(124, 98, 66, 0.28), transparent),
+    linear-gradient(170deg, #3a2c1d, #1c140c);
+  border: 1px solid #050403;
+  border-radius: 5px 3px 6px 4px;
+  box-shadow:
+    inset 0 1px 0 rgba(168, 136, 96, 0.22),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.6),
+    0 2px 2px rgba(0, 0, 0, 0.75);
   padding: var(--space-3) var(--space-4);
   min-width: 44px;
   min-height: 44px;
@@ -83,7 +100,7 @@
    background of a lit control while its dark label stays. Lit controls set their
    own hover below. */
 .button:where(:hover:not(:disabled)) {
-  background: var(--chassis-plastic);
+  background: linear-gradient(170deg, #48382a, #281d12);
 }
 
 .button:active:not(:disabled) {
@@ -96,43 +113,58 @@
 }
 
 .power {
-  background: #3a1a14;
+  background: linear-gradient(170deg, #40190f, #200b06);
   color: var(--led-amber);
 }
 
 .power:hover:not(:disabled) {
-  background: #4c241b;
+  background: linear-gradient(170deg, #55231a, #2c100a);
 }
 
+/* A dirty lamp behind the button, not a bright flat panel. */
 .power[data-on='true'] {
-  background: var(--led-on);
-  color: #1a0603;
+  background:
+    radial-gradient(ellipse 62% 70% at 50% 54%, #e8622e, #93300f 72%, #4f1907) #c4561f;
+  color: #120502;
+  font-weight: 700;
+  box-shadow:
+    inset 0 0 8px rgba(0, 0, 0, 0.55),
+    0 0 12px rgba(214, 84, 30, 0.45);
 }
 
 .power[data-on='true']:hover:not(:disabled) {
-  background: #ff7458;
+  background: radial-gradient(ellipse 62% 70% at 50% 54%, #f47b3f, #a43a14 72%, #5a1e09) #d6622a;
 }
 
 .toggle[aria-pressed='true'] {
-  background: var(--led-amber);
-  color: #1a0603;
+  background: radial-gradient(ellipse 62% 70% at 50% 54%, #dba03f, #8d5e1a 78%, #4c300c) #c48f38;
+  color: #120a02;
+  font-weight: 700;
+  box-shadow:
+    inset 0 0 8px rgba(0, 0, 0, 0.5),
+    0 0 8px rgba(214, 150, 50, 0.32);
 }
 
 .toggle[aria-pressed='true']:hover:not(:disabled) {
-  background: #ffc266;
+  background: radial-gradient(ellipse 62% 70% at 50% 54%, #edb350, #9c6a20 78%, #55360e) #d69f45;
 }
 
+/* Labels on strips of old masking tape, written by whoever gave up on this set. */
 .label {
   font-family: var(--font-chassis);
   font-size: var(--font-size-label);
+  font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--chassis-label);
+  color: #1a140b;
+  background: linear-gradient(95deg, #a59872, #8a7c58 60%, #9a8c66);
+  padding: 0 var(--space-1);
+  transform: rotate(-1.4deg);
 }
 
 .volume {
   width: 120px;
-  accent-color: var(--led-on);
+  accent-color: #b84a1c;
 }
 
 @media (min-width: 769px) {
@@ -166,8 +198,10 @@
   }
 
   .label {
-    width: 100%;
+    width: fit-content;
     margin-bottom: calc(-1 * var(--space-1));
+    flex-basis: 100%;
+    max-width: fit-content;
   }
 
   .volume {

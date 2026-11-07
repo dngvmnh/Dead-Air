@@ -49,10 +49,6 @@ function recorder(fail?: { scene?: boolean; voice?: boolean }): Recorder {
       calls.push(`sfx:${cue}:${gain}:${ms ?? 0}`);
       return Promise.resolve();
     },
-    apparition: (kind, text, ms) => {
-      calls.push(`apparition:${kind}:${text ?? ''}:${ms}`);
-      return Promise.resolve();
-    },
     jump: (kind, ms) => {
       calls.push(`jump:${kind}:${ms}`);
       return Promise.resolve();
@@ -123,7 +119,6 @@ describe('runEventSteps', () => {
     await runEventSteps(
       [
         { do: 'sfx', cue: 'stinger' },
-        { do: 'apparition', kind: 'gourd', ms: 1800, text: 'JUST ONE.' },
         { do: 'jump', kind: 'gourd', ms: 600 },
         { do: 'roomLights', level: 0.4, ms: 300 },
         { do: 'roomGlimpse', ms: 900 },
@@ -133,7 +128,6 @@ describe('runEventSteps', () => {
     );
     expect(ops.calls).toEqual([
       'sfx:stinger:1:0',
-      'apparition:gourd:JUST ONE.:1800',
       'jump:gourd:600',
       'lights:0.4:300',
       'glimpse:900',

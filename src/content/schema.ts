@@ -214,10 +214,39 @@ export const sceneProgramSchema = z
 
 export const seamSchema = z.enum(['tune-in', 'item-boundary', 'mid-item', 'startle', 'tear']);
 
+/** What can fill the window in a jump (see `render/jumpScare.ts`). */
+export const jumpKindSchema = z.enum([
+  'anchor',
+  'gourd',
+  'operator',
+  'deadair',
+  'hands',
+  'eye',
+  'maw',
+  'doll',
+  'crowd',
+  'snow',
+  'pumpkin',
+  'spider',
+  'skull',
+  'claws',
+]);
+export type JumpKind = z.infer<typeof jumpKindSchema>;
+
 /** Procedural sounds an event can play (see `AudioEngine.playCue`). */
 export const sfxCueSchema = z.enum([
   'stinger',
   'jumpHit',
+  'jumpHands',
+  'jumpEye',
+  'jumpMaw',
+  'jumpDoll',
+  'jumpCrowd',
+  'jumpSnow',
+  'jumpPumpkin',
+  'jumpSpider',
+  'jumpSkull',
+  'jumpClaws',
   'tapeStop',
   'heartbeat',
   'knock',
@@ -316,21 +345,11 @@ export const eventStepSchema = z.discriminatedUnion('do', [
       ms: z.number().int().positive().optional(),
     })
     .strict(),
-  // A few seconds of a wrong picture on the tube.
-  z
-    .object({
-      do: z.literal('apparition'),
-      kind: z.enum(['anchor', 'gourd', 'operator', 'deadair']),
-      ms: z.number().int().positive(),
-      text: z.string().min(1).optional(),
-      fallbackText: z.string().optional(),
-    })
-    .strict(),
-  // The figure comes out of the picture and fills the whole window for `ms`.
+  // Something is suddenly filling the whole window, for `ms`.
   z
     .object({
       do: z.literal('jump'),
-      kind: z.enum(['anchor', 'gourd', 'operator', 'deadair']),
+      kind: jumpKindSchema,
       ms: z.number().int().positive().max(1200),
     })
     .strict(),

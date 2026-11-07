@@ -18,7 +18,7 @@ describe('nextStartleDelay', () => {
 describe('keepsProgramme', () => {
   it('lets a jump play over the programme, but not a picture step', () => {
     expect(keepsProgramme({ steps: [{ do: 'jump', kind: 'anchor', ms: 600 }] })).toBe(true);
-    expect(keepsProgramme({ steps: [{ do: 'apparition', kind: 'anchor', ms: 600 }] })).toBe(false);
+    expect(keepsProgramme({ steps: [{ do: 'static', ms: 600 }] })).toBe(false);
     expect(isRoomOnly({ steps: [{ do: 'jump', kind: 'anchor', ms: 600 }] })).toBe(false);
   });
 });
@@ -37,7 +37,7 @@ describe('eventLengthMs', () => {
         steps: [
           { do: 'sfx', cue: 'stinger' },
           { do: 'sfx', cue: 'toyPiano', ms: 1000 },
-          { do: 'apparition', kind: 'gourd', ms: 2000 },
+          { do: 'static', ms: 2000 },
           { do: 'voice', caption: 'hello' },
         ],
       }),

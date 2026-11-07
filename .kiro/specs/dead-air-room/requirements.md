@@ -153,8 +153,8 @@ Short, frequent scares that keep the viewer on edge and then return to normal. T
 4. Startles SHALL NOT use or reset the story events' global gap, so they cannot delay the sign-off path.
 5. The first tear of a session SHALL answer. About 60 percent of later tears MAY answer, subject to the same limits.
 6. Channel change and power off SHALL stop a running startle, cut its sounds and restore the room's lights.
-7. A jump SHALL rise in brightness once and cut to black once. It SHALL NOT strobe, go full-field white or use saturated red, and startles stay within the three-flashes-per-second limit. Every cue SHALL pass through a limiter, and none imitates a real alert tone. Apparitions imply and SHALL NOT show gore or real people.
-10. A jump SHALL arrive with no warning: nothing on the tube leads into it, and its face SHALL fill the window from its first visible frame, with hard cuts and no zoom. Tube apparitions SHALL be events of their own.
+7. A jump SHALL rise in brightness once and cut to black once. It SHALL NOT strobe, go full-field white or use saturated red, and startles stay within the three-flashes-per-second limit. Every cue SHALL pass through a limiter, and none imitates a real alert tone. Scares imply and SHALL NOT show gore or real people.
+10. A jump SHALL arrive with no warning: nothing on the tube leads into it, and it SHALL fill the window from its first visible frame, with hard cuts and no zoom. No scare SHALL appear on the tube first. There SHALL be at least ten kinds besides the face, each with its own picture and sound.
 11. The programme SHALL be louder than the set's own noises and cues. A jump SHALL be louder than the programme, SHALL cut the programme and those noises while it sounds, and SHALL still obey mute and the volume control.
-8. Reduced effects SHALL halve startle sound levels, hold figures still and remove the full-window picture. The first-run notice SHALL warn of jump scares.
+8. The system's reduced-motion setting SHALL halve startle sound levels and remove the full-window picture. The set has no button of its own for this, at the owner's request (2026-11-07). The first-run notice SHALL warn of jump scares.
 9. The room SHALL carry an in-world hint that the wall can be torn. It SHALL NOT become a tutorial or an objective.

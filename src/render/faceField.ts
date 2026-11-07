@@ -8,7 +8,9 @@
  * and the luminance cap keeps it from ever being a white flash (requirement 11.7).
  */
 
-import type { ApparitionKind } from './apparition.ts';
+import { bump, fbm, smooth } from './fieldMath.ts';
+
+export type FaceKind = 'anchor' | 'gourd' | 'operator' | 'deadair';
 
 interface FaceStyle {
   mouth: { y: number; rx: number; ry: number };
@@ -18,7 +20,7 @@ interface FaceStyle {
   ribs: boolean;
 }
 
-const STYLES: Record<ApparitionKind, FaceStyle> = {
+const STYLES: Record<FaceKind, FaceStyle> = {
   anchor: { mouth: { y: 0.6, rx: 0.19, ry: 0.36 }, tint: [0.93, 0.95, 0.86], gain: 1, ribs: false },
   gourd: { mouth: { y: 0.52, rx: 0.42, ry: 0.2 }, tint: [1, 0.62, 0.3], gain: 1.05, ribs: true },
   operator: { mouth: { y: 0.46, rx: 0.5, ry: 0.09 }, tint: [0.78, 0.86, 0.92], gain: 0.85, ribs: false },
@@ -27,36 +29,6 @@ const STYLES: Record<ApparitionKind, FaceStyle> = {
 
 /** Bright enough to read, never close to a white field. */
 export const FACE_MAX_LUMINANCE = 0.82;
-
-function smooth(edge0: number, edge1: number, v: number): number {
-  const c = Math.min(1, Math.max(0, (v - edge0) / (edge1 - edge0)));
-  return c * c * (3 - 2 * c);
-}
-
-function bump(dx: number, dy: number, rx: number, ry: number): number {
-  return Math.exp(-((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry)));
-}
-
-function hash(x: number, y: number): number {
-  const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-  return s - Math.floor(s);
-}
-
-function noise(x: number, y: number): number {
-  const ix = Math.floor(x);
-  const iy = Math.floor(y);
-  const fx = x - ix;
-  const fy = y - iy;
-  const ux = fx * fx * (3 - 2 * fx);
-  const uy = fy * fy * (3 - 2 * fy);
-  const top = hash(ix, iy) + (hash(ix + 1, iy) - hash(ix, iy)) * ux;
-  const bottom = hash(ix, iy + 1) + (hash(ix + 1, iy + 1) - hash(ix, iy + 1)) * ux;
-  return top + (bottom - top) * uy;
-}
-
-function fbm(x: number, y: number): number {
-  return noise(x, y) * 0.55 + noise(x * 2.1, y * 2.1) * 0.3 + noise(x * 4.3, y * 4.3) * 0.15;
-}
 
 /** One eye: a dark socket, then a too-wide pale eye with a pinprick pupil. */
 function eye(l: number, dx: number, dy: number, rx: number, ry: number): number {
@@ -71,7 +43,7 @@ function eye(l: number, dx: number, dy: number, rx: number, ry: number): number 
  * Luminance of the face at (x, y), both -1..1 with y down. 0 is off the head. Pure,
  * so the shape can be tested and baked once per kind.
  */
-export function faceLuminance(kind: ApparitionKind, x: number, y: number, screaming = false): number {
+export function faceLuminance(kind: FaceKind, x: number, y: number, screaming = false): number {
   const style = STYLES[kind];
   const d = Math.hypot(x / 0.8, (y - 0.02) / 1);
   if (d >= 1) return 0;
@@ -119,47 +91,22 @@ export function faceLuminance(kind: ApparitionKind, x: number, y: number, scream
   return Math.min(FACE_MAX_LUMINANCE, out);
 }
 
-const BAKE_SIZE = 420;
-const baked = new Map<string, HTMLCanvasElement>();
-
-/** The baked face, transparent off the head. Null where there is no canvas. */
-export function faceImage(kind: ApparitionKind, screaming = false): HTMLCanvasElement | null {
-  const key = `${kind}:${screaming}`;
-  const existing = baked.get(key);
-  if (existing) return existing;
-  if (typeof document === 'undefined') return null;
-  const canvas = document.createElement('canvas');
-  canvas.width = BAKE_SIZE;
-  canvas.height = BAKE_SIZE;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  const image = ctx.createImageData(BAKE_SIZE, BAKE_SIZE);
+/** RGBA for a `size` square of this face, transparent off the head. Pure, for a worker. */
+export function facePixels(kind: FaceKind, screaming: boolean, size: number): Uint8ClampedArray<ArrayBuffer> {
+  const data = new Uint8ClampedArray(new ArrayBuffer(size * size * 4));
   const [tr, tg, tb] = STYLES[kind].tint;
-  for (let py = 0; py < BAKE_SIZE; py += 1) {
-    for (let px = 0; px < BAKE_SIZE; px += 1) {
-      const x = (px / (BAKE_SIZE - 1)) * 2 - 1;
-      const y = (py / (BAKE_SIZE - 1)) * 2 - 1;
+  for (let py = 0; py < size; py += 1) {
+    for (let px = 0; px < size; px += 1) {
+      const x = (px / (size - 1)) * 2 - 1;
+      const y = (py / (size - 1)) * 2 - 1;
       const l = faceLuminance(kind, x, y, screaming) * 255;
-      const i = (py * BAKE_SIZE + px) * 4;
-      image.data[i] = l * tr;
-      image.data[i + 1] = l * tg;
-      image.data[i + 2] = l * tb;
+      const i = (py * size + px) * 4;
+      data[i] = l * tr;
+      data[i + 1] = l * tg;
+      data[i + 2] = l * tb;
       // The edge dissolves into whatever is behind it: an outline would read as a mask.
-      image.data[i + 3] = 255 * smooth(1, 0.8, Math.hypot(x / 0.8, (y - 0.02) / 1));
+      data[i + 3] = 255 * smooth(1, 0.8, Math.hypot(x / 0.8, (y - 0.02) / 1));
     }
   }
-  ctx.putImageData(image, 0, 0);
-  baked.set(key, canvas);
-  return canvas;
-}
-
-/** Bake every face a jump can use, one per tick, so none is baked on the beat. */
-export function preloadFaces(): void {
-  const kinds: ApparitionKind[] = ['anchor', 'gourd', 'operator', 'deadair'];
-  const queue = kinds.flatMap((kind) => [() => faceImage(kind), () => faceImage(kind, true)]);
-  const next = (): void => {
-    queue.shift()?.();
-    if (queue.length > 0) setTimeout(next, 60);
-  };
-  next();
+  return data;
 }

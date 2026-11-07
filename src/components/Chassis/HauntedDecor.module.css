@@ -1,0 +1,89 @@
+/*
+ * Everything here hangs on the outside of the cabinet. Nothing reaches the tube:
+ * the top and bottom items sit past the bezel, and none of it takes a click.
+ */
+
+.decor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.decor svg {
+  position: absolute;
+  overflow: visible;
+}
+
+.aerials {
+  width: 230px;
+  left: 44%;
+  top: -96px;
+}
+
+.pumpkin {
+  width: 118px;
+  right: 34px;
+  top: -86px;
+  filter: drop-shadow(0 0 16px rgba(240, 130, 30, 0.42));
+}
+
+.candles {
+  width: 66px;
+  left: 76px;
+  top: -70px;
+  filter: drop-shadow(0 0 12px rgba(244, 169, 60, 0.45));
+}
+
+.fingers {
+  width: 104px;
+  left: 28%;
+  top: -40px;
+}
+
+.webLeft {
+  width: 190px;
+  left: -62px;
+  top: -46px;
+}
+
+.webRight {
+  width: 170px;
+  right: -44px;
+  bottom: -36px;
+}
+
+.flame {
+  transform-origin: 50% 100%;
+  animation: guttering 2.3s steps(9) infinite;
+}
+
+@keyframes guttering {
+  0%, 100% { opacity: 1; }
+  22% { opacity: 0.86; }
+  31% { opacity: 0.95; }
+  58% { opacity: 0.8; }
+  71% { opacity: 0.97; }
+  88% { opacity: 0.88; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flame {
+    animation: none;
+  }
+}
+
+/* The stack on a phone has no room above it, and the set is at the top. */
+@media (max-width: 768px) {
+  .aerials,
+  .pumpkin,
+  .candles,
+  .fingers {
+    display: none;
+  }
+
+  .webLeft,
+  .webRight {
+    width: 70px;
+  }
+}

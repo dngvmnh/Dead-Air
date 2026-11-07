@@ -2,22 +2,14 @@ import { useState } from 'react';
 import styles from './RearPanel.module.css';
 
 /**
- * The set's rear panel (task 3.3): accessibility and privacy controls.
- *   - Reduced Effects disables flashes, roll and jitter (requirement 13.2).
- *   - Forget me erases viewer memory (requirement 7.6). A confirm step avoids
- *     an accidental wipe.
+ * The set's rear panel: Forget me erases viewer memory (requirement 7.6). A
+ * confirm step avoids an accidental wipe.
  */
 export interface RearPanelProps {
-  reducedEffects: boolean;
-  onToggleReducedEffects: () => void;
   onForgetMe: () => void;
 }
 
-export function RearPanel({
-  reducedEffects,
-  onToggleReducedEffects,
-  onForgetMe,
-}: RearPanelProps) {
+export function RearPanel({ onForgetMe }: RearPanelProps) {
   const [confirming, setConfirming] = useState(false);
 
   function handleForget(): void {
@@ -32,15 +24,6 @@ export function RearPanel({
   return (
     <div className={styles.panel} role="group" aria-label="Rear panel">
       <span className={styles.title}>Rear panel</span>
-
-      <button
-        type="button"
-        className={styles.button}
-        aria-pressed={reducedEffects}
-        onClick={onToggleReducedEffects}
-      >
-        Reduced effects
-      </button>
 
       <button
         type="button"

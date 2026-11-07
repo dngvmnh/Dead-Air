@@ -1124,3 +1124,15 @@ the unlit plaster was the brightest thing on screen.
 - Pacing: first startle 6 to 12 s, later checks 10 to 22 s, jumps may repeat after
   20 s, two channel changes bring one on, acts at 20 s, 1 min and 2 min, story gap
   20 s.
+
+## Owner feedback: faces on the tube, one kind of scare, new-looking set (2026-11-07)
+
+- Tube apparitions are removed. Every jump is a full-window cut from its first frame.
+- Ten new jump kinds (J01 to J10) with their own art, cuts and sound. Art is baked on
+  a worker, because shading one image took up to about a second on the main thread.
+- The first scare of a session is always a jump: room scares now wait for act 1.
+- Reduced effects button removed. The system reduced-motion setting still applies.
+- App volume defaults to 100%. A web page cannot set the device volume.
+- Cabinet rebuilt: rotted veneer, tar, gouges, rusted bezel, worn buttons, taped labels,
+  cobwebs, candles, pumpkin, bent aerials, fingers over the top. Nothing paints on the tube.
+- The Act 3 shape behind the wall is now a shaded wraith that twitches.

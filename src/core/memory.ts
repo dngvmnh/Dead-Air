@@ -70,7 +70,7 @@ export function createMemory(nowMs: number): ViewerMemory {
     // Captions default ON until real recorded voice exists (task 21): event
     // voice lines have no audio yet, so their caption is their only output
     // (requirement 13.3). The viewer can turn CC off.
-    settings: { volume: 0.7, muted: false, captions: true, reducedEffects: false },
+    settings: { volume: 1, muted: false, captions: true, reducedEffects: false },
   };
 }
 

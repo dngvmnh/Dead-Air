@@ -103,7 +103,7 @@ export class AudioEngine {
   private cues: Array<{ node: AudioScheduledSourceNode; until: number }> = [];
 
   // Volume state (applied to the master gain).
-  private volume01 = 0.7;
+  private volume01 = 1;
   private muted = false;
 
   constructor(options: AudioEngineOptions = {}) {
@@ -377,10 +377,39 @@ export class AudioEngine {
         this.cueNoise('highpass', 900, 0.7, 0.26 * g, 0, 0.008, 0.45);
         break;
       }
-      case 'jumpHit': {
+      case 'jumpHit':
         this.playJumpHit(g);
         break;
-      }
+      case 'jumpHands':
+        this.playJumpHands(g);
+        break;
+      case 'jumpEye':
+        this.playJumpEye(g);
+        break;
+      case 'jumpMaw':
+        this.playJumpMaw(g);
+        break;
+      case 'jumpDoll':
+        this.playJumpDoll(g);
+        break;
+      case 'jumpCrowd':
+        this.playJumpCrowd(g);
+        break;
+      case 'jumpSnow':
+        this.playJumpSnow(g);
+        break;
+      case 'jumpPumpkin':
+        this.playJumpPumpkin(g);
+        break;
+      case 'jumpSpider':
+        this.playJumpSpider(g);
+        break;
+      case 'jumpSkull':
+        this.playJumpSkull(g);
+        break;
+      case 'jumpClaws':
+        this.playJumpClaws(g);
+        break;
       case 'tapeStop': {
         this.cueTone('sawtooth', 440, 28, 0.2 * g, 0, 0.01, 0.75);
         this.cueTone('sine', 220, 22, 0.2 * g, 0, 0.01, 0.75);
@@ -454,28 +483,178 @@ export class AudioEngine {
    * picture has gone, something low moans on in the dark room.
    */
   private playJumpHit(g: number): void {
-    const out = this.scareBus;
+    const out = this.beginJump();
     if (!out) return;
-    this.duckEverythingElse();
-
-    this.cueTone('sine', 120, 26, 0.6 * g, 0, 0.002, 0.7, out);
-    this.cueNoise('highpass', 1100, 0.6, 0.6 * g, 0, 0.001, 0.3, undefined, out);
-    this.cueNoise('lowpass', 500, 0.7, 0.5 * g, 0, 0.002, 0.5, undefined, out);
-
+    this.blow(g, out);
     // Semitone clashes, sagging together: nothing to resolve to.
-    for (const f of [185, 196, 277, 294, 415, 440, 622, 659]) {
-      this.cueTone('sawtooth', f, f * 0.94, 0.15 * g, 0, 0.003, 1.3, out);
-    }
-
+    this.cluster(g, out);
     // Vowels, not sirens: voices rise, crack and fall at slightly different times.
     this.scream(520, 1180, 760, 0, 1.1, 0.45 * g, out);
     this.scream(690, 1490, 900, 0.02, 1.25, 0.38 * g, out);
     this.scream(410, 930, 470, 0.05, 1.5, 0.4 * g, out);
+    this.moan(g, out);
+  }
 
-    // After the cut to black, in the room that is left.
+  /** Cut everything else and hand back the scare path. */
+  private beginJump(): GainNode | null {
+    if (!this.scareBus) return null;
+    this.duckEverythingElse();
+    return this.scareBus;
+  }
+
+  /** The body blow with a crack on top, which every jump opens with. */
+  private blow(g: number, out: AudioNode): void {
+    this.cueTone('sine', 120, 26, 0.6 * g, 0, 0.002, 0.7, out);
+    this.cueNoise('highpass', 1100, 0.6, 0.6 * g, 0, 0.001, 0.3, undefined, out);
+    this.cueNoise('lowpass', 500, 0.7, 0.5 * g, 0, 0.002, 0.5, undefined, out);
+  }
+
+  private cluster(g: number, out: AudioNode): void {
+    for (const f of [185, 196, 277, 294, 415, 440, 622, 659]) {
+      this.cueTone('sawtooth', f, f * 0.94, 0.15 * g, 0, 0.003, 1.3, out);
+    }
+  }
+
+  /** After the cut to black, in the room that is left. */
+  private moan(g: number, out: AudioNode): void {
     this.scream(165, 196, 92, 0.95, 3, 0.16 * g, out);
     this.scream(174, 208, 98, 1.15, 2.8, 0.12 * g, out);
     this.cueNoise('bandpass', 720, 0.9, 0.09 * g, 1.3, 0.5, 2.2, 240, out);
+  }
+
+  /** Palms hitting the glass, faster than anyone has hands for. */
+  private playJumpHands(g: number): void {
+    const out = this.beginJump();
+    if (!out) return;
+    this.blow(g * 0.7, out);
+    for (const t of [0, 0.1, 0.17, 0.3, 0.36, 0.5, 0.56, 0.61, 0.74]) {
+      this.cueTone('sine', 150, 48, 0.6 * g, t, 0.001, 0.16, out);
+      this.cueNoise('bandpass', 900, 0.8, 0.6 * g, t, 0.001, 0.09, undefined, out);
+    }
+    this.scream(330, 640, 300, 0.05, 1.1, 0.26 * g, out);
+    this.moan(g, out);
+  }
+
+  /** A ringing that grows until it is inside your head, and one thin voice. */
+  private playJumpEye(g: number): void {
+    const out = this.beginJump();
+    if (!out) return;
+    this.blow(g, out);
+    for (const f of [3120, 3187, 4410]) this.cueTone('sine', f, f * 1.02, 0.28 * g, 0, 0.02, 1.4, out);
+    for (const t of [0, 0.42]) this.cueTone('sine', 58, 42, 0.6 * g, t, 0.01, 0.34, out);
+    this.scream(900, 1760, 1280, 0.02, 1.2, 0.34 * g, out);
+    this.moan(g, out);
+  }
+
+  /** Something very large breathing out, then the teeth meeting. */
+  private playJumpMaw(g: number): void {
+    const out = this.beginJump();
+    if (!out) return;
+    this.blow(g, out);
+    for (const f of [52, 55, 61, 73, 110]) this.cueTone('sawtooth', f, f * 1.45, 0.34 * g, 0, 0.01, 0.9, out);
+    this.cueNoise('bandpass', 260, 0.9, 0.6 * g, 0, 0.01, 0.95, 1200, out);
+    this.scream(120, 300, 90, 0, 1.2, 0.5 * g, out);
+    // The bite.
+    this.cueNoise('highpass', 1800, 0.7, 0.6 * g, 0.62, 0.001, 0.08, undefined, out);
+    this.cueTone('sine', 180, 40, 0.6 * g, 0.62, 0.001, 0.22, out);
+    this.moan(g, out);
+  }
+
+  /** A music box that has gone wrong, and a very small voice laughing. */
+  private playJumpDoll(g: number): void {
+    const out = this.beginJump();
+    if (!out) return;
+    this.blow(g * 0.8, out);
+    let t = 0;
+    for (const f of [1568, 1661, 1319, 1397, 988, 1047, 784]) {
+      this.cueTone('triangle', f, f * 0.97, 0.3 * g, t, 0.002, 0.3, out);
+      this.cueTone('sine', f * 3.03, f * 3, 0.1 * g, t, 0.001, 0.1, out);
+      t += 0.075;
+    }
+    for (const at of [0.06, 0.2, 0.33, 0.46, 0.62, 0.8]) this.scream(980, 1320, 1040, at, 0.14, 0.42 * g, out);
+    this.scream(1180, 1860, 1400, 0.72, 0.7, 0.3 * g, out);
+    this.moan(g * 0.8, out);
+  }
+
+  /** Everyone at once, none of them in time. */
+  private playJumpCrowd(g: number): void {
+    const out = this.beginJump();
+    if (!out) return;
+    this.blow(g * 0.8, out);
+    for (let i = 0; i < 9; i += 1) {
+      const base = 240 + i * 83;
+      this.scream(base, base * (1.7 + (i % 3) * 0.2), base * 0.8, i * 0.018, 1 + (i % 4) * 0.13, 0.17 * g, out);
+    }
+    this.moan(g, out);
+  }
+
+  /** Static turned all the way up, and something shouting from inside it. */
+  private playJumpSnow(g: number): void {
+    const out = this.beginJump();
+    if (!out) return;
+    this.blow(g * 0.7, out);
+    this.cueNoise('highpass', 400, 0.5, 0.6 * g, 0, 0.001, 0.86, undefined, out);
+    this.cueNoise('bandpass', 2400, 1.4, 0.6 * g, 0, 0.001, 0.86, 700, out);
+    this.scream(240, 520, 180, 0, 0.9, 0.5 * g, out);
+    this.scream(190, 410, 140, 0.03, 0.9, 0.5 * g, out);
+    this.moan(g, out);
+  }
+
+  /** A deep laugh from inside something hollow, over a fire. */
+  private playJumpPumpkin(g: number): void {
+    const out = this.beginJump();
+    if (!out) return;
+    this.blow(g, out);
+    for (const [at, from] of [[0.02, 150], [0.24, 138], [0.46, 124], [0.7, 108], [0.96, 92]] as const) {
+      this.scream(from, from * 1.2, from * 0.85, at, 0.2, 0.6 * g, out);
+      this.scream(from * 1.5, from * 1.8, from * 1.3, at, 0.2, 0.3 * g, out);
+    }
+    for (let i = 0; i < 16; i += 1) {
+      this.cueNoise('bandpass', 1800 + (i * 910) % 2600, 2, 0.34 * g, (i * 0.097) % 1.3, 0.001, 0.025, undefined, out);
+    }
+    this.moan(g * 0.7, out);
+  }
+
+  /** Dry legs on glass, very quick, and a hiss. */
+  private playJumpSpider(g: number): void {
+    const out = this.beginJump();
+    if (!out) return;
+    this.blow(g * 0.8, out);
+    let t = 0;
+    for (let i = 0; i < 26; i += 1) {
+      this.cueNoise('bandpass', 2600 + (i % 5) * 620, 4, 0.6 * g, t, 0.001, 0.02, undefined, out);
+      t += 0.026 + ((i * 37) % 11) * 0.003;
+    }
+    this.cueNoise('highpass', 3000, 0.7, 0.42 * g, 0.02, 0.02, 1, undefined, out);
+    this.scream(560, 1040, 620, 0.04, 0.9, 0.3 * g, out);
+    this.moan(g * 0.8, out);
+  }
+
+  /** Bones knocking together, and a voice that falls a long way. */
+  private playJumpSkull(g: number): void {
+    const out = this.beginJump();
+    if (!out) return;
+    this.blow(g, out);
+    let t = 0.02;
+    for (let i = 0; i < 12; i += 1) {
+      this.cueNoise('bandpass', 1500 + (i % 3) * 700, 6, 0.6 * g, t, 0.001, 0.035, undefined, out);
+      this.cueTone('triangle', 540 + (i % 4) * 90, 300, 0.2 * g, t, 0.001, 0.04, out);
+      t += 0.05 + ((i * 53) % 7) * 0.008;
+    }
+    this.scream(860, 1100, 110, 0, 1.6, 0.5 * g, out);
+    this.scream(640, 830, 90, 0.04, 1.7, 0.4 * g, out);
+    this.moan(g * 0.8, out);
+  }
+
+  /** The wall ripping in four strokes, and metal being dragged through it. */
+  private playJumpClaws(g: number): void {
+    const out = this.beginJump();
+    if (!out) return;
+    this.blow(g * 0.8, out);
+    for (const t of [0, 0.13, 0.28, 0.43]) this.cueNoise('bandpass', 700, 0.9, 0.6 * g, t, 0.002, 0.2, 5200, out);
+    for (const f of [2310, 2445, 3140]) this.cueTone('sawtooth', f, f * 1.2, 0.12 * g, 0.02, 0.01, 0.95, out);
+    this.scream(610, 1240, 720, 0.03, 1, 0.34 * g, out);
+    this.moan(g, out);
   }
 
   /** One throat: a saw with a shaking pitch, through vowel formants. */

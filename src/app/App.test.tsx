@@ -61,7 +61,7 @@ describe('App chassis and controls', () => {
     );
   });
 
-  it('toggles mute, captions and reduced effects via accessible controls', async () => {
+  it('toggles captions via an accessible control, and offers no reduced effects button', async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole('button', { name: /i understand/i }));
@@ -75,9 +75,7 @@ describe('App chassis and controls', () => {
     await user.click(cc);
     expect(cc).toHaveAttribute('aria-pressed', 'true');
 
-    const reduced = screen.getByRole('button', { name: /reduced effects/i });
-    await user.click(reduced);
-    expect(reduced).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: /reduced effects/i })).toBeNull();
   });
 
   it('requires a confirm tap before Forget me erases', async () => {

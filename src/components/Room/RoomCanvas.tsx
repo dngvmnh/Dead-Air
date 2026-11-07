@@ -16,6 +16,7 @@ import {
 import { TearGLRenderer } from '../../render/tearRenderer.ts';
 import { bakeRoom } from '../../render/roomWallpaper.ts';
 import { bakeBehindLayer, bakeGlimpse } from '../../render/behindRenderer.ts';
+import { wraithImage } from '../../render/wraithField.ts';
 import type { AudioEngine } from '../../audio/AudioEngine.ts';
 import type { RoomState } from '../../core/roomState.ts';
 import type { BehindView } from '../../core/behindState.ts';
@@ -167,8 +168,9 @@ export function RoomCanvas({
       return true;
     };
 
-    // Act 3: a shape in the dark, turning towards the pointer with a long delay.
-    // It starts behind the viewer's own tear and drifts, so it never jumps.
+    // Act 3: something in the dark, leaning towards the pointer with a long delay.
+    // It starts behind the viewer's own tear and drifts, except that now and then it
+    // jerks, the way nothing that size should.
     const strokeMid = { x: 0.08, y: 0.5 };
     const pointer = { x: 0.5, y: 0.5 };
     const shape = { x: 0.08, y: 0.5 };
@@ -177,6 +179,8 @@ export function RoomCanvas({
     // a twelfth of the fill on a wall that may be torn for the rest of the session.
     const SHAPE_REDRAW_MS = 200;
     let lastShapeDraw = 0;
+    let figureReady = false;
+    let nextTwitchAt = 0;
     const updateShape = (dt: number): void => {
       const on = behindView.act === 3 && strokeCount > 0;
       if (!on) {
@@ -188,7 +192,18 @@ export function RoomCanvas({
         shape.x += (strokeMid.x + (pointer.x - strokeMid.x) * 0.1 - shape.x) * k;
         shape.y += (strokeMid.y + (pointer.y - strokeMid.y) * 0.1 - shape.y) * k;
       }
-      gl?.setShape(shape.x, shape.y, 1);
+      if (!figureReady) {
+        figureReady = true;
+        const figure = wraithImage();
+        if (figure) gl?.setFigure(figure);
+      }
+      let twitch = 0;
+      const now = performance.now();
+      if (!reducedRef.current && now >= nextTwitchAt) {
+        twitch = (Math.random() - 0.5) * 0.035;
+        nextTwitchAt = now + 2500 + Math.random() * 4000;
+      }
+      gl?.setShape(shape.x + twitch, shape.y, 1);
     };
 
     // The lights sinking and the glimpse (requirement 11). Both ease, so neither

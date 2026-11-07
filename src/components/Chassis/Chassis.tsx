@@ -3,6 +3,7 @@ import styles from './Chassis.module.css';
 import { Screen } from '../Screen/Screen.tsx';
 import { Remote } from '../Remote/Remote.tsx';
 import { RearPanel } from './RearPanel.tsx';
+import { HauntedDecor } from './HauntedDecor.tsx';
 import { channelLabel } from '../../core/channels.ts';
 import { type TelevisionApi } from '../../app/useTelevision.ts';
 
@@ -21,6 +22,7 @@ export function Chassis({ tv, powerRef }: ChassisProps) {
 
   return (
     <div className={styles.chassis}>
+      <HauntedDecor />
       <div className={styles.bezel}>
         <Screen
           phase={tv.state.phase}
@@ -44,11 +46,7 @@ export function Chassis({ tv, powerRef }: ChassisProps) {
         onToggleCaptions={tv.toggleCaptions}
       />
 
-      <RearPanel
-        reducedEffects={tv.settings.reducedEffects}
-        onToggleReducedEffects={tv.toggleReducedEffects}
-        onForgetMe={tv.forgetMe}
-      />
+      <RearPanel onForgetMe={tv.forgetMe} />
     </div>
   );
 }

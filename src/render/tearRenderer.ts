@@ -120,6 +120,7 @@ precision highp float;
 uniform sampler2D uBehind;
 uniform sampler2D uEmissive;
 uniform sampler2D uGlimpse;
+uniform sampler2D uFigure;
 uniform sampler2D uMask;
 uniform vec2 uRes;
 uniform float uHoleFloor;   // light left in the middle of a hole, 0..1
@@ -163,12 +164,12 @@ void main() {
   col = min(col, vec3(0.42));
 
   if (uShapeAmt > 0.0) {
-    // Head and shoulders, far back. Added after the hole floor, which would
-    // otherwise hide it, and only ever a shade above the dark around it.
-    vec2 p = (uv - uShapePos) * vec2(uRes.x / uRes.y, 1.0);
-    float head = 1.0 - smoothstep(0.05, 0.085, length(p - vec2(0.0, -0.09)));
-    float body = 1.0 - smoothstep(0.1, 0.19, length(p * vec2(0.8, 1.6) - vec2(0.0, 0.1)));
-    col += vec3(0.075, 0.07, 0.066) * max(head, body) * uShapeAmt * (0.5 + 0.5 * uLevel);
+    // It stands in the dark at about the height of the window. Added after the
+    // hole floor, which would otherwise hide it.
+    vec2 p = (uv - uShapePos - vec2(0.0, 0.2)) * vec2(uRes.x / uRes.y, 1.0) / 1.15 + 0.5;
+    if (p.x > 0.0 && p.x < 1.0 && p.y > 0.0 && p.y < 1.0) {
+      col += texture(uFigure, p).rgb * 0.42 * uShapeAmt * (0.6 + 0.4 * uLevel);
+    }
   }
 
   // Things behind the wall that give their own light.
@@ -275,6 +276,7 @@ interface Gpu {
   behindTex: WebGLTexture;
   emissiveTex: WebGLTexture;
   glimpseTex: WebGLTexture;
+  figureTex: WebGLTexture;
   maskTex: [WebGLTexture, WebGLTexture];
   maskFbo: [WebGLFramebuffer, WebGLFramebuffer];
 }
@@ -305,6 +307,7 @@ export class TearGLRenderer {
   private behindSrc: TexImageSource | null = null;
   private emissiveSrc: TexImageSource | null = null;
   private glimpseSrc: TexImageSource | null = null;
+  private figureSrc: TexImageSource | null = null;
   /** All triangles as node-index triples (static), and their 3 edge-constraint ids. */
   private triangles: Int32Array = new Int32Array(0);
   private triEdges: Int32Array = new Int32Array(0);
@@ -345,6 +348,7 @@ export class TearGLRenderer {
     if (this.behindSrc) this.uploadTex(this.gpu.behindTex, this.behindSrc);
     if (this.emissiveSrc) this.uploadTex(this.gpu.emissiveTex, this.emissiveSrc);
     if (this.glimpseSrc) this.uploadTex(this.gpu.glimpseTex, this.glimpseSrc);
+    if (this.figureSrc) this.uploadTex(this.gpu.figureTex, this.figureSrc);
     if (this.sheet) this.setSheet(this.sheet);
   };
 
@@ -372,6 +376,7 @@ export class TearGLRenderer {
       behindTex: this.makeTex([40, 36, 30, 255]),
       emissiveTex: this.makeTex([0, 0, 0, 255]),
       glimpseTex: this.makeTex([0, 0, 0, 255]),
+      figureTex: this.makeTex([0, 0, 0, 255]),
       maskTex,
       maskFbo,
     };
@@ -528,6 +533,12 @@ export class TearGLRenderer {
     this.shape = [x, y, amount];
   }
 
+  /** Upload what stands in the dark. */
+  setFigure(src: TexImageSource): void {
+    this.figureSrc = src;
+    this.uploadTex(this.gpu.figureTex, src);
+  }
+
   /** Upload what can be glimpsed through a tear. */
   setGlimpse(src: TexImageSource): void {
     this.glimpseSrc = src;
@@ -584,13 +595,14 @@ export class TearGLRenderer {
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    const { behind, paper, emptyVao, vao, behindTex, emissiveTex, glimpseTex, frontTex, maskTex } = this.gpu;
+    const { behind, paper, emptyVao, vao, behindTex, emissiveTex, glimpseTex, figureTex, frontTex, maskTex } = this.gpu;
     gl.useProgram(behind);
     gl.bindVertexArray(emptyVao);
     this.bindTexture(behind, 'uBehind', 0, behindTex);
     this.bindTexture(behind, 'uEmissive', 1, emissiveTex);
     this.bindTexture(behind, 'uGlimpse', 2, glimpseTex);
     this.bindTexture(behind, 'uMask', 3, maskTex[0]);
+    this.bindTexture(behind, 'uFigure', 4, figureTex);
     this.bindLight(behind);
     gl.uniform1f(gl.getUniformLocation(behind, 'uHoleFloor'), this.holeFloor);
     gl.uniform1f(gl.getUniformLocation(behind, 'uMaskOn'), this.holeMask ? 1 : 0);
@@ -720,7 +732,7 @@ export class TearGLRenderer {
     gl.deleteVertexArray(g.vao);
     gl.deleteVertexArray(g.emptyVao);
     for (const b of [g.posBuf, g.uvBuf, g.zBuf, g.indexBuf]) gl.deleteBuffer(b);
-    for (const t of [g.frontTex, g.behindTex, g.emissiveTex, g.glimpseTex, ...g.maskTex]) gl.deleteTexture(t);
+    for (const t of [g.frontTex, g.behindTex, g.emissiveTex, g.glimpseTex, g.figureTex, ...g.maskTex]) gl.deleteTexture(t);
     for (const f of g.maskFbo) gl.deleteFramebuffer(f);
   }
 }

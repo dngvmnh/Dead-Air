@@ -149,15 +149,12 @@ A few seconds each, then back to the programme. These run on their own clock, se
 
 | ID | Where | From act | What happens |
 |---|---|---|---|
-| S01-S04 | Ch 2, 4, 7, 13 | 0 | No warning. A face is suddenly filling the window, cuts closer twice with its mouth falling open, then black, and something moans on in the dark. |
-| S08 | Ch 2 | 0 | Tape stops, snow. The anchor's face goes wrong under ALDER RD, then the programme comes back. |
-| S09 | Ch 4 | 0 | The jingle goes flat and slows. A gourd too close to the lens, JUST ONE., then back. |
-| S10 | Ch 7 | 0 | The order line rings, someone breathes. A shape rises, OUR OPERATORS ARE WATCHING., then back. |
-| S11 | Ch 13 | 0 | Snow and whispering. A face settles in it, then goes. |
+| S01-S04 | Ch 2, 4, 7, 13 | 0 | No warning. A face fills the window, cuts closer twice with its mouth falling open, then black, and something moans in the dark. |
+| J01-J10 | Any | 0 | The same no-warning cut, each with its own sound: hands on fogged glass, one eye, a maw, a cracked doll, a crowd, a figure in static, a rotten pumpkin, a spider, a skull, claws through the wall. |
 | S05 | Room | 0 | Three knocks and the lights dip. The programme carries on. |
 | S06 | Room | 1 | The lights sink, something scrapes, and pale eyes show behind the viewer's own tears. |
 | S07 | Room | 0 | The lights sink slowly over a heartbeat. |
-| T03 | Room, first tear | 0 | The first tear is answered by the same no-warning face. |
+| T03 | Room, first tear | 0 | The first tear is answered by claws through the wall. |
 | T01 | Room, on a tear | 0 | The wall knocks back. |
 | T02 | Room, on a tear | 1 | Breathing, and eyes behind the tear just made. |
 

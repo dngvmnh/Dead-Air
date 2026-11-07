@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { FACE_MAX_LUMINANCE, faceLuminance } from './faceField.ts';
-import type { ApparitionKind } from './apparition.ts';
+import { FACE_MAX_LUMINANCE, faceLuminance, type FaceKind } from './faceField.ts';
 
-const KINDS: ApparitionKind[] = ['anchor', 'gourd', 'operator', 'deadair'];
+const KINDS: FaceKind[] = ['anchor', 'gourd', 'operator', 'deadair'];
 
 describe('faceLuminance', () => {
   for (const kind of KINDS) {

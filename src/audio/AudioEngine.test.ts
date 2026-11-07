@@ -316,7 +316,7 @@ describe('AudioEngine lifecycle', () => {
   });
 
   describe('horror cues', () => {
-    const CUES = ['stinger', 'jumpHit', 'tapeStop', 'heartbeat', 'knock', 'breath', 'whisper', 'toyPiano', 'phoneRing', 'scrape', 'drone'] as const;
+    const CUES = ['stinger', 'jumpHit', 'jumpHands', 'jumpEye', 'jumpMaw', 'jumpDoll', 'jumpCrowd', 'jumpSnow', 'jumpPumpkin', 'jumpSpider', 'jumpSkull', 'jumpClaws', 'tapeStop', 'heartbeat', 'knock', 'breath', 'whisper', 'toyPiano', 'phoneRing', 'scrape', 'drone'] as const;
 
     it('every cue plays, and stopping them is safe', async () => {
       const { engine } = newEngine();

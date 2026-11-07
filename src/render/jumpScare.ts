@@ -1,47 +1,64 @@
 /**
  * The jump itself: no warning and no approach. On one frame there is a programme,
- * and on the next a face is already filling the whole window. Seeing it coming
+ * and on the next something is already filling the whole window. Seeing it coming
  * would spend the only thing a jump has, so nothing appears on the tube first.
  * It is the one thing that draws in front of the set, so it exists only while it
  * runs, and it takes no clicks. The caller must not start one over a YouTube item,
  * which may never have anything in front of it.
  *
  * Not a strobe: brightness rises once and cuts to black once, the shots between
- * are all of the same dim face, and startles are many seconds apart, well inside
+ * are all of one dim thing, and startles are many seconds apart, well inside
  * the flash limit. It stays grey and never full-field white or saturated red.
  */
 
-import type { ApparitionKind } from './apparition.ts';
-import { faceImage } from './faceField.ts';
+import type { JumpKind } from '../content/schema.ts';
+import type { Pose } from './jumpArt.ts';
+import { jumpImage } from './jumpBake.ts';
 
 /** The black it leaves behind, so the eye has nothing to hold on to. */
 export const JUMP_CUT_MS = 450;
 
-/** One shot of the jump: how close the face is, and where it is framed. */
+/** One shot of the jump: how close it is, where it is framed, and in which pose. */
 export interface JumpShot {
   /** Multiple of the size that already fills the window. */
   scale: number;
-  /** Shifts the framing up the face, as a fraction of its size. */
+  /** Shifts the framing, as a fraction of its size. */
   lift: number;
-  screaming: boolean;
+  pose: Pose;
 }
 
+type TimedShot = JumpShot & { atMs: number };
+
 /** Hard cuts, nothing between them. Each is closer, none lets the eye settle. */
-const SHOTS: ReadonlyArray<JumpShot & { atMs: number }> = [
-  { atMs: 0, scale: 1.08, lift: 0, screaming: false },
-  { atMs: 250, scale: 1.3, lift: -0.06, screaming: true },
-  { atMs: 520, scale: 1.95, lift: 0.1, screaming: true },
+const FACE_SHOTS: readonly TimedShot[] = [
+  { atMs: 0, scale: 1.08, lift: 0, pose: 0 },
+  { atMs: 250, scale: 1.3, lift: -0.06, pose: 1 },
+  { atMs: 520, scale: 1.95, lift: 0.1, pose: 1 },
 ];
+/** Each kind moves in its own way, or they would all feel like one scare. */
+const KIND_SHOTS: Partial<Record<JumpKind, readonly TimedShot[]>> = {
+  hands: [{ atMs: 0, scale: 1, lift: 0, pose: 0 }, { atMs: 190, scale: 1, lift: 0, pose: 1 }, { atMs: 500, scale: 1.25, lift: 0.03, pose: 1 }],
+  eye: [{ atMs: 0, scale: 1, lift: 0, pose: 0 }, { atMs: 380, scale: 1.1, lift: 0, pose: 1 }, { atMs: 600, scale: 1.7, lift: 0, pose: 1 }],
+  maw: [{ atMs: 0, scale: 1, lift: 0, pose: 0 }, { atMs: 330, scale: 1.05, lift: 0, pose: 1 }, { atMs: 610, scale: 1.45, lift: 0, pose: 1 }],
+  doll: [{ atMs: 0, scale: 1, lift: 0.02, pose: 0 }, { atMs: 300, scale: 1.1, lift: 0.02, pose: 1 }, { atMs: 560, scale: 1.6, lift: 0.08, pose: 1 }],
+  crowd: [{ atMs: 0, scale: 1, lift: 0.08, pose: 0 }, { atMs: 400, scale: 1, lift: 0.04, pose: 1 }],
+  snow: [{ atMs: 0, scale: 1, lift: 0, pose: 0 }, { atMs: 350, scale: 1, lift: 0, pose: 1 }, { atMs: 620, scale: 1.4, lift: 0.07, pose: 1 }],
+  pumpkin: [{ atMs: 0, scale: 1, lift: 0, pose: 0 }, { atMs: 320, scale: 1.1, lift: -0.02, pose: 1 }, { atMs: 600, scale: 1.45, lift: -0.08, pose: 1 }],
+  spider: [{ atMs: 0, scale: 1, lift: 0.02, pose: 0 }, { atMs: 240, scale: 1, lift: 0.02, pose: 1 }, { atMs: 540, scale: 1.5, lift: 0.08, pose: 1 }],
+  skull: [{ atMs: 0, scale: 1, lift: 0.04, pose: 0 }, { atMs: 280, scale: 1, lift: 0.02, pose: 1 }, { atMs: 570, scale: 1.45, lift: 0.02, pose: 1 }],
+  claws: [{ atMs: 0, scale: 1, lift: 0, pose: 0 }, { atMs: 300, scale: 1, lift: 0, pose: 1 }, { atMs: 590, scale: 1.3, lift: 0.04, pose: 1 }],
+};
 
 /** The shot on screen at `tMs`. It is at full size from the first frame. */
-export function jumpShotAt(tMs: number): JumpShot {
-  let shot = SHOTS[0] as JumpShot;
-  for (const candidate of SHOTS) if (tMs >= candidate.atMs) shot = candidate;
+export function jumpShotAt(kind: JumpKind, tMs: number): JumpShot {
+  const shots = KIND_SHOTS[kind] ?? FACE_SHOTS;
+  let shot: JumpShot = shots[0]!;
+  for (const candidate of shots) if (tMs >= candidate.atMs) shot = candidate;
   return shot;
 }
 
 export interface JumpOptions {
-  kind: ApparitionKind;
+  kind: JumpKind;
   ms: number;
 }
 
@@ -59,8 +76,7 @@ export function playJump({ kind, ms }: JumpOptions): Promise<void> {
   const ctx = canvas.getContext('2d');
   if (!ctx) return Promise.resolve();
 
-  const closed = faceImage(kind);
-  const open = faceImage(kind, true);
+  const poses: Record<Pose, HTMLCanvasElement | null> = { 0: jumpImage(kind, 0), 1: jumpImage(kind, 1) };
   // Chin and forehead run off the window: too close to be seen whole.
   const full = Math.max(W, H * 1.55);
   const start = performance.now();
@@ -73,11 +89,11 @@ export function playJump({ kind, ms }: JumpOptions): Promise<void> {
       return;
     }
     const t = Math.floor(real / FILM_FRAME_MS) * FILM_FRAME_MS;
-    const shot = jumpShotAt(t);
+    const shot = jumpShotAt(kind, t);
     const size = full * shot.scale;
     const cx = W / 2 + Math.sin(t * 0.09) * 16;
     const cy = H / 2 + shot.lift * size + Math.cos(t * 0.13) * 16;
-    const face = shot.screaming ? open : closed;
+    const face = poses[shot.pose];
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, W, H);
     if (face) ctx.drawImage(face, cx - size / 2, cy - size / 2, size, size);

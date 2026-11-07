@@ -5,9 +5,9 @@ import { expect, test, type Page } from '@playwright/test';
  * fires one on demand and then proves it comes back to the programme.
  */
 
-async function seed(page: Page, act: number, reduced = false): Promise<void> {
+async function seed(page: Page, act: number): Promise<void> {
   await page.addInitScript(
-    ([a, r]) => {
+    (a) => {
       (window as unknown as { __CRT_PRESERVE_DRAWING_BUFFER__?: boolean }).__CRT_PRESERVE_DRAWING_BUFFER__ = true;
       const ch = () => ({ visits: 1, watchMs: 0, lastVisitedAt: 1 });
       const now = Date.now();
@@ -25,11 +25,11 @@ async function seed(page: Page, act: number, reduced = false): Promise<void> {
           firedEvents: {},
           act: a,
           noticeSeen: true,
-          settings: { volume: 0.7, muted: false, captions: true, reducedEffects: r },
+          settings: { volume: 0.7, muted: false, captions: true, reducedEffects: false },
         }),
       );
     },
-    [act, reduced] as const,
+    act,
   );
 }
 
@@ -53,15 +53,6 @@ async function onAir(page: Page): Promise<void> {
 }
 
 test.describe('startles', () => {
-  test('a picture startle shows, then returns to the programme', async ({ page }) => {
-    await seed(page, 1);
-    await onAir(page);
-    await page.evaluate(() => (window as unknown as { __tv: Tv }).__tv.forceStartle('S08'));
-    await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 3000 }).toBe('EVENT');
-    await expect.poll(() => tv(page, (t) => t.lastEventText()), { timeout: 4000 }).toBe('ALDER RD');
-    await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 7000 }).toBe('ON_AIR');
-  });
-
   test('a jump arrives cold: nothing on the tube first, face already painted', async ({ page }) => {
     await seed(page, 0);
     await onAir(page);
@@ -83,7 +74,6 @@ test.describe('startles', () => {
     });
     // The picture never leaves the programme, so nothing on the tube can warn of it.
     expect(await tv(page, (t) => t.phase())).toBe('ON_AIR');
-    expect(await tv(page, (t) => t.lastEventText())).not.toBe('ALDER RD');
     await expect
       .poll(() => page.evaluate(() => (window as unknown as { __firstBright: number }).__firstBright), { timeout: 3000 })
       .toBeGreaterThan(20);
@@ -102,8 +92,9 @@ test.describe('startles', () => {
     await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 5000 }).toBe('ON_AIR');
   });
 
-  test('reduced effects keeps the sound and drops the lunge', async ({ page }) => {
-    await seed(page, 0, true);
+  test('the system reduced-motion setting keeps the sound and drops the picture', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await seed(page, 0);
     await onAir(page);
     await page.evaluate(() => {
       (window as unknown as { __sawJump: boolean }).__sawJump = false;
@@ -135,12 +126,28 @@ test.describe('startles', () => {
   test('changing channel cuts a startle short', async ({ page }) => {
     await seed(page, 1);
     await onAir(page);
-    await page.evaluate(() => (window as unknown as { __tv: Tv }).__tv.forceStartle('S08'));
-    await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 3000 }).toBe('EVENT');
+    await page.evaluate(() => (window as unknown as { __tv: Tv }).__tv.forceStartle('S07'));
+    await expect.poll(() => tv(page, (t) => t.roomEventRunning()), { timeout: 2000 }).toBe(true);
     await page.getByRole('button', { name: /channel up|^\+$/i }).click();
     await expect.poll(() => tv(page, (t) => t.channel()), { timeout: 3000 }).toBe(4);
+    await expect.poll(() => tv(page, (t) => t.roomEventRunning()), { timeout: 3000 }).toBe(false);
     await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 8000 }).toBe('ON_AIR');
-    expect(await tv(page, (t) => t.channel())).toBe(4);
+  });
+
+  test('every kind of jump plays and goes away', async ({ page }) => {
+    test.setTimeout(90000);
+    await seed(page, 0);
+    await onAir(page);
+    const jump = page.locator('[data-testid="jump-scare"]');
+    for (const id of ['S01', 'J01', 'J02', 'J03', 'J04', 'J05', 'J06', 'J07', 'J08', 'J09', 'J10']) {
+      // A startle is refused while an item changes over, so ask until it is taken.
+      await expect
+        .poll(() => page.evaluate((i) => (window as unknown as { __tv: Tv }).__tv.forceStartle(i), id), { timeout: 8000 })
+        .toBe(id);
+      await expect(jump, id).toHaveCount(1, { timeout: 5000 });
+      await expect(jump, id).toHaveCount(0, { timeout: 3000 });
+      await expect.poll(() => tv(page, (t) => t.roomEventRunning()), { timeout: 2000 }).toBe(false);
+    }
   });
 
   test('powering off cuts a room startle and restores the lights', async ({ page }) => {
@@ -166,13 +173,5 @@ test.describe('startles', () => {
     await page.mouse.up();
     await expect.poll(() => tv(page, (t) => t.lastStartle()), { timeout: 3000 }).toBe('T03');
     expect(await tv(page, (t) => t.phase())).toBe('ON_AIR');
-  });
-
-  test('a startle still shows under reduced effects', async ({ page }) => {
-    await seed(page, 1, true);
-    await onAir(page);
-    await page.evaluate(() => (window as unknown as { __tv: Tv }).__tv.forceStartle('S08'));
-    await expect.poll(() => tv(page, (t) => t.lastEventText()), { timeout: 4000 }).toBe('ALDER RD');
-    await expect.poll(() => tv(page, (t) => t.phase()), { timeout: 7000 }).toBe('ON_AIR');
   });
 });

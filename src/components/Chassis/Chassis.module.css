@@ -1,7 +1,8 @@
 /*
- * The television cabinet. The bezel and gloss live on the chassis shell only —
- * never over the tube opening (design §3). The opening is a child with no
- * visual effects applied to it or to this element.
+ * The television cabinet, found in a cellar: rotted veneer, gouges, tar stains and a
+ * corroded bezel. All of it is background painting on the shell. Per design §3 the
+ * shell and its ancestors carry no transform, filter, opacity or mask, and nothing
+ * paints over the tube opening.
  */
 
 .chassis {
@@ -11,38 +12,80 @@
   z-index: 1;
   width: min(92vw, 1180px);
   max-width: 100%;
-  background: linear-gradient(
-    160deg,
-    var(--chassis-plastic-light),
-    var(--chassis-plastic) 40%,
-    var(--chassis-plastic-dark)
-  );
-  border-radius: var(--radius-chassis);
+  /* Uneven corners, from a cabinet that has been dropped more than once. */
+  border-radius: 22px 13px 26px 10px / 15px 24px 12px 28px;
   padding: var(--space-6);
+  background-color: #1b120b;
+  background-image:
+    /* Tar running down from the top edge. */
+    var(--tar-runs),
+    /* Three sets of gouges. */
+    var(--gouges),
+    /* Damp, spreading from the corners. */
+    radial-gradient(ellipse 40% 34% at 6% 96%, rgba(4, 8, 2, 0.82), transparent 72%),
+    radial-gradient(ellipse 36% 30% at 96% 4%, rgba(4, 6, 2, 0.72), transparent 72%),
+    radial-gradient(ellipse 22% 16% at 72% 99%, rgba(32, 40, 16, 0.5), transparent 75%),
+    var(--veneer);
+  background-size: 100% 150px, 100% 100%, auto, auto, auto, 520px 400px;
+  background-position: top, center, center, center, center, center;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat;
+  border: 2px solid #0a0604;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 24px 60px rgba(0, 0, 0, 0.7);
+    inset 0 2px 1px rgba(150, 118, 78, 0.14),
+    inset 0 -14px 26px rgba(0, 0, 0, 0.75),
+    inset 12px 0 22px rgba(0, 0, 0, 0.5),
+    inset -12px 0 22px rgba(0, 0, 0, 0.5),
+    0 24px 60px rgba(0, 0, 0, 0.82);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+
+  --veneer: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='400'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.008 0.14' numOctaves='4' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.20 0 0 0 0 0.12 0 0 0 0 0.06 0.9 0.9 0 0 -0.32'/%3E%3C/filter%3E%3Cfilter id='r' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.5 0.08' numOctaves='3' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.8 0 0 0 -0.92'/%3E%3C/filter%3E%3Crect width='520' height='400' fill='%231f140b'/%3E%3Crect width='520' height='400' filter='url(%23g)'/%3E%3Crect width='520' height='400' filter='url(%23r)'/%3E%3C/svg%3E");
+  --gouges: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 620' preserveAspectRatio='none'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cg stroke='%23060302' stroke-width='3'%3E%3Cpath d='M836 508 L890 604'/%3E%3Cpath d='M860 500 L916 600'/%3E%3Cpath d='M884 496 L942 590'/%3E%3Cpath d='M908 498 L962 576'/%3E%3Cpath d='M6 290 L18 372'/%3E%3Cpath d='M14 286 L27 366'/%3E%3C/g%3E%3Cg stroke='%23755c3e' stroke-width='1' opacity='.55'%3E%3Cpath d='M838 508 L892 604'/%3E%3Cpath d='M862 500 L918 600'/%3E%3Cpath d='M886 496 L944 590'/%3E%3Cpath d='M910 498 L964 576'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --tar-runs: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 150' preserveAspectRatio='none'%3E%3Cpath fill='%23050302' opacity='.86' d='M0 0H1000V8C985 12 980 42 972 44C964 44 963 12 948 10C930 10 925 22 915 22C900 22 900 8 880 8C860 8 858 18 840 18C820 18 820 8 800 8H640C620 8 618 30 610 58C606 74 596 74 594 56C592 30 590 8 570 8H420C400 8 396 18 380 18C368 18 366 8 345 8H230C210 8 208 16 198 40C192 62 180 62 178 42C176 20 170 8 150 8C125 8 120 20 104 20C90 20 86 8 60 8C30 8 24 16 16 26C8 34 2 28 0 20Z'/%3E%3C/svg%3E");
 }
 
 .bezel {
+  position: relative;
+  /* Above the cobwebs, so nothing can ever paint over the tube. */
+  z-index: 3;
   display: flex;
   justify-content: center;
   padding: var(--space-4);
-  background: var(--chassis-plastic-dark);
-  border-radius: 12px;
-  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.8);
+  /* Iron, rusting from the edges in. */
+  background-color: #17110c;
+  background-image:
+    radial-gradient(circle at 12px 12px, #5a4a38 0 3px, #0a0604 3.6px 5px, transparent 5.5px),
+    radial-gradient(circle at calc(100% - 12px) 12px, #4a3b2c 0 3px, #0a0604 3.6px 5px, transparent 5.5px),
+    radial-gradient(circle at 12px calc(100% - 12px), #4a3b2c 0 3px, #0a0604 3.6px 5px, transparent 5.5px),
+    radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), #0a0604 0 4px, transparent 5px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Cfilter id='a' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.045' numOctaves='5' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.36 0 0 0 0 0.17 0 0 0 0 0.06 1.9 0 0 0 -0.82'/%3E%3C/filter%3E%3Crect width='400' height='300' filter='url(%23a)'/%3E%3C/svg%3E");
+  border-radius: 9px 14px 8px 16px;
+  box-shadow:
+    inset 0 0 26px rgba(0, 0, 0, 0.9),
+    0 0 0 1px #070403,
+    0 1px 0 1px rgba(136, 104, 68, 0.2);
 }
 
+/* A corroded plate, hanging by the one screw it has left. */
 .brand {
+  position: relative;
   font-family: var(--font-chassis);
   font-size: var(--font-size-label);
-  letter-spacing: 0.3em;
+  font-weight: 700;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--chassis-label);
+  color: #b9a988;
   text-align: center;
+  padding: var(--space-1) var(--space-2);
+  background:
+    radial-gradient(circle at 7px 50%, #18110b 0 2px, transparent 2.6px),
+    radial-gradient(ellipse 40% 90% at 88% 70%, rgba(26, 44, 34, 0.75), transparent),
+    linear-gradient(170deg, #4b3d27, #2c2316 62%, #3a2e1c);
+  border: 1px solid #0a0704;
+  transform: rotate(-2.6deg);
+  transform-origin: 7px 50%;
+  box-shadow: 1px 3px 4px rgba(0, 0, 0, 0.7);
 }
 
 @media (min-width: 769px) {

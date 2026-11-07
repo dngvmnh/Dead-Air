@@ -11,7 +11,7 @@
  * sequences and degrades.
  */
 
-import type { EventStepInput, SfxCue } from '../content/schema.ts';
+import type { EventStepInput, JumpKind, SfxCue } from '../content/schema.ts';
 import type { Look } from '../core/types.ts';
 
 /**
@@ -42,10 +42,8 @@ export interface EventOps {
   captionsOverStatic(caption: string, ms: number): Promise<void>;
   /** Play a sound. Resolves after `ms` if given, otherwise at once. */
   sfx(cue: SfxCue, gain: number, ms?: number): Promise<void>;
-  /** Show a wrong picture on the tube for `ms`. */
-  apparition(kind: 'anchor' | 'gourd' | 'operator' | 'deadair', text: string | undefined, ms: number): Promise<void>;
   /** The figure is suddenly filling the whole window, for `ms`. */
-  jump(kind: 'anchor' | 'gourd' | 'operator' | 'deadair', ms: number): Promise<void>;
+  jump(kind: JumpKind, ms: number): Promise<void>;
   /** Sink or restore the room's lights over `ms`. */
   roomLights(level: number, ms: number): Promise<void>;
   /** Something pale behind the viewer's tears for `ms`. */
@@ -103,8 +101,6 @@ function runStep(step: ResolvedStep, ops: EventOps): Promise<void> {
       return ops.signOff();
     case 'sfx':
       return ops.sfx(step.cue, step.gain ?? 1, step.ms);
-    case 'apparition':
-      return ops.apparition(step.kind, step.text, step.ms);
     case 'jump':
       return ops.jump(step.kind, step.ms);
     case 'roomLights':
@@ -118,7 +114,6 @@ function runStep(step: ResolvedStep, ops: EventOps): Promise<void> {
 function captionOf(step: ResolvedStep): string | null {
   if (step.do === 'voice') return step.caption;
   if (step.do === 'slate') return step.text;
-  if (step.do === 'apparition') return step.text ?? null;
   return null;
 }
 

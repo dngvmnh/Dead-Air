@@ -28,7 +28,7 @@ import { deriveRoom, type RoomState } from '../core/roomState.ts';
 import { deriveBehind, type BehindView } from '../core/behindState.ts';
 import { keepsProgramme, nextStartleDelay, SURF_MIN_GAP_MS, SURF_SETTLE_MS, SURF_TRIGGER, TEAR_ANSWER_CHANCE } from '../core/startle.ts';
 import { playJump } from '../render/jumpScare.ts';
-import { preloadFaces } from '../render/faceField.ts';
+import { preloadJumps } from '../render/jumpBake.ts';
 import { FileAdapter } from '../playback/FileAdapter.ts';
 import { hush, say, spokenMs } from '../audio/speech.ts';
 import type { ProgrammeBed } from '../audio/AudioEngine.ts';
@@ -73,7 +73,6 @@ export interface TelevisionApi {
   setVolume: (volume: number) => void;
   toggleMute: () => void;
   toggleCaptions: () => void;
-  toggleReducedEffects: () => void;
   forgetMe: () => void;
   /** Screen hands its renderer here so owned sources can publish their picture. */
   registerRenderer: (renderer: Renderer | null) => void;
@@ -111,7 +110,7 @@ export interface RoomEffects {
 
 
 const DEFAULT_SETTINGS: UiSettings = {
-  volume: 0.7,
+  volume: 1,
   // Captions default ON until real recorded voice exists (task 21): voice event
   // lines have no audio yet, so their caption is their only output and must show
   // (requirement 13.3, Fix 11). The viewer can still turn CC off.
@@ -431,24 +430,13 @@ export function useTelevision(): TelevisionApi {
           restingStatic();
         },
         sfx: async (cue, gain, ms) => {
-          const reduced = memoryRef.current.settings.reducedEffects || prefersReducedMotion();
+          const reduced = prefersReducedMotion();
           audioRef.current?.playCue(cue, reduced ? gain * 0.5 : gain);
           if (ms !== undefined) await wait(ms);
         },
-        apparition: async (kind, text, ms) => {
-          restingStatic();
-          if (text) setAnnouncement(text);
-          await presenter.showApparition(
-            kind,
-            text,
-            ms,
-            memoryRef.current.settings.reducedEffects || prefersReducedMotion(),
-            () => eventCancelRef.current,
-          );
-        },
         jump: async (kind, ms) => {
           hush();
-          const reduced = memoryRef.current.settings.reducedEffects || prefersReducedMotion();
+          const reduced = prefersReducedMotion();
           // Reduced effects keeps the sound and drops the picture: no full-window
           // cut for a viewer who asked for none.
           if (reduced) {
@@ -482,9 +470,6 @@ export function useTelevision(): TelevisionApi {
       }
       if (step.do === 'voice') {
         return { ...step, caption: renderLine(step.caption, step.fallbackCaption, memoryRef.current, tctx) };
-      }
-      if (step.do === 'apparition' && step.text !== undefined) {
-        return { ...step, text: renderLine(step.text, step.fallbackText, memoryRef.current, tctx) };
       }
       return step;
     });
@@ -891,7 +876,7 @@ export function useTelevision(): TelevisionApi {
       return undefined;
     }
     // Baked ahead, so the first frame of a jump lands on the same beat as the hit.
-    const bake = setTimeout(preloadFaces, 1000);
+    const stopBaking = preloadJumps();
     let dueAt: number | null = null;
     let surfs = 0;
     let lastAskedAt = 0;
@@ -922,7 +907,7 @@ export function useTelevision(): TelevisionApi {
       }
     }, 500);
     return () => {
-      clearTimeout(bake);
+      stopBaking();
       clearInterval(timer);
     };
   }, [demo, fireStartle]);
@@ -1259,7 +1244,7 @@ export function useTelevision(): TelevisionApi {
     setSettings((s) => ({
       ...s,
       ...loaded.settings,
-      reducedEffects: loaded.settings.reducedEffects || prefersReducedMotion(),
+      reducedEffects: prefersReducedMotion(),
     }));
     // Restore the TV shell from memory: POWER tunes to the last channel watched
     // (requirement 1.3, Fix 8), and after-hours (Act 4) is restored so Act-4
@@ -1331,11 +1316,7 @@ export function useTelevision(): TelevisionApi {
     () => setSettings((s) => ({ ...s, captions: !s.captions })),
     [],
   );
-  const toggleReducedEffects = useCallback(
-    () => setSettings((s) => ({ ...s, reducedEffects: !s.reducedEffects })),
-    [],
-  );
-  const forgetMe = useCallback(() => {
+const forgetMe = useCallback(() => {
     // Erase all persisted memory and reset the live memory (requirement 7.6).
     // Suppress the re-persist that the settings reset below would otherwise
     // trigger, so storage stays empty until the viewer acts again.
@@ -1359,7 +1340,6 @@ export function useTelevision(): TelevisionApi {
       setVolume,
       toggleMute,
       toggleCaptions,
-      toggleReducedEffects,
       forgetMe,
       registerRenderer,
       getAudio,
@@ -1380,7 +1360,6 @@ export function useTelevision(): TelevisionApi {
       setVolume,
       toggleMute,
       toggleCaptions,
-      toggleReducedEffects,
       forgetMe,
       registerRenderer,
       getAudio,
