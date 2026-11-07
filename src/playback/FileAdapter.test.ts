@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { FileAdapter } from './FileAdapter.ts';
+import { FileAdapter, mediaUrl } from './FileAdapter.ts';
 import type { Item } from '../core/types.ts';
 import type { SceneContext } from './PlaybackAdapter.ts';
 
@@ -42,6 +42,14 @@ function setup() {
   const ctx = { setSource, setLook: vi.fn() } as unknown as SceneContext;
   return { video, adapter, ctx, setSource };
 }
+
+describe('mediaUrl', () => {
+  it('leaves a root URL alone at the root, and puts it under a sub-path', () => {
+    expect(mediaUrl('/film/a.mp4', '/')).toBe('/film/a.mp4');
+    expect(mediaUrl('/film/a.mp4', '/Kiroween/')).toBe('/Kiroween/film/a.mp4');
+    expect(mediaUrl('https://x.test/a.mp4', '/Kiroween/')).toBe('https://x.test/a.mp4');
+  });
+});
 
 describe('FileAdapter', () => {
   it('seeks to the clock position and publishes the video', async () => {

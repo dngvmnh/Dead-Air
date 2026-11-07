@@ -8,6 +8,15 @@
 import type { Item } from '../core/types.ts';
 import type { AdapterEvent, PlaybackAdapter, SceneContext } from './PlaybackAdapter.ts';
 
+/**
+ * Catalogue URLs start at the site root. On a host that serves the site from a
+ * sub-path (GitHub Pages: `/Kiroween/`) they are put under that path.
+ */
+export function mediaUrl(url: string, base: string = import.meta.env.BASE_URL): string {
+  if (!url.startsWith('/') || url.startsWith('//')) return url;
+  return base.replace(/\/$/, '') + url;
+}
+
 export interface FileAdapterDeps {
   createVideo?: () => HTMLVideoElement;
 }
@@ -64,7 +73,7 @@ export class FileAdapter implements PlaybackAdapter {
         resolve();
       };
       this.video.addEventListener('loadedmetadata', done);
-      this.video.src = item.url;
+      this.video.src = mediaUrl(item.url);
       this.video.load();
     });
   }
