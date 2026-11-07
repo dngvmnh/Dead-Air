@@ -167,6 +167,11 @@
   accent-color: #b84a1c;
 }
 
+.toggles {
+  display: flex;
+  gap: var(--space-2);
+}
+
 @media (min-width: 769px) {
   /* Compact control column: it must not set the cabinet height, so the stack
      stays within the tube's height. Smaller LED, tighter gaps, a 2-up CH row, and
@@ -189,6 +194,12 @@
 
   .group {
     flex-wrap: wrap;
+  }
+
+  .toggles .button {
+    flex: 1;
+    min-height: 40px;
+    padding: var(--space-2) var(--space-3);
   }
 
   .group .button {

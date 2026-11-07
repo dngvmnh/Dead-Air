@@ -50,12 +50,69 @@
     padding: var(--space-2);
   }
 
+  .panel > * {
+    flex-basis: auto;
+  }
+
   .panel .button {
-    min-height: 36px;
+    min-height: 32px;
     padding: var(--space-1) var(--space-3);
   }
 }
 
 .forget {
   color: #f0795d;
+}
+
+/* The reflection: a switch, the lamp that says the camera is live, and the words. */
+.header {
+  display: flex;
+  flex-basis: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.lamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-family: var(--font-chassis);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  color: #a2957c;
+  white-space: nowrap;
+}
+
+.lampDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2a1512;
+  box-shadow: inset 0 0 2px #000;
+}
+
+.lamp[data-lit='true'] {
+  color: #ffb9a2;
+}
+
+.lamp[data-lit='true'] .lampDot {
+  background: #ff5a3c;
+  box-shadow: 0 0 6px #ff5a3c;
+}
+
+.copy {
+  margin: 0;
+  flex-basis: 100%;
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  color: #c4b698;
+}
+
+.message {
+  margin: 0;
+  flex-basis: 100%;
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  color: #f0b45d;
 }

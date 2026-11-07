@@ -89,6 +89,8 @@ export const INERT_TRANSIENT: Omit<CrtUniforms, keyof LookPreset | 'resolution'>
   collapse: 0,
   static: 0,
   power: 0,
+  reflAmount: 0,
+  reflShadow: 0,
 };
 
 /**

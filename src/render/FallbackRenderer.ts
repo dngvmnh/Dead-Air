@@ -144,6 +144,16 @@ export class FallbackRenderer implements Renderer {
     void _image;
   }
 
+  setReflection(_video: HTMLVideoElement | null, _level: number, _shadow?: boolean): void {
+    void _video;
+    void _level;
+    void _shadow;
+  }
+
+  supportsReflection(): boolean {
+    return false;
+  }
+
   /** The same answers a test can ask of the CRT, for a path with no tear at all. */
   tubeStats(): { enabled: boolean; active: boolean; broken: number; behindImage: boolean } {
     return { enabled: false, active: false, broken: 0, behindImage: false };

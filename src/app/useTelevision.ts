@@ -104,6 +104,14 @@ export interface TelevisionApi {
   onTearEnd: () => void;
   /** Our own picture is up and may be torn (requirement 2). */
   tubeTearable: boolean;
+  /** What the current source draws on. */
+  surface: 'canvas' | 'youtube' | null;
+  /** A scripted silence is holding the tube dark. */
+  scriptedSilence: boolean;
+  /** The renderer, for the reflection. */
+  getRenderer: () => Renderer | null;
+  /** The current act, for the reflection's fixed shape. No story depends on this. */
+  getAct: () => number;
 }
 
 /** The sound under each channel's original programmes. Films bring their own. */
@@ -188,6 +196,7 @@ export function useTelevision(): TelevisionApi {
   // What the current source draws on: our canvas, or (once one exists) a player
   // we may never touch. Nothing tears unless this says canvas (requirement 2.2).
   const [surface, setSurface] = useState<'canvas' | 'youtube' | null>(null);
+  const [scriptedSilence, setScriptedSilence] = useState(false);
 
   // Effects must be computed from the latest committed state. This ref tracks
   // it so a sequence of actions across separate renders (e.g. rapid surfing)
@@ -503,7 +512,11 @@ export function useTelevision(): TelevisionApi {
         },
         silence: async (ms) => {
           audioRef.current?.setStatic(0);
+          // Only an event that stopped the picture leaves the tube dark. A silence in
+          // the room has the programme still up.
+          if (stateRef.current.phase === 'EVENT') setScriptedSilence(true);
           await wait(ms);
+          setScriptedSilence(false);
           restingStatic();
         },
         signOff: async () => {
@@ -671,6 +684,8 @@ export function useTelevision(): TelevisionApi {
   const registerRenderer = useCallback((renderer: Renderer | null) => {
     rendererRef.current = renderer;
   }, []);
+  const getRenderer = useCallback(() => rendererRef.current, []);
+  const getAct = useCallback(() => memoryRef.current.act, []);
 
   // The picture may be torn only while the programme itself is up: not under event
   // text or the sign-off, which are other phases, and never on a player.
@@ -1562,6 +1577,10 @@ const forgetMe = useCallback(() => {
       registerRoom,
       onTearEnd,
       tubeTearable,
+      surface,
+      scriptedSilence,
+      getRenderer,
+      getAct,
     }),
     [
       state,
@@ -1585,6 +1604,10 @@ const forgetMe = useCallback(() => {
       registerRoom,
       onTearEnd,
       tubeTearable,
+      surface,
+      scriptedSilence,
+      getRenderer,
+      getAct,
     ],
   );
 }

@@ -1203,3 +1203,24 @@ the unlit plaster was the brightest thing on screen.
   the owner.
 - Found on the way: the first-run notice still pointed at the removed Reduced Effects
   button, and promised only a face. Both fixed.
+
+## Task 12: Reflection (2026-11-07)
+
+- Off until the rear-panel switch is clicked, and the words are there before any prompt.
+  `REFL` lamp lit only while a track is live. Not stored, so a reload starts off.
+- Shown with the tube off, and during a scripted silence on our own picture. Not over a
+  YouTube surface or the sign-off. Power leaves the camera alone. A hidden tab and Forget me
+  stop every track, and it only comes back when asked.
+- Shader: mirrored, grey, blurred, bent further than the picture, about a tenth as bright,
+  on top of the power envelope. From Act 3 a fixed dark shape stands beside the centre.
+  Nothing detects anything.
+- Additions to the design's interface: a third `shadow` argument on `setReflection`, and
+  `supportsReflection()`, so the fallback path never starts a camera it cannot show.
+- `reflection.test.ts` holds the privacy rule by reading the source: one module asks for the
+  camera, one imports it, no read-back API in either, no `readPixels` anywhere in `src`.
+- Checked by eye with Chromium's fake camera only: `docs/screenshots/reflection-act3-fake-camera.png`.
+  No real camera or real face has been tried. That needs a person.
+- Found on the way: the lamp overflowed the rear panel (moved to its header), the new words
+  made the cabinet too tall (Mute and CC now share a row, panel buttons 32px on desktop),
+  and at 360x640 the rear panel could not be reached at all because the body never scrolled.
+  Small windows now scroll, with a test.

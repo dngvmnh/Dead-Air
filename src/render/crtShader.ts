@@ -36,6 +36,9 @@ export const UNIFORM_NAMES = [
   'uCollapse', // float: vertical collapse-to-a-line amount, 0..1 (0 = normal)
   'uStatic', // float: snow mix, 0..1 (1 = full static, used during tuning)
   'uPower', // float: warm-up/shutdown envelope, 0..1 (0 = dark, 1 = full)
+  'uReflection', // sampler2D: the optional camera image for the dark glass
+  'uReflAmount', // float: how much of the reflection shows, 0..1 (0 = none)
+  'uReflShadow', // float: the fixed shape in the reflection from Act 3, 0..1
 ] as const;
 
 export type UniformName = (typeof UNIFORM_NAMES)[number];
@@ -62,6 +65,10 @@ export interface CrtUniforms {
   static: number;
   /** 0..1 power envelope. Boot ramps up, shutdown ramps down (task 4.2). */
   power: number;
+  /** 0..1 how much of the viewer's reflection shows in the glass. */
+  reflAmount: number;
+  /** 0..1 the fixed shape in the reflection. */
+  reflShadow: number;
 }
 
 /** A full-screen triangle; no vertex buffer needed, driven by gl_VertexID. */
@@ -106,6 +113,9 @@ uniform float uTear;
 uniform float uCollapse;
 uniform float uStatic;
 uniform float uPower;
+uniform sampler2D uReflection;
+uniform float uReflAmount;
+uniform float uReflShadow;
 
 // --- Hash / value noise: deterministic per pixel per frame ------------------
 float hash(vec2 p) {
@@ -215,6 +225,32 @@ void main() {
   // --- Power envelope: warm-up / collapse brightness (task 4.2) -------------
   col *= clamp(uPower, 0.0, 1.0);
 
+  // --- The viewer's reflection in the dark glass (optional, design §8) --------
+  // On the glass, so after the power envelope. Grey, mirrored, soft, bent further
+  // than the picture and about a tenth as bright. It adds to a dark tube; it never
+  // replaces one.
+  if (uReflAmount > 0.001) {
+    vec2 ruv = barrel(vec2(1.0 - vUv.x, vUv.y), uCurvature + 0.25);
+    vec2 rb = 2.5 / uResolution;
+    vec3 r = texture(uReflection, ruv).rgb * 0.4
+           + texture(uReflection, ruv + vec2(rb.x, 0.0)).rgb * 0.15
+           + texture(uReflection, ruv - vec2(rb.x, 0.0)).rgb * 0.15
+           + texture(uReflection, ruv + vec2(0.0, rb.y)).rgb * 0.15
+           + texture(uReflection, ruv - vec2(0.0, rb.y)).rgb * 0.15;
+    float grey = 0.12 + 0.7 * dot(r, vec3(0.299, 0.587, 0.114));
+    if (uReflShadow > 0.0) {
+      // A fixed shape beside the centre. It knows nothing about the room behind
+      // the viewer: it is painted here, and it stays where it is.
+      vec2 head = (vUv - vec2(0.7, 0.62)) * vec2(1.0, 0.75);
+      vec2 body = (vUv - vec2(0.72, 0.24)) * vec2(0.8, 0.42);
+      float shape = max(smoothstep(0.11, 0.06, length(head)), smoothstep(0.17, 0.09, length(body)));
+      grey *= 1.0 - 0.9 * uReflShadow * shape;
+    }
+    vec2 rc = vUv - 0.5;
+    grey *= clamp(1.0 - dot(rc, rc) * 1.3, 0.0, 1.0);
+    col += vec3(grey) * 0.11 * clamp(uReflAmount, 0.0, 1.0);
+  }
+
   fragColor = vec4(col, 1.0);
 }
 `;
@@ -226,7 +262,7 @@ void main() {
  *
  * `uSource` is omitted: the texture unit is bound by the renderer, not packed.
  */
-export function packUniforms(u: CrtUniforms): Record<Exclude<UniformName, 'uSource'>, number | readonly [number, number]> {
+export function packUniforms(u: CrtUniforms): Record<Exclude<UniformName, 'uSource' | 'uReflection'>, number | readonly [number, number]> {
   return {
     uResolution: u.resolution,
     uTime: u.time,
@@ -242,5 +278,7 @@ export function packUniforms(u: CrtUniforms): Record<Exclude<UniformName, 'uSour
     uCollapse: u.collapse,
     uStatic: u.static,
     uPower: u.power,
+    uReflAmount: u.reflAmount,
+    uReflShadow: u.reflShadow,
   };
 }

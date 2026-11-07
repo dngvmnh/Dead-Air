@@ -78,11 +78,11 @@ Tick a task only when the behaviour has been seen in a real browser, not because
 
 ## Phase E: Reflection
 
-- [ ] 12. Reflection
-  - [ ] 12.1 Add the rear-panel control and copy, `REFL` lamp, and controller. No camera request before the click.
-  - [ ] 12.2 Add the shader path and visibility rules.
-  - [ ] 12.3 Fake-camera tests: no request on load, denied path, tracks stop on off, Forget me, and hidden tab, nothing shown on stubbed YouTube or sign-off, choice not persisted.
-  - [ ] 12.4 Add the guard against frame read-back.
+- [x] 12. Reflection
+  - [x] 12.1 Add the rear-panel control and copy, `REFL` lamp, and controller. No camera request before the click.
+  - [x] 12.2 Add the shader path and visibility rules.
+  - [x] 12.3 Fake-camera tests: no request on load, denied path, tracks stop on off, Forget me, and hidden tab, nothing shown on stubbed YouTube or sign-off, choice not persisted.
+  - [x] 12.4 Add the guard against frame read-back.
   - _Requirements: 7.1–7.11_
 
 ## Phase F: Ready to deploy

@@ -73,6 +73,9 @@ export function supportsWebGL2(canvas?: HTMLCanvasElement): boolean {
 }
 
 const TEXTURE_UNIT = 0;
+const REFLECTION_UNIT = 1;
+/** How quickly the reflection comes up in the glass, and goes. */
+const REFLECTION_EASE_MS = 300;
 
 /** A 1×1 black pixel used as the source until a real one is set. */
 const BLACK_PIXEL = new Uint8Array([0, 0, 0, 255]);
@@ -129,10 +132,19 @@ export class CrtRenderer {
   private readonly tube: TubeTear;
   private tubeEnabled = false;
 
+  // --- The viewer's reflection (dead-air-room task 12) -----------------------
+  private reflectionVideo: HTMLVideoElement | null = null;
+  private reflectionTarget = 0;
+  private reflectionShadow = 0;
+  private reflectionNow = 0;
+  private reflectionTexture: WebGLTexture;
+  private lastFrameMs = 0;
+
   private constructor(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     this.gl = gl;
     this.canvas = canvas;
     this.tube = new TubeTear(gl);
+    this.reflectionTexture = this.buildTexture();
     this.program = this.buildProgram();
     this.vao = this.buildVao();
     this.texture = this.buildTexture();
@@ -155,6 +167,7 @@ export class CrtRenderer {
     this.program = this.buildProgram();
     this.vao = this.buildVao();
     this.texture = this.buildTexture();
+    this.reflectionTexture = this.buildTexture();
     this.cacheLocations();
     this.tube.contextRestored();
     this.contextLost = false;
@@ -283,6 +296,27 @@ export class CrtRenderer {
 
   setTubeBehind(tint: readonly [number, number, number], image: TexImageSource | null): void {
     this.tube.setBehind(tint, image);
+  }
+
+  setReflection(video: HTMLVideoElement | null, level: number, shadow = false): void {
+    this.reflectionVideo = video;
+    this.reflectionTarget = video ? clamp01(level) : 0;
+    this.reflectionShadow = shadow ? 1 : 0;
+    // Switched off means off this frame, not faded: the camera has already stopped.
+    if (!video) this.reflectionNow = 0;
+  }
+
+  supportsReflection(): boolean {
+    return true;
+  }
+
+  /** How the reflection stands, for tests. */
+  reflectionStats(): { hasVideo: boolean; level: number; shadow: boolean } {
+    return {
+      hasVideo: this.reflectionVideo !== null,
+      level: this.reflectionNow,
+      shadow: this.reflectionShadow > 0,
+    };
   }
 
   /** How the tube tear stands, for tests. */
@@ -491,6 +525,7 @@ export class CrtRenderer {
     this.resize(this.canvas.clientWidth || this.canvas.width, this.canvas.clientHeight || this.canvas.height);
 
     this.uploadSource();
+    this.updateReflection(t);
     // With no tear this pass does not run, so an untouched picture costs nothing.
     const picture = this.tube.active ? this.tube.render(this.texture, t) : this.texture;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -507,6 +542,8 @@ export class CrtRenderer {
     this.uploadUniforms(uniforms);
 
     // Source texture on unit 0.
+    gl.activeTexture(gl.TEXTURE0 + REFLECTION_UNIT);
+    gl.bindTexture(gl.TEXTURE_2D, this.reflectionTexture);
     gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNIT);
     gl.bindTexture(gl.TEXTURE_2D, picture);
 
@@ -522,6 +559,7 @@ export class CrtRenderer {
     this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored);
     const gl = this.gl;
     this.tube.dispose();
+    gl.deleteTexture(this.reflectionTexture);
     gl.deleteTexture(this.texture);
     gl.deleteVertexArray(this.vao);
     gl.deleteProgram(this.program);
@@ -587,7 +625,7 @@ export class CrtRenderer {
     const names = [
       'uSource', 'uResolution', 'uTime', 'uCurvature', 'uScanline', 'uMask',
       'uBloom', 'uAberration', 'uNoise', 'uVignette', 'uRoll', 'uTear',
-      'uCollapse', 'uStatic', 'uPower',
+      'uCollapse', 'uStatic', 'uPower', 'uReflection', 'uReflAmount', 'uReflShadow',
     ];
     for (const name of names) {
       this.locations.set(name, gl.getUniformLocation(this.program, name));
@@ -609,6 +647,29 @@ export class CrtRenderer {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
   }
 
+  /** Ease the reflection, and send this frame of the video to its texture only. */
+  private updateReflection(t: number): void {
+    const gl = this.gl;
+    const dt = Math.max(0, t - this.lastFrameMs);
+    this.lastFrameMs = t;
+    // Not while the picture is collapsing or warming up: the tube is not dark yet.
+    const target = this.envelopePhase === 'idle' ? this.reflectionTarget : 0;
+    const step = Math.min(1, dt / REFLECTION_EASE_MS);
+    this.reflectionNow += (target - this.reflectionNow) * step;
+    if (target === 0 && this.reflectionNow < 0.005) this.reflectionNow = 0;
+    this.transient.reflAmount = this.reflectionNow;
+    this.transient.reflShadow = this.reflectionShadow;
+    const video = this.reflectionVideo;
+    if (this.reflectionNow > 0 && video && video.readyState >= 2 && video.videoWidth > 0) {
+      gl.activeTexture(gl.TEXTURE0 + REFLECTION_UNIT);
+      gl.bindTexture(gl.TEXTURE_2D, this.reflectionTexture);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNIT);
+    }
+  }
+
   private isSourceReady(source: CrtSource): boolean {
     if (source instanceof HTMLVideoElement) {
       // readyState >= HAVE_CURRENT_DATA (2) means a frame is available.
@@ -628,6 +689,8 @@ export class CrtRenderer {
     // Sampler always on unit 0.
     const sourceLoc = this.locations.get('uSource');
     if (sourceLoc) gl.uniform1i(sourceLoc, TEXTURE_UNIT);
+    const reflectionLoc = this.locations.get('uReflection');
+    if (reflectionLoc) gl.uniform1i(reflectionLoc, REFLECTION_UNIT);
 
     for (const [name, value] of Object.entries(packed)) {
       const loc = this.locations.get(name);

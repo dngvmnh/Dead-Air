@@ -6,6 +6,7 @@ import { RearPanel } from './RearPanel.tsx';
 import { HauntedDecor } from './HauntedDecor.tsx';
 import { channelLabel } from '../../core/channels.ts';
 import { type TelevisionApi } from '../../app/useTelevision.ts';
+import { useReflection } from '../../app/useReflection.ts';
 
 /**
  * The television cabinet: bezel + tube opening, the control panel, and the rear
@@ -19,6 +20,13 @@ export interface ChassisProps {
 
 export function Chassis({ tv, powerRef }: ChassisProps) {
   const label = channelLabel(tv.state.channel);
+  const reflection = useReflection({
+    phase: tv.state.phase,
+    scriptedSilence: tv.scriptedSilence,
+    surface: tv.surface,
+    getRenderer: tv.getRenderer,
+    getAct: tv.getAct,
+  });
 
   return (
     <div className={styles.chassis}>
@@ -49,7 +57,13 @@ export function Chassis({ tv, powerRef }: ChassisProps) {
         onToggleCaptions={tv.toggleCaptions}
       />
 
-      <RearPanel onForgetMe={tv.forgetMe} />
+      <RearPanel
+        onForgetMe={() => {
+          reflection.off();
+          tv.forgetMe();
+        }}
+        reflection={reflection}
+      />
     </div>
   );
 }

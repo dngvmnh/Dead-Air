@@ -99,6 +99,9 @@ export function Remote({
           aria-label="Volume"
           aria-valuetext={`${Math.round(settings.volume * 100)} percent`}
         />
+      </div>
+
+      <div className={styles.toggles}>
         <button
           type="button"
           className={`${styles.button} ${styles.toggle}`}
@@ -107,17 +110,16 @@ export function Remote({
         >
           Mute
         </button>
+        <button
+          type="button"
+          className={`${styles.button} ${styles.toggle}`}
+          aria-pressed={settings.captions}
+          onClick={onToggleCaptions}
+          aria-label="Closed captions"
+        >
+          CC
+        </button>
       </div>
-
-      <button
-        type="button"
-        className={`${styles.button} ${styles.toggle}`}
-        aria-pressed={settings.captions}
-        onClick={onToggleCaptions}
-        aria-label="Closed captions"
-      >
-        CC
-      </button>
     </div>
   );
 }

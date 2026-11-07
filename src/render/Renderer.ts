@@ -48,6 +48,14 @@ export interface Renderer {
   resetTubeTear(): boolean;
   /** What is behind the picture: the channel's dark colour, or an image in place of it. */
   setTubeBehind(tint: readonly [number, number, number], image: TexImageSource | null): void;
+  /**
+   * The viewer's reflection in the glass. `video` is only ever uploaded as a texture.
+   * `level` 0 hides it without letting go of the camera; `shadow` adds the fixed
+   * shape from Act 3.
+   */
+  setReflection(video: HTMLVideoElement | null, level: number, shadow?: boolean): void;
+  /** False where there is no shader to show a reflection, so nobody starts a camera. */
+  supportsReflection(): boolean;
   /** Start the per-frame loop. */
   start(now?: number): void;
   /** Stop the per-frame loop. */

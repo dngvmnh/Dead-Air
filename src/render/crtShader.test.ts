@@ -22,6 +22,8 @@ const SAMPLE: CrtUniforms = {
   collapse: 0,
   static: 1,
   power: 1,
+  reflAmount: 0,
+  reflShadow: 0,
 };
 
 describe('CRT shader source', () => {
@@ -65,7 +67,8 @@ describe('CRT shader source', () => {
     expect(FRAGMENT_SHADER_SOURCE).toMatch(/staticNoise\s*\(/);
     expect(FRAGMENT_SHADER_SOURCE).toContain('uStatic');
     const samplers = FRAGMENT_SHADER_SOURCE.match(/uniform\s+sampler2D\s+\w+/g) ?? [];
-    expect(samplers.length).toBe(1); // only uSource
+    // The picture, and the viewer's optional reflection. Neither is a snow texture.
+    expect(samplers.map((s) => s.split(/\s+/).pop())).toEqual(['uSource', 'uReflection']);
   });
 
   it('exposes the transition uniforms tasks 4.2 and 4.3 drive', () => {
@@ -101,7 +104,7 @@ describe('packUniforms', () => {
 
   it('packs a value for every non-sampler uniform name', () => {
     const packed = packUniforms(SAMPLE);
-    const expected = UNIFORM_NAMES.filter((n) => n !== 'uSource');
+    const expected = UNIFORM_NAMES.filter((n) => n !== 'uSource' && n !== 'uReflection');
     expect(Object.keys(packed).sort()).toEqual([...expected].sort());
   });
 });

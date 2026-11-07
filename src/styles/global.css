@@ -62,3 +62,11 @@ body {
   );
   box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.7);
 }
+
+/* A small window cannot hold the whole set. The rear panel must still be reachable. */
+@media (max-width: 768px), (max-height: 660px) {
+  body {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+}
