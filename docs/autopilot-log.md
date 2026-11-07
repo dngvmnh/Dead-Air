@@ -1161,3 +1161,16 @@ the unlit plaster was the brightest thing on screen.
 - Objects: frame tilts, bowl empties, garland comes down.
 - Found while here: the wall clock was baked once at load and then stayed wrong. The wall
   now rebakes when the minute changes (requirement 5.1).
+
+## Task 9: Tube tear (2026-11-07)
+
+- The picture tears in a pass ahead of the CRT shader (`render/tubeTear.ts`), 640x480,
+  skipped until there is a tear. So it bends and scans with the programme.
+- Handlers exist on the tube canvas only while our own picture is on air. On a YouTube
+  surface, in an event and in the sign-off there is no sheet input and no listener.
+  The YouTube adapter does not exist yet, so the test forces the surface state.
+- A tune mends it under the static. An item boundary mends it with a short burst.
+- Behind the picture: the channel's own dark. On 13 from Act 2, the viewer's wall.
+- The first tear of a session answers whether it is on the wall or the picture.
+- Spec change: `resetTubeTear` returns whether there was damage, and `setTubeBehind` is
+  added to the `Renderer`. Mesh code shared with the wall moved to `sheetMesh.ts`.

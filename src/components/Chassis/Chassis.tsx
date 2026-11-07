@@ -29,6 +29,9 @@ export function Chassis({ tv, powerRef }: ChassisProps) {
           channelLabel={label}
           reducedEffects={tv.settings.reducedEffects}
           onRendererReady={tv.registerRenderer}
+          tubeTearable={tv.tubeTearable}
+          onTubeRip={(speed) => tv.getAudio().playRip(speed)}
+          onTubeTearEnd={tv.onTearEnd}
         />
       </div>
       <p className={styles.brand}>KDA · DEAD AIR</p>

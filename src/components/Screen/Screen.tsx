@@ -38,6 +38,12 @@ export interface ScreenProps {
    * Screen still owns the renderer's lifecycle and phase-driven envelopes.
    */
   onRendererReady?: (renderer: Renderer | null) => void;
+  /** Our own picture is on the tube with nothing written on it, so it may be torn. */
+  tubeTearable?: boolean;
+  /** The picture just ripped, at this speed, 0..1. */
+  onTubeRip?: (speed: number) => void;
+  /** The viewer let go of a tear in the picture. */
+  onTubeTearEnd?: () => void;
 }
 
 /**
@@ -66,7 +72,7 @@ function steadyDrive(phase: TvPhase): { power: number; static: number } {
   }
 }
 
-export function Screen({ phase, channelLabel, reducedEffects, onRendererReady }: ScreenProps) {
+export function Screen({ phase, channelLabel, reducedEffects, onRendererReady, tubeTearable = false, onTubeRip, onTubeTearEnd }: ScreenProps) {
   const off = phase === 'OFF';
   void channelLabel; // the LED on the chassis is the channel indicator, not the tube
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -117,6 +123,76 @@ export function Screen({ phase, channelLabel, reducedEffects, onRendererReady }:
   useEffect(() => {
     rendererRef.current?.setReducedEffects(reducedEffects);
   }, [reducedEffects]);
+
+  // The picture's tear (requirement 2). Handlers exist only while it may be torn,
+  // so a YouTube surface never has one anywhere near it. On the canvas only, and no
+  // style beyond cursor and touch handling goes on it: effects stay in the shader.
+  const ripRef = useRef(onTubeRip);
+  const tearEndRef = useRef(onTubeTearEnd);
+  useEffect(() => {
+    ripRef.current = onTubeRip;
+    tearEndRef.current = onTubeTearEnd;
+  }, [onTubeRip, onTubeTearEnd]);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const renderer = rendererRef.current;
+    if (!tubeTearable || !canvas || !renderer) return;
+    renderer.setTubeTearEnabled(true);
+    canvas.style.touchAction = 'none';
+    canvas.style.cursor = 'grab';
+    const held = new Map<number, { x: number; y: number; t: number; cut: boolean }>();
+    const at = (e: PointerEvent): { x: number; y: number } => {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) / Math.max(1, r.width), y: (e.clientY - r.top) / Math.max(1, r.height) };
+    };
+    const onDown = (e: PointerEvent): void => {
+      renderer.tubePointer({ id: e.pointerId, kind: 'down', ...at(e) });
+      held.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp, cut: false });
+      try {
+        canvas.setPointerCapture?.(e.pointerId);
+      } catch {
+        // The pointer ended before the browser could capture it.
+      }
+      e.preventDefault();
+    };
+    const onMove = (e: PointerEvent): void => {
+      const h = held.get(e.pointerId);
+      if (!h) return;
+      const cut = renderer.tubePointer({ id: e.pointerId, kind: 'move', ...at(e) });
+      if (cut) {
+        h.cut = true;
+        const dist = Math.hypot(e.clientX - h.x, e.clientY - h.y);
+        ripRef.current?.(Math.min(1, dist / Math.max(1, e.timeStamp - h.t) / 2));
+      }
+      h.x = e.clientX;
+      h.y = e.clientY;
+      h.t = e.timeStamp;
+      e.preventDefault();
+    };
+    const onUp = (e: PointerEvent): void => {
+      const h = held.get(e.pointerId);
+      if (!h) return;
+      renderer.tubePointer({ id: e.pointerId, kind: 'up', ...at(e) });
+      held.delete(e.pointerId);
+      if (h.cut) tearEndRef.current?.();
+    };
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointercancel', onUp);
+    return () => {
+      canvas.removeEventListener('pointerdown', onDown);
+      canvas.removeEventListener('pointermove', onMove);
+      canvas.removeEventListener('pointerup', onUp);
+      canvas.removeEventListener('pointercancel', onUp);
+      canvas.style.touchAction = '';
+      canvas.style.cursor = '';
+      renderer.setTubeTearEnabled(false);
+      // Whatever replaces this picture is not torn: a tune mends it under the
+      // static, and event text must never sit across an old tear.
+      renderer.resetTubeTear();
+    };
+  }, [tubeTearable]);
 
   // Drive the renderer from phase transitions. Boot and shutdown are animated
   // envelopes inside the shader (uPower/uCollapse); tuning holds full static;

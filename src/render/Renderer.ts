@@ -7,6 +7,7 @@
 
 import { type Look } from '../core/types.ts';
 import { type CrtSource } from './CrtRenderer.ts';
+import { type TubePointerInput } from './tubeTear.ts';
 
 export interface Renderer {
   /** Choose the resting look preset for the current source. */
@@ -39,6 +40,14 @@ export interface Renderer {
    * never reads from a YouTube player. Returns true if the flash was permitted.
    */
   flashPrevious(ms: number, nowMs: number, stationCardLabel?: string): boolean;
+  /** Allow or refuse tube tears. Refusing drops anything held and keeps the damage. */
+  setTubeTearEnabled(enabled: boolean): void;
+  /** Drive the tube tear from a pointer on the canvas. Returns true if this cut anything. */
+  tubePointer(e: TubePointerInput): boolean;
+  /** Mend the picture. Returns true if it had any damage. */
+  resetTubeTear(): boolean;
+  /** What is behind the picture: the channel's dark colour, or an image in place of it. */
+  setTubeBehind(tint: readonly [number, number, number], image: TexImageSource | null): void;
   /** Start the per-frame loop. */
   start(now?: number): void;
   /** Stop the per-frame loop. */

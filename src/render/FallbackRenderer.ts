@@ -17,6 +17,7 @@
 import { type Look } from '../core/types.ts';
 import { type CrtSource } from './CrtRenderer.ts';
 import { type Renderer } from './Renderer.ts';
+import { type TubePointerInput } from './tubeTear.ts';
 import { bootDrive, isComplete, shutdownDrive, type EnvelopePhase } from './envelope.ts';
 import { cappedResolution } from './looks.ts';
 import { drawStationCard } from './overlayRenderer.ts';
@@ -122,6 +123,30 @@ export class FallbackRenderer implements Renderer {
     // The flash window is measured on the renderer's own clock (render loop).
     this.flashUntilMs = nowMs() + Math.max(0, ms);
     return true;
+  }
+
+  // No shader, so no tube tear: the picture simply will not rip on this path.
+  setTubeTearEnabled(_enabled: boolean): void {
+    void _enabled;
+  }
+
+  tubePointer(_e: TubePointerInput): boolean {
+    void _e;
+    return false;
+  }
+
+  resetTubeTear(): boolean {
+    return false;
+  }
+
+  setTubeBehind(_tint: readonly [number, number, number], _image: TexImageSource | null): void {
+    void _tint;
+    void _image;
+  }
+
+  /** The same answers a test can ask of the CRT, for a path with no tear at all. */
+  tubeStats(): { enabled: boolean; active: boolean; broken: number; behindImage: boolean } {
+    return { enabled: false, active: false, broken: 0, behindImage: false };
   }
 
   startBoot(durationMs: number, onDone?: () => void): void {

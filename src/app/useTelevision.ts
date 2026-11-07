@@ -28,6 +28,8 @@ import { deriveRoom, type RoomState } from '../core/roomState.ts';
 import { deriveBehind, type BehindView } from '../core/behindState.ts';
 import { keepsProgramme, nextStartleDelay, SURF_MIN_GAP_MS, SURF_SETTLE_MS, SURF_TRIGGER, TEAR_ANSWER_CHANCE } from '../core/startle.ts';
 import { playJump } from '../render/jumpScare.ts';
+import { bakeRoom } from '../render/roomWallpaper.ts';
+import { paintFigure } from '../render/figureShadow.ts';
 import { preloadJumps } from '../render/jumpBake.ts';
 import { FileAdapter } from '../playback/FileAdapter.ts';
 import { hush, say, spokenMs } from '../audio/speech.ts';
@@ -100,6 +102,8 @@ export interface TelevisionApi {
   registerRoom: (handle: RoomEffects | null) => void;
   /** The viewer just finished a tear. */
   onTearEnd: () => void;
+  /** Our own picture is up and may be torn (requirement 2). */
+  tubeTearable: boolean;
 }
 
 /** The sound under each channel's original programmes. Films bring their own. */
@@ -133,6 +137,16 @@ const DEFAULT_SETTINGS: UiSettings = {
   reducedEffects: false,
 };
 
+/** The dark behind each channel's picture, in that channel's colour. */
+const TUBE_DARK: Record<ChannelId, readonly [number, number, number]> = {
+  2: [0.5, 0.62, 0.95],
+  4: [0.95, 0.72, 0.4],
+  7: [0.55, 0.9, 0.6],
+  13: [0.7, 0.68, 0.66],
+};
+/** How long a boundary's burst of static takes to carry off a torn picture. */
+const MEND_STATIC_MS = 180;
+
 /** A scripted room this dark counts as nobody being able to see it. */
 const BLACKOUT_LEVEL = 0.1;
 /** How far the lights sink, and how fast, to cover something moving during a tune. */
@@ -160,6 +174,9 @@ export function useTelevision(): TelevisionApi {
     reducedEffects: prefersReducedMotion(),
   }));
   const [announcement, setAnnouncement] = useState('');
+  // What the current source draws on: our canvas, or (once one exists) a player
+  // we may never touch. Nothing tears unless this says canvas (requirement 2.2).
+  const [surface, setSurface] = useState<'canvas' | 'youtube' | null>(null);
 
   // Effects must be computed from the latest committed state. This ref tracks
   // it so a sequence of actions across separate renders (e.g. rapid surfing)
@@ -623,6 +640,14 @@ export function useTelevision(): TelevisionApi {
     rendererRef.current = renderer;
   }, []);
 
+  // The picture may be torn only while the programme itself is up: not under event
+  // text or the sign-off, which are other phases, and never on a player.
+  const tubeTearable = state.phase === 'ON_AIR' && surface === 'canvas';
+  const tubeTearableRef = useRef(tubeTearable);
+  useEffect(() => {
+    tubeTearableRef.current = tubeTearable;
+  }, [tubeTearable]);
+
   // Test seam: expose the live channel and the clock-resolved broadcast
   // position so the mocked-clock continuity e2e (task 11) can prove the
   // programme advanced with wall-clock time across a leave-and-return.
@@ -646,6 +671,8 @@ export function useTelevision(): TelevisionApi {
           lastEventText: () => string;
           forceMidItem: () => void;
           forceStartle: (id: string) => string | null;
+          forceSurface: (surface: 'canvas' | 'youtube') => void;
+          tubeTearable: () => boolean;
           forceTearAnswer: () => void;
           lastStartle: () => string | null;
           roomEventRunning: () => boolean;
@@ -680,6 +707,9 @@ export function useTelevision(): TelevisionApi {
       // Startles run on real timers and are off under this flag, so the rest of
       // the suite stays deterministic. These fire them on demand.
       forceStartle: (id: string) => fireStartleRef.current('startle', id),
+      // Stands in for a YouTube item until the adapter exists (task 9.3).
+      forceSurface: (s) => setSurface(s),
+      tubeTearable: () => tubeTearableRef.current,
       forceTearAnswer: () => {
         tearRandomRef.current = () => 0;
       },
@@ -712,7 +742,26 @@ export function useTelevision(): TelevisionApi {
       const resolved: Resolved | null = resolveBroadcast(ch, Date.now(), (item) => !deadItemsRef.current.has(item.id));
       if (!resolved) return null;
       // The YouTube adapter is not built yet, so a YouTube item cannot play.
-      if (resolved.item.source === 'youtube') return null;
+      if (resolved.item.source === 'youtube') {
+        setSurface('youtube');
+        return null;
+      }
+      setSurface('canvas');
+      // Behind the picture, this channel's dark. On 13 from Act 2, the viewer's own
+      // wall, so the picture seems to be a hole in the set.
+      {
+        const m = memoryRef.current;
+        let wall: HTMLCanvasElement | null = null;
+        if (channel === 13 && m.act >= 2) {
+          try {
+            const d = new Date();
+            wall = paintFigure(bakeRoom(d.getHours(), d.getMinutes(), m.room.objectVariant).canvas, m.room.figureStep);
+          } catch {
+            wall = null; // no 2D context: it keeps the channel's dark.
+          }
+        }
+        rendererRef.current?.setTubeBehind(TUBE_DARK[channel], wall);
+      }
       const itemId = resolved.item.id;
       const isFilm = resolved.item.source === 'file';
       const hasOwnSound = resolved.item.source === 'file' && !SILENT_FILMS.has(resolved.item.url);
@@ -1170,8 +1219,14 @@ export function useTelevision(): TelevisionApi {
           }
           case 'reResolve': {
             // An item ended (or an event finished): re-resolve the clock and
-            // play the next item without user action (requirement 3.3).
+            // play the next item without user action (requirement 3.3). A torn
+            // picture does not survive the boundary: it goes through a burst of
+            // static (requirement 2.3).
             audioRef.current?.setStatic(0.08);
+            if (rendererRef.current?.resetTubeTear()) {
+              rendererRef.current.setStatic(0.85);
+              setTimeout(() => rendererRef.current?.setStatic(RESTING_STATIC), MEND_STATIC_MS);
+            }
             playFromClock(effect.channel, effect.token);
             break;
           }
@@ -1448,6 +1503,7 @@ const forgetMe = useCallback(() => {
       onStroke,
       registerRoom,
       onTearEnd,
+      tubeTearable,
     }),
     [
       state,
@@ -1470,6 +1526,7 @@ const forgetMe = useCallback(() => {
       onStroke,
       registerRoom,
       onTearEnd,
+      tubeTearable,
     ],
   );
 }

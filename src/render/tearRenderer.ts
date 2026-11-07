@@ -19,6 +19,7 @@
  */
 
 import type { TearSheet } from '../core/tearSheet.ts';
+import { buildSheetMesh, liveTriangles, markStretched, type SheetMesh } from './sheetMesh.ts';
 
 /** Shared light model, so paper and what is behind it sit in the same room. */
 const ROOM_LIGHT = `
@@ -36,7 +37,7 @@ float roomLit(float pool) {
   return (uAmbient * 0.35 + uLightAmount * pool * 1.35) * uLevel;
 }`;
 
-const NOISE = `
+export const NOISE = `
 float hash(vec2 p) {
   p = fract(p * vec2(123.34, 456.21));
   p += dot(p, p + 45.32);
@@ -108,7 +109,7 @@ void main() {
 }`;
 
 /** Fills the frame; the fragment shader works from gl_FragCoord. */
-const FULLSCREEN_VERT = `#version 300 es
+export const FULLSCREEN_VERT = `#version 300 es
 precision highp float;
 void main() {
   vec2 p = vec2((gl_VertexID == 1) ? 3.0 : -1.0, (gl_VertexID == 2) ? 3.0 : -1.0);
@@ -178,7 +179,7 @@ void main() {
   frag = vec4(col, 1.0);
 }`;
 
-const MASK_VERT = `#version 300 es
+export const MASK_VERT = `#version 300 es
 precision highp float;
 layout(location=0) in vec2 aPos;
 uniform vec2 uGrid;
@@ -187,12 +188,12 @@ void main() {
   gl_Position = vec4(n.x * 2.0 - 1.0, 1.0 - n.y * 2.0, 0.0, 1.0);
 }`;
 
-const MASK_FRAG = `#version 300 es
+export const MASK_FRAG = `#version 300 es
 precision highp float;
 out vec4 frag;
 void main() { frag = vec4(1.0); }`;
 
-const BLUR_FRAG = `#version 300 es
+export const BLUR_FRAG = `#version 300 es
 precision highp float;
 uniform sampler2D uSrc;
 uniform vec2 uStep;
@@ -211,13 +212,6 @@ const MASK_W = 320;
 const MASK_H = 200;
 /** Light left in the middle of a hole in an ordinary wall. */
 const DEFAULT_HOLE_FLOOR = 0.12;
-/**
- * A surviving triangle stretched past this (relative to rest) is dropped. A node
- * freed by a cut can be pulled far from its neighbours, and the sliver between
- * them would otherwise draw as a long dark spike across the hole.
- */
-const MAX_TRIANGLE_STRETCH = 1.55;
-
 export interface TearGLOptions {
   preserveDrawingBuffer?: boolean;
 }
@@ -308,11 +302,7 @@ export class TearGLRenderer {
   private emissiveSrc: TexImageSource | null = null;
   private glimpseSrc: TexImageSource | null = null;
   private figureSrc: TexImageSource | null = null;
-  /** All triangles as node-index triples (static), and their 3 edge-constraint ids. */
-  private triangles: Int32Array = new Int32Array(0);
-  private triEdges: Int32Array = new Int32Array(0);
-  /** 1 for a triangle currently stretched past MAX_TRIANGLE_STRETCH. */
-  private triStretched: Uint8Array = new Uint8Array(0);
+  private mesh: SheetMesh | null = null;
   private lastBrokenCount = -1;
   private lastStretchedCount = -1;
 
@@ -411,43 +401,8 @@ export class TearGLRenderer {
     this.posArray = new Float32Array(n * 2);
     this.zArray = new Float32Array(n);
 
-    const uv = new Float32Array(n * 2);
-    for (let r = 0; r < rows; r += 1) {
-      for (let c = 0; c < cols; c += 1) {
-        const i = r * cols + c;
-        uv[i * 2] = c / (cols - 1);
-        uv[i * 2 + 1] = r / (rows - 1);
-      }
-    }
-
-    // Map each node pair to its constraint, so a triangle can tell whether any
-    // of its 3 edges has broken.
-    const pairToConstraint = new Map<number, number>();
-    const key = (a: number, b: number): number => (a < b ? a * n + b : b * n + a);
-    const cc = sheet.restLength.length;
-    for (let k = 0; k < cc; k += 1) {
-      pairToConstraint.set(key(sheet.constraints[k * 2]!, sheet.constraints[k * 2 + 1]!), k);
-    }
-    const tris: number[] = [];
-    const edges: number[] = [];
-    const pushTri = (a: number, b: number, c2: number): void => {
-      tris.push(a, b, c2);
-      edges.push(
-        pairToConstraint.get(key(a, b)) ?? -1,
-        pairToConstraint.get(key(b, c2)) ?? -1,
-        pairToConstraint.get(key(a, c2)) ?? -1,
-      );
-    };
-    for (let r = 0; r < rows - 1; r += 1) {
-      for (let c = 0; c < cols - 1; c += 1) {
-        const i = r * cols + c;
-        pushTri(i, i + 1, i + cols);
-        pushTri(i + 1, i + cols + 1, i + cols);
-      }
-    }
-    this.triangles = Int32Array.from(tris);
-    this.triEdges = Int32Array.from(edges);
-    this.triStretched = new Uint8Array(this.triangles.length / 3);
+    const mesh = buildSheetMesh(sheet);
+    this.mesh = mesh;
     this.lastBrokenCount = -1;
     this.lastStretchedCount = -1;
 
@@ -458,7 +413,7 @@ export class TearGLRenderer {
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.bindBuffer(gl.ARRAY_BUFFER, uvBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, uv, gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, mesh.uv, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(1);
     gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0);
     gl.bindBuffer(gl.ARRAY_BUFFER, zBuf);
@@ -466,32 +421,9 @@ export class TearGLRenderer {
     gl.enableVertexAttribArray(2);
     gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 0, 0);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuf);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(this.triangles), gl.DYNAMIC_DRAW);
-    this.indexCount = this.triangles.length;
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(mesh.triangles), gl.DYNAMIC_DRAW);
+    this.indexCount = mesh.triangles.length;
     gl.bindVertexArray(null);
-  }
-
-  /** Rebuild the element buffer, dropping torn and over-stretched triangles. */
-  private rebuildIndex(sheet: TearSheet): void {
-    const gl = this.gl;
-    const live: number[] = [];
-    const triCount = this.triangles.length / 3;
-    for (let t = 0; t < triCount; t += 1) {
-      const e0 = this.triEdges[t * 3]!;
-      const e1 = this.triEdges[t * 3 + 1]!;
-      const e2 = this.triEdges[t * 3 + 2]!;
-      const torn =
-        (e0 >= 0 && sheet.broken[e0] === 1) ||
-        (e1 >= 0 && sheet.broken[e1] === 1) ||
-        (e2 >= 0 && sheet.broken[e2] === 1);
-      if (torn || this.triStretched[t] === 1) continue;
-      live.push(this.triangles[t * 3]!, this.triangles[t * 3 + 1]!, this.triangles[t * 3 + 2]!);
-    }
-    gl.bindVertexArray(this.gpu.vao);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.gpu.indexBuf);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(live), gl.DYNAMIC_DRAW);
-    gl.bindVertexArray(null);
-    this.indexCount = live.length;
   }
 
   /** Upload a 2D canvas/image as the front (paper) texture. */
@@ -675,28 +607,6 @@ export class TearGLRenderer {
     gl.uniform1f(gl.getUniformLocation(program, 'uLevel'), this.level);
   }
 
-  /** Mark triangles stretched too far to draw, returning how many there are. */
-  private markStretched(sheet: TearSheet): number {
-    const { xs, ys } = sheet;
-    const limit2 = MAX_TRIANGLE_STRETCH * MAX_TRIANGLE_STRETCH;
-    const tris = this.triangles;
-    let count = 0;
-    for (let t = 0; t < this.triStretched.length; t += 1) {
-      const a = tris[t * 3]!;
-      const b = tris[t * 3 + 1]!;
-      const c = tris[t * 3 + 2]!;
-      // Each cell splits into triangles with two unit edges and one diagonal,
-      // whose rest length squared is 2.
-      const ab = (xs[a]! - xs[b]!) ** 2 + (ys[a]! - ys[b]!) ** 2;
-      const bc = (xs[b]! - xs[c]!) ** 2 + (ys[b]! - ys[c]!) ** 2;
-      const ac = (xs[a]! - xs[c]!) ** 2 + (ys[a]! - ys[c]!) ** 2;
-      const stretched = Math.max(ab, bc, ac) > 2 * limit2;
-      this.triStretched[t] = stretched ? 1 : 0;
-      if (stretched) count += 1;
-    }
-    return count;
-  }
-
   /** Upload live node positions/z each frame, and rebuild the index on a change. */
   private updateDynamic(sheet: TearSheet): void {
     const gl = this.gl;
@@ -715,11 +625,18 @@ export class TearGLRenderer {
 
     let broken = 0;
     for (let k = 0; k < sheet.broken.length; k += 1) if (sheet.broken[k] === 1) broken += 1;
-    const stretched = this.markStretched(sheet);
+    const mesh = this.mesh;
+    if (!mesh) return;
+    const stretched = markStretched(sheet, mesh);
     if (broken !== this.lastBrokenCount || stretched !== this.lastStretchedCount) {
       this.lastBrokenCount = broken;
       this.lastStretchedCount = stretched;
-      this.rebuildIndex(sheet);
+      const live = liveTriangles(sheet, mesh);
+      gl.bindVertexArray(this.gpu.vao);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.gpu.indexBuf);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, live, gl.DYNAMIC_DRAW);
+      gl.bindVertexArray(null);
+      this.indexCount = live.length;
     }
   }
 

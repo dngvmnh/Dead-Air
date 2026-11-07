@@ -60,10 +60,10 @@ Tick a task only when the behaviour has been seen in a real browser, not because
   - _Requirements: 4.1–4.4_
 - [x] 8. Figure and objects, moving only in unobserved moments, with tests.
   - _Requirements: 5.5, 5.6_
-- [ ] 9. Tube tear
-  - [ ] 9.1 Add the tear pass to `CrtRenderer`, and Renderer API with no-op fallback.
-  - [ ] 9.2 Enable only on `canvas` surfaces. Disable on sign-off and text steps. Reset at tune and boundary.
-  - [ ] 9.3 Add a Playwright test with stub YouTube state proving the tube sheet is disabled and no pointer handler is attached for that source.
+- [x] 9. Tube tear
+  - [x] 9.1 Add the tear pass to `CrtRenderer`, and Renderer API with no-op fallback.
+  - [x] 9.2 Enable only on `canvas` surfaces. Disable on sign-off and text steps. Reset at tune and boundary.
+  - [x] 9.3 Add a Playwright test with stub YouTube state proving the tube sheet is disabled and no pointer handler is attached for that source.
   - _Requirements: 2.1–2.5_
 
 ## Phase D: The turn

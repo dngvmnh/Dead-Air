@@ -43,6 +43,7 @@ import {
 } from './envelope.ts';
 import { FlashLimiter } from './flashLimiter.ts';
 import { drawStationCard } from './overlayRenderer.ts';
+import { TubeTear, type TubePointerInput } from './tubeTear.ts';
 import { type Look } from '../core/types.ts';
 
 /** Options for {@link CrtRenderer.create}. */
@@ -124,9 +125,14 @@ export class CrtRenderer {
   /** Fires once when the active boot/shutdown envelope finishes. */
   private onEnvelopeDone: (() => void) | null = null;
 
+  // --- Tube tear (dead-air-room task 9) --------------------------------------
+  private readonly tube: TubeTear;
+  private tubeEnabled = false;
+
   private constructor(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     this.gl = gl;
     this.canvas = canvas;
+    this.tube = new TubeTear(gl);
     this.program = this.buildProgram();
     this.vao = this.buildVao();
     this.texture = this.buildTexture();
@@ -150,6 +156,7 @@ export class CrtRenderer {
     this.vao = this.buildVao();
     this.texture = this.buildTexture();
     this.cacheLocations();
+    this.tube.contextRestored();
     this.contextLost = false;
   };
 
@@ -256,6 +263,36 @@ export class CrtRenderer {
     if (this.capturedFrame) return this.capturedFrame;
     if (stationCardLabel !== undefined) return makeStationCard(stationCardLabel);
     return null;
+  }
+
+  // --- Tube tear -------------------------------------------------------------
+
+  setTubeTearEnabled(enabled: boolean): void {
+    this.tubeEnabled = enabled;
+    if (!enabled) this.tube.releaseAll();
+  }
+
+  tubePointer(e: TubePointerInput): boolean {
+    if (!this.tubeEnabled) return false;
+    return this.tube.pointer(e, lookPreset(this.look).curvature);
+  }
+
+  resetTubeTear(): boolean {
+    return this.tube.reset();
+  }
+
+  setTubeBehind(tint: readonly [number, number, number], image: TexImageSource | null): void {
+    this.tube.setBehind(tint, image);
+  }
+
+  /** How the tube tear stands, for tests. */
+  tubeStats(): { enabled: boolean; active: boolean; broken: number; behindImage: boolean } {
+    return {
+      enabled: this.tubeEnabled,
+      active: this.tube.active,
+      broken: this.tube.brokenCount(),
+      behindImage: this.tube.hasImage(),
+    };
   }
 
   // --- Transitions (task 4.2) ----------------------------------------------
@@ -452,9 +489,11 @@ export class CrtRenderer {
 
     // Keep the buffer at the capped resolution for the canvas's CSS box.
     this.resize(this.canvas.clientWidth || this.canvas.width, this.canvas.clientHeight || this.canvas.height);
-    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
     this.uploadSource();
+    // With no tear this pass does not run, so an untouched picture costs nothing.
+    const picture = this.tube.active ? this.tube.render(this.texture, t) : this.texture;
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
@@ -469,7 +508,7 @@ export class CrtRenderer {
 
     // Source texture on unit 0.
     gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNIT);
-    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    gl.bindTexture(gl.TEXTURE_2D, picture);
 
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -482,6 +521,7 @@ export class CrtRenderer {
     this.canvas.removeEventListener('webglcontextlost', this.handleContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored);
     const gl = this.gl;
+    this.tube.dispose();
     gl.deleteTexture(this.texture);
     gl.deleteVertexArray(this.vao);
     gl.deleteProgram(this.program);
