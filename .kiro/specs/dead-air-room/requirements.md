@@ -99,7 +99,7 @@ The goal for a judge: within 30 seconds they have discovered the tear without be
 #### Acceptance Criteria
 
 1. THE SYSTEM SHALL request the camera only after the viewer switches on the Reflection control on the rear panel, never on load, and never from an event.
-2. BEFORE the browser prompt THE control SHALL state plainly that the image stays on this device and nothing is recorded or sent.
+2. BEFORE the browser prompt THE control SHALL state plainly that it uses the camera, that the image stays on this device, and that nothing is recorded or sent. It need not say what the glass will show (the owner, 2026-11-07).
 3. THE SYSTEM SHALL show the reflection only as a darkened, low-contrast image in the tube glass while the tube is dark: when the TV is off, and during scripted silence on owned sources.
 4. WHILE a YouTube item is on screen or the sign-off text is showing THE SYSTEM SHALL NOT draw the reflection.
 5. THE SYSTEM SHALL NOT analyse, detect, save, upload, or read back camera frames, and SHALL NOT mention what the camera sees.
@@ -158,3 +158,8 @@ Short, frequent scares that keep the viewer on edge and then return to normal. T
 11. The programme SHALL be louder than the set's own noises and cues. A jump SHALL be louder than the programme, SHALL cut the programme and those noises while it sounds, and SHALL still obey mute and the volume control.
 8. The system's reduced-motion setting SHALL halve startle sound levels and remove the full-window picture. The set has no button of its own for this, at the owner's request (2026-11-07). The first-run notice SHALL warn of jump scares.
 9. The room SHALL carry an in-world hint that the wall can be torn. It SHALL NOT become a tutorial or an objective.
+12. A startle that comes due SHALL wait a few seconds for the viewer to press, tune or tear, and land on that action; if the viewer does nothing it SHALL come anyway. Startles SHALL be at least 8 seconds apart (6 under demo), at most 4 in any minute (5 under demo), and after two in a row set off by the viewer the next SHALL come on the clock (the owner, 2026-11-07).
+
+## Requirement 12: Fullscreen
+
+1. The first click of a visit (the notice's button, or POWER from off) SHALL ask the browser for fullscreen. A refusal SHALL leave the window as it was, and nothing else SHALL depend on it (the owner, 2026-11-07).

@@ -32,7 +32,7 @@ export function RearPanel({ onForgetMe, reflection }: RearPanelProps) {
         <span className={styles.title}>Rear panel</span>
         <span className={styles.lamp} data-testid="refl-lamp" data-lit={lit}>
           <span className={styles.lampDot} aria-hidden="true" />
-          REFL
+          CAM
           <span className="visually-hidden">{lit ? ' camera in use' : ' camera not in use'}</span>
         </span>
       </div>
@@ -43,10 +43,10 @@ export function RearPanel({ onForgetMe, reflection }: RearPanelProps) {
         onClick={reflection.toggle}
         aria-pressed={reflection.status !== 'off'}
       >
-        Reflection {reflection.status === 'off' ? 'off' : 'on'}
+        {reflection.status === 'off' ? 'Let it see you' : 'Look away'}
       </button>
       <p className={styles.copy}>
-        Reflection (optional). Uses your camera to show you in the glass. Stays on this device. Nothing is recorded or
+        It wants to see who is watching. Optional; it uses your camera. Stays on this device. Nothing is recorded or
         sent.
       </p>
       {reflection.message ? (

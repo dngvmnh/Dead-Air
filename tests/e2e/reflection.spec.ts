@@ -78,7 +78,7 @@ async function open(page: Page, seed = memory(), refuse?: string): Promise<void>
   await page.waitForFunction(() => (window as unknown as Win).__crt && (window as unknown as Win).__tv);
 }
 
-const control = (page: Page) => page.getByRole('button', { name: /reflection/i });
+const control = (page: Page) => page.getByRole('button', { name: /let it see you|look away/i });
 const lamp = (page: Page) => page.getByTestId('refl-lamp');
 const stats = (page: Page) => page.evaluate(() => (window as unknown as Win).__crt.reflectionStats());
 const asks = (page: Page) => page.evaluate(() => (window as unknown as Win).__gum);
@@ -114,7 +114,7 @@ test.describe('the reflection', () => {
     await page.waitForTimeout(800);
     expect(await asks(page)).toBe(0);
     await expect(lamp(page)).toHaveAttribute('data-lit', 'false');
-    await expect(page.getByText('Stays on this device. Nothing is recorded or sent.')).toBeVisible();
+    await expect(page.getByText(/Stays on this device\. Nothing is recorded or sent\./)).toBeVisible();
     await page.getByRole('button', { name: /^power$/i }).click();
     await page.waitForFunction(() => (window as unknown as Win).__tv.phase() === 'ON_AIR', undefined, { timeout: 15000 });
     expect(await asks(page)).toBe(0);

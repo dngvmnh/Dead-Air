@@ -7,6 +7,14 @@
  */
 
 import type { StoredStroke } from '../core/memory.ts';
+import { bakeWallpaper } from './roomWallpaper.ts';
+
+// Plain paper to cut the misplaced square from, one per wall size.
+let paperCache: { w: number; h: number; canvas: HTMLCanvasElement } | null = null;
+function plainPaper(w: number, h: number): HTMLCanvasElement {
+  if (!paperCache || paperCache.w !== w || paperCache.h !== h) paperCache = { w, h, canvas: bakeWallpaper(w, h).canvas };
+  return paperCache.canvas;
+}
 
 function seeded(seed: number): () => number {
   let a = seed >>> 0;
@@ -25,7 +33,7 @@ function tracePath(ctx: CanvasRenderingContext2D, pts: ReadonlyArray<readonly [n
   ctx.stroke();
 }
 
-function paintRepair(ctx: CanvasRenderingContext2D, base: HTMLCanvasElement, stroke: StoredStroke, W: number, H: number): void {
+function paintRepair(ctx: CanvasRenderingContext2D, paper: HTMLCanvasElement, stroke: StoredStroke, W: number, H: number): void {
   const rnd = seeded(stroke.seed);
   const pts = stroke.points.map(([x, y]) => [x * W, y * H] as const);
 
@@ -44,7 +52,8 @@ function paintRepair(ctx: CanvasRenderingContext2D, base: HTMLCanvasElement, str
   ctx.lineWidth = 1;
   tracePath(ctx, jagged, 2, 1.5);
 
-  // One piece of the wall, from somewhere else, put back here.
+  // One piece of the wall, from somewhere else, put back here. Cut from plain paper,
+  // never from the room as drawn, or it could carry a scrap of the note or a frame.
   const [mx, my] = pts[Math.floor(pts.length / 2)]!;
   const size = 62 + rnd() * 44;
   const sx = rnd() * Math.max(1, W - size);
@@ -67,7 +76,7 @@ function paintRepair(ctx: CanvasRenderingContext2D, base: HTMLCanvasElement, str
   ctx.fill();
   ctx.shadowColor = 'transparent';
   ctx.clip();
-  ctx.drawImage(base, sx, sy, size * 1.3, size * 1.3, -size * 0.65, -size * 0.65, size * 1.3, size * 1.3);
+  ctx.drawImage(paper, sx, sy, size * 1.3, size * 1.3, -size * 0.65, -size * 0.65, size * 1.3, size * 1.3);
   ctx.restore();
 
   // Tape, every so often, at whatever angle was easiest. Added last, because it
@@ -103,6 +112,7 @@ export function paintRepairs(base: HTMLCanvasElement, strokes: readonly StoredSt
   const ctx = out.getContext('2d');
   if (!ctx) return base;
   ctx.drawImage(base, 0, 0);
-  for (const stroke of strokes) paintRepair(ctx, base, stroke, out.width, out.height);
+  const paper = strokes.length > 0 ? plainPaper(out.width, out.height) : base;
+  for (const stroke of strokes) paintRepair(ctx, paper, stroke, out.width, out.height);
   return out;
 }

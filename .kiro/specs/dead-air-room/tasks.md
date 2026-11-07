@@ -92,3 +92,13 @@ Tick a task only when the behaviour has been seen in a real browser, not because
   - [x] 13.2 Confirm full gate from a clean clone: `npm ci`, then all commands.
   - [x] 13.3 Do not deploy. Report final hash, results, and everything unverified. Hosting is set up by a person.
   - _Requirements: 10.1–10.4_
+
+## Phase G: Owner changes after the release check (2026-11-07)
+
+- [x] 14. Startles that answer the viewer
+  - [x] 14.1 Pure pacer with unit and property tests: lands on press, tune, tear; still comes when idle; gap, cap and streak hold.
+  - [x] 14.2 Wire it in, with a seam to run it under the test flag, and browser tests at real timings.
+  - _Requirements: 11.12_
+- [x] 15. Rear-panel words that do not give the reflection away, still naming the camera. _Requirements: 7.2_
+- [x] 16. Fullscreen on the first click. _Requirements: 12.1_
+- [ ] 17. Deploy, now that the owner has asked for it. Check the live site.

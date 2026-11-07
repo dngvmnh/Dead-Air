@@ -1265,3 +1265,24 @@ Measured on this machine: Intel UHD Graphics (integrated), Chromium with ANGLE D
   reset there. The tube tests now wait for 4 s of item left, and a forced surface holds.
   The earlier `room-screenshots` timeout did not come back in 36 repeated runs.
 - Not deployed. Hosting notes for the person who sets it up: `docs/hosting.md`.
+
+## Tasks 14-16: owner changes (2026-11-07)
+
+- Startles now answer the viewer (`core/startlePacer.ts`). A due startle waits 2.5 to
+  5.5 s for a press, a channel landing or a finished tear, and lands on it: about 60 ms
+  after a click, on the new picture after a tune, a breath after a tear. Keeping still
+  does not help: it comes anyway. Balance: 8 s apart at least, 4 a minute at most, and
+  after two set off by the viewer the next comes on the clock, so nobody learns a rule.
+  A story event cancels the wait and it re-arms after, so nothing lands on its heels.
+- Property test: over random action sequences the gap and cap always hold. An idle
+  viewer still gets 10 to 20 in five minutes.
+- Browser tests run the real pacer at real timings (`startle-pacer.spec.ts`). They check
+  that one fired and when, not which: from Act 1 the director may pick a room startle.
+- Rear panel: "Let it see you" / "Look away", lamp `CAM`, and the words "It wants to see
+  who is watching. Optional; it uses your camera. Stays on this device. Nothing is
+  recorded or sent." They do not give the reflection away and still name the camera
+  before any prompt. The first label wrapped and made the cabinet too tall; shortened.
+- Fullscreen on the first click: the notice's button, or POWER from off. A refusal is
+  ignored. Tests check both.
+- The mended-tear patch is now cut from plain wallpaper, so it can no longer carry a
+  scrap of the note or a frame.

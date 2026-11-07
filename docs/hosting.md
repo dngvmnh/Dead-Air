@@ -26,7 +26,7 @@ off until the viewer clicks the rear panel.
 
 ## Check after deploying
 
-1. No camera prompt on load. Switch Reflection on: one prompt, `REFL` lit, a faint grey
+1. No camera prompt on load. Switch "Let it see you" on: one prompt, `CAM` lit, a faint grey
    mirror image with the set off.
 2. A film plays, and seeking works after a reload, so byte ranges are on.
 3. `/?demo=1` reaches the sign-off inside three and a half minutes.

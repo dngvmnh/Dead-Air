@@ -207,8 +207,8 @@ export interface ReflectionController {
 - `steadyDrive` decides visibility: `OFF` after the shutdown ends, plus scripted `silence` steps on owned sources.
 - Act 3 adds a soft, fixed shadow to the shader, at a fixed place beside the centre. No detection. It is pure theatre.
 - When the tab becomes hidden, stop all tracks and set the control to off. Pressing POWER does not affect the camera.
-- Chassis: a small `REFL` lamp that lights only while a track is live.
-- Rear-panel copy: "Reflection (optional). Uses your camera to show you in the glass. Stays on this device. Nothing is recorded or sent."
+- Chassis: a small `CAM` lamp that lights only while a track is live.
+- Rear-panel switch "Let it see you" (reads "Look away" while on), with the copy: "It wants to see who is watching. Optional; it uses your camera. Stays on this device. Nothing is recorded or sent." The words do not say what the glass will show (the owner, 2026-11-07), but they do say the camera is used and that nothing leaves the device, before any prompt.
 
 **Hosting:** `Permissions-Policy: camera=(self), microphone=(), geolocation=()`.
 
@@ -232,3 +232,24 @@ Rip: filtered noise burst with envelope following drag speed, plus a short low t
 | Reflection with no face analysis | Almost all the fear at almost no privacy or bundle cost | MediaPipe: big, and makes it surveillance |
 | E13 data-driven | Project rule: horror is data | Bespoke code path |
 | No HTML-in-canvas | Trial only, and not cross-browser | Would have let real DOM tear |
+
+## Startle pacer (requirement 11.12, owner request 2026-11-07)
+
+`core/startlePacer.ts`, pure, wired in `useTelevision`. The clock still makes a startle
+due at the same intervals. When one is due it waits 2.5 to 5.5 s for the viewer: a press
+anywhere in the set or the room (not POWER, the channel buttons or the rear panel), a
+channel landing, or a finished tear on the wall or the picture. It lands on the action:
+60 ms after a press, 700 ms after a landing (the new picture), 250 ms after a tear. With
+no action it comes anyway. Between due times, two landings, a tear (first always, then
+60%), or rarely a press after a quiet spell (at most 20%, rising over 12 s after the gap)
+can set one off.
+
+Balance: never two within 8 s (6 s demo), at most 4 a minute (5 demo), and after two in
+a row set off by the viewer the next comes on the clock. A story event or hidden tab
+cancels the wait; it re-arms 1.5 s after the programme is back. The director can still
+refuse; the pacer then tries again in 1.5 s.
+
+## Fullscreen (owner request 2026-11-07)
+
+`app/fullscreen.ts`. The first click (the notice's "I understand", or POWER from off)
+asks for fullscreen on the document. A refusal is ignored; Escape leaves as usual.

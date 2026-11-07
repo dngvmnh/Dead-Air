@@ -26,7 +26,8 @@ import { EventPresenter } from '../playback/EventPresenter.ts';
 import { channelInfo as channelInfoLookup } from '../core/channels.ts';
 import { deriveRoom, type RoomState } from '../core/roomState.ts';
 import { deriveBehind, type BehindView } from '../core/behindState.ts';
-import { keepsProgramme, nextStartleDelay, SURF_MIN_GAP_MS, SURF_SETTLE_MS, SURF_TRIGGER, TEAR_ANSWER_CHANCE } from '../core/startle.ts';
+import { keepsProgramme, TEAR_ANSWER_CHANCE } from '../core/startle.ts';
+import { initialPacer, pacerAct, pacerFired, pacerRefused, pacerTick, type PacerAction, type PacerState } from '../core/startlePacer.ts';
 import { playJump } from '../render/jumpScare.ts';
 import { bakeRoom } from '../render/roomWallpaper.ts';
 import { paintFigure } from '../render/figureShadow.ts';
@@ -341,6 +342,10 @@ export function useTelevision(): TelevisionApi {
   const fireStartleRef = useRef<(seam: 'startle' | 'tear', forcedId?: string) => string | null>(() => null);
   const tearRandomRef = useRef<() => number>(Math.random);
   const tearsRef = useRef(0);
+  // The pacer's state while it runs; null while it is off (under the test flag).
+  const pacerRef = useRef<PacerState | null>(null);
+  const pacerActRef = useRef<(action: PacerAction) => void>(() => undefined);
+  const [pacerForced, setPacerForced] = useState(false);
   const dipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
@@ -725,6 +730,8 @@ export function useTelevision(): TelevisionApi {
           tubeTearable: () => boolean;
           itemLeftMs: () => number;
           forceTearAnswer: () => void;
+          runPacer: () => void;
+          pacer: () => PacerState | null;
           lastStartle: () => string | null;
           roomEventRunning: () => boolean;
           visitTotal: () => number;
@@ -769,6 +776,9 @@ export function useTelevision(): TelevisionApi {
         tearRandomRef.current = () => 0;
       },
       lastStartle: () => lastStartleRef.current,
+      // Run the real pacer under the test flag, to check when startles land.
+      runPacer: () => setPacerForced(true),
+      pacer: () => pacerRef.current,
       roomEventRunning: () => roomEventRunningRef.current,
       // Total recorded visits across channels, read from live memory (not
       // localStorage, which is throttled), so a test can assert tune-complete
@@ -1066,60 +1076,103 @@ export function useTelevision(): TelevisionApi {
     runRoomEventRef.current = runRoomEvent;
   }, [fireStartle, runRoomEvent]);
 
-  // The startle clock. It only asks; `fireStartle` decides. It starts counting at
-  // the first picture, not at page load, and channel-hopping brings it forward,
-  // because a viewer flicking through channels is looking for something to happen.
-  // It stays off under the test flag, where the suite drives startles itself.
+  // The startle pacer (requirement 11.12). A startle that comes due waits a moment
+  // for the viewer to click, tune or tear, and lands on that; if they keep still it
+  // comes anyway. `core/startlePacer.ts` holds the balance. It counts from the first
+  // picture, not from page load. It stays off under the test flag, where the suite
+  // drives startles itself, unless a test turns it on.
   useEffect(() => {
     const flagged = (window as unknown as { __CRT_PRESERVE_DRAWING_BUFFER__?: boolean }).__CRT_PRESERVE_DRAWING_BUFFER__;
-    if (flagged) {
+    if (flagged && !pacerForced) {
       tearRandomRef.current = () => 1;
       return undefined;
     }
     // Baked ahead, so the first frame of a jump lands on the same beat as the hit.
-    const stopBaking = preloadJumps();
-    let dueAt: number | null = null;
-    let surfs = 0;
-    let lastAskedAt = 0;
+    const stopBaking = flagged ? () => undefined : preloadJumps();
+    pacerRef.current = initialPacer();
+    const pending = new Set<ReturnType<typeof setTimeout>>();
+    const ctx = () => ({ now: Date.now(), random: Math.random, demo });
+    const live = (): boolean => {
+      const { phase, channel } = stateRef.current;
+      return phase === 'ON_AIR' && channel !== null && !document.hidden;
+    };
+    const fire = (byViewer: boolean, seam: 'startle' | 'tear'): void => {
+      const pacer = pacerRef.current;
+      if (!pacer || !live()) return;
+      const id = fireStartle(seam);
+      pacerRef.current = id ? pacerFired(pacer, ctx(), byViewer) : pacerRefused(pacer, Date.now());
+    };
+    const schedule = (delayMs: number, byViewer: boolean, seam: 'startle' | 'tear'): void => {
+      if (delayMs <= 0) {
+        fire(byViewer, seam);
+        return;
+      }
+      const t = setTimeout(() => {
+        pending.delete(t);
+        fire(byViewer, seam);
+      }, delayMs);
+      pending.add(t);
+    };
+    pacerActRef.current = (action) => {
+      const pacer = pacerRef.current;
+      if (!pacer || !live()) return;
+      const d = pacerAct(pacer, action, ctx());
+      pacerRef.current = d.state;
+      if (d.fireInMs !== null) schedule(d.fireInMs, true, action === 'tear' ? 'tear' : 'startle');
+    };
     let lastChannel: ChannelId | null = null;
     const timer = setInterval(() => {
       const { phase, channel } = stateRef.current;
-      if (phase !== 'ON_AIR' || channel === null || document.hidden) {
-        if (phase === 'OFF') dueAt = null;
+      if (phase === 'OFF') {
+        pacerRef.current = { ...(pacerRef.current ?? initialPacer()), dueAt: null, armedUntil: null };
+        lastChannel = null;
         return;
       }
-      const now = Date.now();
-      if (lastChannel !== null && channel !== lastChannel) {
-        surfs += 1;
-        if (surfs >= SURF_TRIGGER && now - lastAskedAt >= SURF_MIN_GAP_MS) {
-          surfs = 0;
-          dueAt = now + SURF_SETTLE_MS;
+      if (!pacerRef.current) return;
+      if (!live()) {
+        // A story event or a hidden tab: stop waiting for the viewer, and wait again
+        // afresh once the programme is back, so nothing lands on the event's heels.
+        if (pacerRef.current.armedUntil !== null) {
+          const due = Date.now() + 1500;
+          pacerRef.current = { ...pacerRef.current, armedUntil: null, dueAt: Math.max(pacerRef.current.dueAt ?? due, due) };
         }
-      }
-      lastChannel = channel;
-      if (dueAt === null) {
-        dueAt = now + nextStartleDelay(Math.random, demo, true);
         return;
       }
-      if (now >= dueAt) {
-        fireStartle('startle');
-        lastAskedAt = now;
-        dueAt = now + nextStartleDelay(Math.random, demo, false);
-      }
-    }, 500);
+      if (lastChannel !== null && channel !== lastChannel) pacerActRef.current('tune');
+      lastChannel = channel;
+      const d = pacerTick(pacerRef.current, ctx());
+      pacerRef.current = d.state;
+      if (d.fireInMs !== null) schedule(d.fireInMs, false, 'startle');
+    }, 250);
+    // Any press in the set or the room counts, except the ones that already stop a
+    // startle (power, channel) or belong to the viewer's own settings (rear panel).
+    const onPress = (e: PointerEvent): void => {
+      const target = e.target instanceof Element ? e.target : null;
+      if (target?.closest('[aria-label="Rear panel"], [aria-label="Channel"], [aria-label="Channel up"], [aria-label="Channel down"]')) return;
+      if (target?.closest('button')?.textContent?.trim().toLowerCase() === 'power') return;
+      pacerActRef.current('press');
+    };
+    document.addEventListener('pointerdown', onPress, true);
     return () => {
       stopBaking();
       clearInterval(timer);
+      for (const t of pending) clearTimeout(t);
+      document.removeEventListener('pointerdown', onPress, true);
+      pacerActRef.current = () => undefined;
+      pacerRef.current = null;
     };
-  }, [demo, fireStartle]);
+  }, [demo, fireStartle, pacerForced]);
 
   const registerRoom = useCallback((handle: RoomEffects | null) => {
     roomEffectsRef.current = handle;
   }, []);
 
   const onTearEnd = useCallback(() => {
-    // The first tear always answers: it is the moment the viewer finds out the
-    // wall is not just a wall.
+    if (pacerRef.current) {
+      pacerActRef.current('tear');
+      return;
+    }
+    // With the pacer off, the first tear still answers.
     tearsRef.current += 1;
     const chance = tearsRef.current === 1 ? 1 : TEAR_ANSWER_CHANCE;
     if (tearRandomRef.current() < chance) fireStartle('tear');
