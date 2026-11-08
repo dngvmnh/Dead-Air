@@ -36,7 +36,7 @@ inclusion: always
 
 ## Environment
 
-- Work in `C:\Data\Singapore\SMU\Kiroween 2026`, in the native Windows folder. Kiro is a Windows app, so its file tools and terminal must stay on Windows.
+- Work in `C:\Data\Singapore\SMU\Dead Air`, in the native Windows folder. Kiro is a Windows app, so its file tools and terminal must stay on Windows.
 - Never run this project through WSL, `/mnt/c`, or `\\wsl.localhost`. Crossing that boundary has made file tools resolve the wrong paths and terminal commands return no output.
 - The terminal is Windows PowerShell 5.1, set in `.vscode/settings.json`. It has no `&&`, so run commands one at a time and check each result. Don't use `2>&1` on `npm` or `npx`; PowerShell can report failure even when they succeed.
 - Use Windows Node on `PATH`. `node_modules` must be installed from Windows; if native binaries are missing, run `npm ci`.
