@@ -6,6 +6,8 @@ DEAD AIR resurrects linear analog television in the browser. You sit in front of
 
 **Play it:** https://dngvmnh.github.io/Dead-Air/ (desktop Chrome or Edge, sound on). Add `?demo=1` to reach the ending in about three minutes.
 
+**Watch it:** https://youtu.be/5ahST7N6Edg
+
 - **Kiroween category:** Resurrection (primary).
 - **Interaction:** POWER, CH+, CH-, volume. Understood in three seconds.
 - **Backend:** none. Static site, deterministic broadcast clock, local memory.

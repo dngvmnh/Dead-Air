@@ -22,7 +22,7 @@ Resurrection: analog broadcast television, brought back as behaviour, not just a
 - Live: https://dngvmnh.github.io/Dead-Air/ (desktop Chrome or Edge, sound on; `?demo=1` for
   a three-minute run)
 - Code: https://github.com/dngvmnh/Dead-Air
-- Video: **[Team]** link once uploaded
+- Video: https://youtu.be/5ahST7N6Edg
 
 ## Inspiration
 

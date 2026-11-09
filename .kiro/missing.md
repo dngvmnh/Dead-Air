@@ -53,12 +53,11 @@ Needed: the team picks a licence and adds a `LICENSE` file.
 `docs/devpost.md` and `docs/video-plan.md` carry `[Team]` markers:
 
 - Devpost: the "How we used Kiro" section is a draft to rewrite in the team's
-  own words; the video link is a placeholder until the file is uploaded; the
-  "Built with" list may need more tools.
-- Video: a short screen recording of the demo is still to be recorded.
+  own words; the "Built with" list may need more tools.
+- Video: uploaded 2026-11-09, https://youtu.be/5ahST7N6Edg. The link is in
+  `README.md` and `docs/devpost.md`. Done.
 
-Needed: the team writes the final Devpost copy, records and uploads the video,
-and pastes the link.
+Needed: the team writes the final Devpost copy.
 
 ## 6. Host header the deploy cannot set
 
