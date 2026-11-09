@@ -8,6 +8,8 @@ DEAD AIR resurrects linear analog television in the browser. You sit in front of
 
 **Watch it:** https://youtu.be/5ahST7N6Edg
 
+**Built with Kiro and Kiro Crew:** see [docs/KIRO_CREW.md](docs/KIRO_CREW.md).
+
 - **Kiroween category:** Resurrection (primary).
 - **Interaction:** POWER, CH+, CH-, volume. Understood in three seconds.
 - **Backend:** none. Static site, deterministic broadcast clock, local memory.
