@@ -24,6 +24,25 @@ Resurrection: analog broadcast television, brought back as behaviour, not just a
 - Code: https://github.com/dngvmnh/Dead-Air
 - Video: https://youtu.be/5ahST7N6Edg
 
+## Image gallery
+
+Eleven JPEGs in `docs/devpost-gallery/`, 3:2, each under 300 KB (Devpost allows 15, 5 MB
+each). Upload in this order; the first one is the cover in the gallery.
+
+1. `03-ch02-news.jpg`: the set on the news channel. The best first look.
+2. `07-wall-torn-act0.jpg`: the wallpaper torn, with something behind it.
+3. `09-picture-torn.jpg`: the picture on the tube torn, programme still playing.
+4. `10-jump-scare.jpg`: a jump scare, the first painted frame.
+5. `11-sign-off.jpg`: the fixed sign-off text.
+6. `08-wall-torn-act3.jpg`: the same wall in Act 3, darker, with a shape on the right.
+7. `06-ch13-dead-air.jpg`: channel 13.
+8. `04-ch04-pumpkin-hour.jpg`: the children's hour.
+9. `05-ch07-shopping.jpg`: the shopping channel.
+10. `02-room-set-off.jpg`: the room with the set off.
+11. `01-warning-notice.jpg`: the first-run warning.
+
+Captured by a throwaway Playwright script on real WebGL at 1500x1000.
+
 ## Inspiration
 
 Broadcast television was something you tuned into, not something you chose from a menu.
