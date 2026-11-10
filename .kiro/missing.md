@@ -48,16 +48,16 @@ the specs are part of the submission and should be covered too.
 
 Needed: the team picks a licence and adds a `LICENSE` file.
 
-## 5. Devpost and video decisions are still open
+## 5. Devpost and video (SUBMITTED 2026-11-10)
 
-`docs/devpost.md` and `docs/video-plan.md` carry `[Team]` markers:
+The Devpost entry was submitted on 2026-11-10.
 
-- Devpost: the "How we used Kiro" section is a draft to rewrite in the team's
-  own words; the "Built with" list may need more tools.
 - Video: uploaded 2026-11-09, https://youtu.be/5ahST7N6Edg. The link is in
   `README.md` and `docs/devpost.md`. Done.
+- Gallery images: `docs/devpost-gallery`. Done.
+- Kiro usage text and Kiro Crew bonus text: `docs/KIRO_CREW.md`. Done.
 
-Needed: the team writes the final Devpost copy.
+Needed: nothing. Any leftover `[Team]` markers in `docs/devpost.md` are history.
 
 ## 6. Host header the deploy cannot set
 
